@@ -10,7 +10,9 @@ import pytest
 import respx
 from fastmcp import Client
 
+import server
 import wallet_client
+from memory_store import MemoryStore
 from server import mcp
 
 PROXY = wallet_client.WALLET_PROXY_BASE_URL
@@ -110,3 +112,49 @@ async def test_tool_returns_structured_error_on_source_failure():
         result = await client.call_tool("get_wallet_summary", {})
     payload = result.data
     assert payload["error"]["code"] == "source_unavailable"
+
+
+class TestGetSessionContext:
+    """T022 — contract of the session bootstrap tool and memory error mapping."""
+
+    async def test_returns_digest_shape_with_fresh_memory(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(server, "memory", MemoryStore(str(tmp_path / "memory.json")))
+        async with Client(mcp) as client:
+            result = await client.call_tool("get_session_context", {})
+        payload = result.data
+        assert payload["memory_status"] == "ok"
+        assert payload["triggered_alerts"] == []
+        digest = payload["memory"]
+        assert set(digest) >= {"wallet_goal", "theses", "rules", "pending_decisions", "recent_insights"}
+
+    async def test_invalid_params_and_not_found_mapping(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(server, "memory", MemoryStore(str(tmp_path / "memory.json")))
+        async with Client(mcp) as client:
+            bad_kind = (await client.call_tool("log_decision", {"kind": "nonsense", "content": "x"})).data
+            assert bad_kind["error"]["code"] == "invalid_params"
+            missing = (
+                await client.call_tool("record_decision_outcome", {"decision_id": 999, "outcome": "accepted"})
+            ).data
+            assert missing["error"]["code"] == "not_found"
+
+    async def test_corrupted_memory_reports_unavailable_and_data_tools_still_work(
+        self, tmp_path, monkeypatch
+    ):
+        broken = tmp_path / "memory.json"
+        broken.write_text("{corrupt", encoding="utf-8")
+        monkeypatch.setattr(server, "memory", MemoryStore(str(broken)))
+
+        async with Client(mcp) as client:
+            context = (await client.call_tool("get_session_context", {})).data
+            assert context["memory_status"] == "unavailable"
+            assert context["memory"] is None
+
+            save = (await client.call_tool("save_thesis", {"ticker": "PETR4", "text": "x"})).data
+            assert save["error"]["code"] == "memory_unavailable"
+
+            # Data tools keep working while memory is down (spec edge case).
+            with respx.mock:
+                respx.get(f"{PROXY}/summary/metrics/1234567").respond(json=SUMMARY_PAYLOAD)
+                wallet_client.wallet_client._cache.clear()
+                summary = (await client.call_tool("get_wallet_summary", {})).data
+            assert summary["data"] == SUMMARY_PAYLOAD
