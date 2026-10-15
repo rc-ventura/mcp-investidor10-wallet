@@ -52,6 +52,28 @@ class SourceError(Exception):
         return {"error": {"code": self.code, "message": self.message}}
 
 
+VALID_ASSET_TYPES = ("Ticker", "Fii", "EtfInternational", "Treasure", "Crypto")
+
+ASSET_TYPE_ALIASES = {
+    "ticker": "Ticker",
+    "fii": "Fii",
+    "etfinternational": "EtfInternational",
+    "treasure": "Treasure",
+    "crypto": "Crypto",
+}
+
+
+def normalize_asset_type(asset_type: str) -> str:
+    """Map a user-supplied asset type (any case, trimmed) to the API value."""
+    canonical = ASSET_TYPE_ALIASES.get(asset_type.strip().lower())
+    if canonical is None:
+        raise SourceError(
+            "invalid_asset_type",
+            f"Invalid asset type '{asset_type}'. Valid types: {', '.join(VALID_ASSET_TYPES)}",
+        )
+    return canonical
+
+
 class WalletClient:
     """HTTP client with an in-process TTL cache keyed by path + params."""
 
@@ -113,6 +135,33 @@ class WalletClient:
         fetched_at = _now_iso()
         self._cache[cache_key] = (time.monotonic(), fetched_at, data)
         return self._envelope(data, cached=False, fetched_at=fetched_at)
+
+    # ------------------------------------------------------------- wallet endpoints
+
+    async def get_summary(self) -> dict:
+        """Wallet summary: applied amount, equity, variations, total/12M returns."""
+        return await self.request(
+            f"/summary/metrics/{self.wallet_id}", params={"type": "without-earnings", "raw": 1}
+        )
+
+    async def get_allocation(self) -> dict:
+        """Wallet allocation by asset and asset class."""
+        return await self.request(f"/summary/donutchart/{self.wallet_id}/all", params={"groupBy": "ticker"})
+
+    async def get_positions(self, asset_type: str) -> dict:
+        """Detailed positions of one asset class (see VALID_ASSET_TYPES)."""
+        canonical = normalize_asset_type(asset_type)
+        return await self.request(
+            f"/summary/actives/{self.wallet_id}/{canonical}",
+            params={
+                "raw": 1,
+                "api_version": "v2",
+                "start": 0,
+                "length": 50,
+                "order_column": "equity_total",
+                "order_dir": "desc",
+            },
+        )
 
 
 wallet_client = WalletClient(WALLET_PROXY_BASE_URL)
