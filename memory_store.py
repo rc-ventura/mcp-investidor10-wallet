@@ -19,6 +19,9 @@ import re
 SCHEMA_VERSION = 1
 COLLECTIONS = ("theses", "rules", "decisions", "insights_log", "alerts")
 
+DECISION_KINDS = ("recommendation", "user_decision")
+DECISION_OUTCOMES = ("accepted", "rejected", "postponed")
+
 
 class MemoryUnavailableError(Exception):
     """Raised when the memory store is in degraded mode.
@@ -138,3 +141,115 @@ class MemoryStore:
         entry.update(changes)
         self.save()
         return entry
+
+    # ---------------------------------------------------------- domain operations
+
+    @staticmethod
+    def _clean_text(value: str, field: str) -> str:
+        text = (value or "").strip()
+        if not text:
+            raise ValueError(f"{field} must not be empty")
+        return text
+
+    def get_wallet_goal(self) -> dict | None:
+        self._require_available()
+        return self.data.get("wallet_goal")
+
+    def set_wallet_goal(self, text: str) -> dict:
+        self._require_available()
+        goal = {"text": self._clean_text(text, "text"), "updated_at": self.now_iso()}
+        self.data["wallet_goal"] = goal
+        self.save()
+        return goal
+
+    def save_thesis(self, ticker: str, text: str) -> dict:
+        return self.add(
+            "theses",
+            {
+                "ticker": self._clean_text(ticker, "ticker").upper(),
+                "text": self._clean_text(text, "text"),
+                "updated_at": self.now_iso(),
+            },
+        )
+
+    def get_theses(self, ticker: str | None = None) -> list:
+        theses = self.get_all("theses")
+        if ticker is None:
+            return theses
+        normalized = ticker.strip().upper()
+        return [t for t in theses if t.get("ticker") == normalized]
+
+    def save_rule(self, text: str) -> dict:
+        return self.add("rules", {"text": self._clean_text(text, "text")})
+
+    def get_rules(self) -> list:
+        return self.get_all("rules")
+
+    def log_decision(
+        self, kind: str, content: str, ticker: str | None = None, rationale: str | None = None
+    ) -> dict:
+        self._require_available()
+        if kind not in DECISION_KINDS:
+            raise ValueError(f"Invalid decision kind '{kind}'. Valid kinds: {', '.join(DECISION_KINDS)}")
+        entry = {"kind": kind, "content": self._clean_text(content, "content")}
+        if ticker is not None:
+            entry["ticker"] = self._clean_text(ticker, "ticker").upper()
+        else:
+            entry["ticker"] = None
+        entry["rationale"] = (rationale or "").strip() or None
+        entry["date"] = self.now_iso()[:10]
+        entry["outcome"] = "pending"
+        entry["outcome_note"] = None
+        entry["outcome_at"] = None
+        return self.add("decisions", entry)
+
+    def record_decision_outcome(
+        self, decision_id: int, outcome: str, note: str | None = None
+    ) -> dict | None:
+        self._require_available()
+        if outcome not in DECISION_OUTCOMES:
+            raise ValueError(
+                f"Invalid outcome '{outcome}'. Valid outcomes: {', '.join(DECISION_OUTCOMES)}"
+            )
+        return self.update(
+            "decisions",
+            decision_id,
+            {"outcome": outcome, "outcome_note": (note or "").strip() or None, "outcome_at": self.now_iso()},
+        )
+
+    def log_insight(self, kind: str, fingerprint: str, summary: str) -> dict:
+        """Log a communicated insight; dedupes by fingerprint (SC-005).
+
+        Returns {"already_logged": False, "entry": ...} for new insights or
+        {"already_logged": True, "existing": ...} when the fingerprint exists —
+        in that case nothing is appended.
+        """
+        self._require_available()
+        fingerprint = self._clean_text(fingerprint, "fingerprint")
+        for existing in self.get_all("insights_log"):
+            if existing.get("fingerprint") == fingerprint:
+                return {"already_logged": True, "existing": existing}
+        entry = self.add(
+            "insights_log",
+            {
+                "kind": self._clean_text(kind, "kind"),
+                "fingerprint": fingerprint,
+                "summary": self._clean_text(summary, "summary"),
+                "date": self.now_iso()[:10],
+            },
+        )
+        return {"already_logged": False, "entry": entry}
+
+    def session_digest(self, recent_insights_limit: int = 10) -> dict:
+        """Digest of the investor memory for the session bootstrap (FR-009)."""
+        self._require_available()
+        theses_by_ticker: dict = {}
+        for thesis in self.get_all("theses"):
+            theses_by_ticker.setdefault(thesis.get("ticker"), []).append(thesis)
+        return {
+            "wallet_goal": self.data.get("wallet_goal"),
+            "theses": theses_by_ticker,
+            "rules": self.get_rules(),
+            "pending_decisions": [d for d in self.get_all("decisions") if d.get("outcome") == "pending"],
+            "recent_insights": self.get_all("insights_log")[-recent_insights_limit:],
+        }
