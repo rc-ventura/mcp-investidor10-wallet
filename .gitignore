@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Runtime state (local investor memory)
+memory.json
+memory.json.tmp
+memory.json.broken-*
+
+# Tooling session state
+.specify/feature.json
+.pytest_cache/
+
+# Universal
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/

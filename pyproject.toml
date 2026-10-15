@@ -1,0 +1,23 @@
+[project]
+name = "mcp-investidor10-wallet"
+version = "0.1.0"
+description = "MCP server that exposes an Investidor10 public wallet, with long-term investor memory and price alerts"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp==4.0.10",
+    "httpx==0.28.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "respx==0.23.1",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+markers = [
+    "live: integration tests that hit the real Investidor10 API (deselected by default; opt-in with -m live)",
+]
