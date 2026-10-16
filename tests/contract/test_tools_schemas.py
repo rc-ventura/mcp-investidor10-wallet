@@ -84,6 +84,23 @@ async def test_get_wallet_positions_passthrough_keeps_percent_and_buy_fields():
 
 
 @respx.mock
+async def test_every_position_keeps_rebalancing_fields():
+    """T018/US2 — the passthrough must never strip percent_wallet, percent_ideal
+    or buy from ANY position, otherwise rebalancing analysis breaks (SC-003)."""
+    many_positions = [
+        dict(POSITIONS_PAYLOAD[0], ticker="PETR4"),
+        dict(POSITIONS_PAYLOAD[0], ticker="VALE3"),
+        dict(POSITIONS_PAYLOAD[0], ticker="ITUB4"),
+    ]
+    respx.get(f"{PROXY}/summary/actives/1234567/Ticker").respond(json=many_positions)
+    async with Client(mcp) as client:
+        result = await client.call_tool("get_wallet_positions", {"asset_type": "Ticker"})
+    for position in result.data["data"]:
+        for field in ("percent_wallet", "percent_ideal", "buy"):
+            assert field in position, f"field {field} stripped from {position['ticker']}"
+
+
+@respx.mock
 async def test_get_wallet_positions_rejects_invalid_asset_type():
     async with Client(mcp) as client:
         result = await client.call_tool("get_wallet_positions", {"asset_type": "Bitcoin"})
@@ -112,6 +129,52 @@ async def test_tool_returns_structured_error_on_source_failure():
         result = await client.call_tool("get_wallet_summary", {})
     payload = result.data
     assert payload["error"]["code"] == "source_unavailable"
+
+
+class TestGetAssetQuote:
+    """T026/US4 — contract of the quote tool against the REST assets API."""
+
+    QUOTE_PAYLOAD = {
+        "variation_day": {"last_quotation": "57.45", "variation_percent": 1.2},
+        "variation_twelve": 103.7,
+        "dy": "6,23",
+        "graham": {"price": "93.21"},
+        "bazin": {"price": "137.13"},
+        "sector": {"segment": {"name": "Exploração, Refino e Distribuição"}},
+    }
+
+    async def test_quote_returns_data_envelope(self):
+        with respx.mock:
+            respx.get(f"{wallet_client.REST_BASE_URL}/assets/tickers/PETR4").respond(
+                json=self.QUOTE_PAYLOAD
+            )
+            wallet_client.rest_client._cache.clear()
+            async with Client(mcp) as client:
+                result = await client.call_tool("get_asset_quote", {"ticker": "PETR4"})
+        payload = result.data
+        assert {"cached", "fetched_at", "data"} <= set(payload)
+        assert payload["data"] == self.QUOTE_PAYLOAD
+
+    async def test_quote_normalizes_ticker(self):
+        route = None
+        with respx.mock:
+            route = respx.get(f"{wallet_client.REST_BASE_URL}/assets/tickers/PETR4").respond(
+                json=self.QUOTE_PAYLOAD
+            )
+            wallet_client.rest_client._cache.clear()
+            async with Client(mcp) as client:
+                await client.call_tool("get_asset_quote", {"ticker": " petr4 "})
+        assert route.called, "the request must hit the normalized PETR4 endpoint"
+
+    async def test_unknown_ticker_returns_ticker_not_found(self):
+        with respx.mock:
+            respx.get(f"{wallet_client.REST_BASE_URL}/assets/tickers/VALE99").respond(status_code=404)
+            wallet_client.rest_client._cache.clear()
+            async with Client(mcp) as client:
+                result = await client.call_tool("get_asset_quote", {"ticker": "VALE99"})
+        payload = result.data
+        assert payload["error"]["code"] == "ticker_not_found"
+        assert "spelling" in payload["error"]["message"].lower()
 
 
 class TestGetSessionContext:
