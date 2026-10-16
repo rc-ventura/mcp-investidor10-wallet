@@ -163,6 +163,21 @@ class WalletClient:
             },
         )
 
+    async def get_quote(self, ticker: str) -> dict:
+        """Market quote and fundamentals of one ticker (REST assets API)."""
+        normalized = (ticker or "").strip().upper()
+        if not normalized:
+            raise SourceError("invalid_params", "ticker must not be empty")
+        try:
+            return await self.request(f"/assets/tickers/{normalized}")
+        except SourceError as exc:
+            if exc.code == "source_unavailable" and "404" in exc.message:
+                raise SourceError(
+                    "ticker_not_found",
+                    f"Ticker '{normalized}' was not found — check the spelling",
+                ) from exc
+            raise
+
 
 wallet_client = WalletClient(WALLET_PROXY_BASE_URL)
 rest_client = WalletClient(REST_BASE_URL)

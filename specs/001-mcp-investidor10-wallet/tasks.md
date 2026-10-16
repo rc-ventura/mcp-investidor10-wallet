@@ -80,12 +80,12 @@ description: "Task list for feature implementation"
 
 ### Tests for User Story 2
 
-- [ ] T018 [P] [US2] Estender `tests/contract/test_tools_schemas.py`: fixture de posições (respx) DEVE conter `percent_wallet`, `percent_ideal` e flag `buy` em cada posição — teste falha se algum campo for descartado no passthrough (proteção contra o servidor "ajudar demais" filtrando payload)
+- [X] T018 [P] [US2] Estender `tests/contract/test_tools_schemas.py`: fixture de posições (respx) DEVE conter `percent_wallet`, `percent_ideal` e flag `buy` em cada posição — teste falha se algum campo for descartado no passthrough (proteção contra o servidor "ajudar demais" filtrando payload)
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Revisar e endurecer docstrings de `get_wallet_positions` e `get_wallet_allocation` em `server.py`: instruir explicitamente o modelo a comparar `percent_wallet` vs `percent_ideal` ordenando por magnitude do desvio, priorizar aportes em ativos abaixo do ideal com `buy` positivo, e nunca sugerir vendas não solicitadas
-- [ ] T020 [US2] Validação manual ponta a ponta (cenário quickstart Story 2): desvios com precisão de 0,1 p.p. (SC-003); carteira alinhada ao ideal → agente declara ausência de desvios sem forçar sugestões
+- [X] T019 [US2] Revisar e endurecer docstrings de `get_wallet_positions` e `get_wallet_allocation` em `server.py`: instruir explicitamente o modelo a comparar `percent_wallet` vs `percent_ideal` ordenando por magnitude do desvio, priorizar aportes em ativos abaixo do ideal com `buy` positivo, e nunca sugerir vendas não solicitadas
+- [X] T020 [US2] Validação manual ponta a ponta (cenário quickstart Story 2): desvios com precisão de 0,1 p.p. (SC-003); carteira alinhada ao ideal → agente declara ausência de desvios sem forçar sugestões
 
 **Checkpoint**: Análises de rebalanceamento corretas a partir de dados 100% passthrough.
 
@@ -124,13 +124,13 @@ description: "Task list for feature implementation"
 
 ### Tests for User Story 4
 
-- [ ] T026 [P] [US4] Estender `tests/contract/test_tools_schemas.py`: `get_asset_quote("PETR4")` (respx) retorna preço/variações/Graham/Bazin/DY/setor no envelope; ticker inexistente (HTTP 404 ou payload vazio da fonte) → erro `ticker_not_found`; input `" petr4 "` é normalizado (trim+upper)
+- [X] T026 [P] [US4] Estender `tests/contract/test_tools_schemas.py`: `get_asset_quote("PETR4")` (respx) retorna preço/variações/Graham/Bazin/DY/setor no envelope; ticker inexistente (HTTP 404 ou payload vazio da fonte) → erro `ticker_not_found`; input `" petr4 "` é normalizado (trim+upper)
 
 ### Implementation for User Story 4
 
-- [ ] T027 [US4] Adicionar `get_quote(ticker)` a `wallet_client.py`: `GET /api/rest/assets/tickers/{ticker}` (base URL REST, não o proxy wallet); normalizar ticker (trim+upper); 404/vazio → `ticker_not_found` com sugestão de verificar grafia
-- [ ] T028 [US4] Registrar em `server.py` tool `get_asset_quote(ticker)` com docstring em inglês: declarar defasagem inerente da fonte (~15 min B3), instruir o modelo a SEMPRE informar `cached`/`fetched_at` ao usuário (FR-014), e a cruzar cotação com preço médio da posição quando o ativo estiver na carteira (chamando `get_wallet_positions`)
-- [ ] T029 [US4] Estender `tests/integration/test_live_api.py` (marker `live`): `get_asset_quote("PETR4")` retorna preço > 0 contra a API real
+- [X] T027 [US4] Adicionar `get_quote(ticker)` a `wallet_client.py`: `GET /api/rest/assets/tickers/{ticker}` (base URL REST, não o proxy wallet); normalizar ticker (trim+upper); 404/vazio → `ticker_not_found` com sugestão de verificar grafia
+- [X] T028 [US4] Registrar em `server.py` tool `get_asset_quote(ticker)` com docstring em inglês: declarar defasagem inerente da fonte (~15 min B3), instruir o modelo a SEMPRE informar `cached`/`fetched_at` ao usuário (FR-014), e a cruzar cotação com preço médio da posição quando o ativo estiver na carteira (chamando `get_wallet_positions`)
+- [X] T029 [US4] Estender `tests/integration/test_live_api.py` (marker `live`): `get_asset_quote("PETR4")` retorna preço > 0 contra a API real
 
 **Checkpoint**: SC-007 validável no cliente (cotação com defasagem declarada; erro claro para ticker inválido).
 

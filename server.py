@@ -69,9 +69,15 @@ async def get_wallet_summary() -> dict:
 async def get_wallet_allocation() -> dict:
     """Wallet allocation broken down by asset (ticker) and by asset class.
 
-    Use together with get_wallet_positions to compare the current allocation
-    against the ideal one. This is also a data envelope — always mention
-    `fetched_at` and `cached` when presenting the numbers.
+    Use together with get_wallet_positions to analyze rebalancing (FR-007):
+    compare each position's percent_wallet against its percent_ideal, order the
+    deviations by magnitude (SC-003, 0.1 percentage-point precision), and when
+    suggesting new contributions prioritize assets below their ideal percent
+    that carry a positive `buy` flag from the source. Never suggest selling an
+    asset unless the user explicitly asks for it; if the wallet is aligned with
+    the ideal, say so instead of forcing suggestions. This is also a data
+    envelope — always mention `fetched_at` and `cached` when presenting the
+    numbers.
     """
     try:
         return await wallet_client.wallet_client.get_allocation()
@@ -102,6 +108,28 @@ async def get_wallet_positions(asset_type: str) -> dict:
     """
     try:
         return await wallet_client.wallet_client.get_positions(asset_type)
+    except wallet_client.SourceError as exc:
+        return source_error_payload(exc)
+
+
+@mcp.tool
+async def get_asset_quote(ticker: str) -> dict:
+    """Current market quote and fundamentals of a ticker (any asset, in the
+    wallet or not): price, day and 12-month variation, Graham and Bazin fair
+    prices, P/E, P/BV, dividend yield and sector.
+
+    Args:
+        ticker: Asset ticker (e.g. PETR4, MXRF11, IVVB11). Any case accepted.
+
+    IMPORTANT presentation rules: quotes from the B3 have an inherent delay of
+    ~15 minutes — always state this when giving prices. Always mention
+    `cached`/`fetched_at` (the response is a data envelope). When the ticker is
+    also in the wallet, cross the quote with the position's average price using
+    get_wallet_positions. Unknown tickers return a ticker_not_found error with
+    a spelling suggestion — never guess another ticker.
+    """
+    try:
+        return await wallet_client.rest_client.get_quote(ticker)
     except wallet_client.SourceError as exc:
         return source_error_payload(exc)
 
