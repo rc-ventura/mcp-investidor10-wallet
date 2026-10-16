@@ -18,6 +18,7 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["."]
+addopts = '-m "not live"'
 markers = [
     "live: integration tests that hit the real Investidor10 API (deselected by default; opt-in with -m live)",
 ]
