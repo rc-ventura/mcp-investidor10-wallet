@@ -28,3 +28,12 @@ async def test_live_all_asset_classes_respond_without_error():
             result = await client.call_tool("get_wallet_positions", {"asset_type": asset_type})
             payload = result.data
             assert "error" not in payload, f"{asset_type}: {payload}"
+
+
+async def test_live_asset_quote_returns_positive_price():
+    async with Client(mcp) as client:
+        result = await client.call_tool("get_asset_quote", {"ticker": "PETR4"})
+    payload = result.data
+    assert "error" not in payload, payload
+    last = float(payload["data"]["variation_day"]["last_quotation"])
+    assert last > 0
