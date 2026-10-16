@@ -55,16 +55,16 @@ description: "Task list for feature implementation"
 
 > Escrever PRIMEIRO, verificar que FALHAM antes da implementação.
 
-- [ ] T011 [P] [US1] Testes de unidade do cache e erros do cliente em `tests/unit/test_wallet_client.py` com respx: hit de cache dentro do TTL (2ª chamada não bate na rede, `cached=true`), expiração do TTL, `source_unavailable` em timeout SEM cache válido, `unexpected_format` em payload sem chaves-chave
-- [ ] T012 [P] [US1] Testes de contrato das tools de carteira em `tests/contract/test_tools_schemas.py` com respx: envelope `{cached, fetched_at, data}` presente em resumo/alocação/posições; `get_wallet_positions("Ticker")` retorna posições com `average_price`, `percent_wallet`, `percent_ideal`; `get_wallet_positions("Bitcoin")` → erro `invalid_asset_type` listando `Ticker|Fii|EtfInternational|Treasure|Crypto`; classe vazia → `data: []` sem erro
+- [X] T011 [P] [US1] Testes de unidade do cache e erros do cliente em `tests/unit/test_wallet_client.py` com respx: hit de cache dentro do TTL (2ª chamada não bate na rede, `cached=true`), expiração do TTL, `source_unavailable` em timeout SEM cache válido, `unexpected_format` em payload sem chaves-chave
+- [X] T012 [P] [US1] Testes de contrato das tools de carteira em `tests/contract/test_tools_schemas.py` com respx: envelope `{cached, fetched_at, data}` presente em resumo/alocação/posições; `get_wallet_positions("Ticker")` retorna posições com `average_price`, `percent_wallet`, `percent_ideal`; `get_wallet_positions("Bitcoin")` → erro `invalid_asset_type` listando `Ticker|Fii|EtfInternational|Treasure|Crypto`; classe vazia → `data: []` sem erro
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Adicionar `get_summary(wallet_id)` a `wallet_client.py`: `GET /summary/metrics/{WALLET_ID}?type=without-earnings&raw=1`, passthrough do payload no envelope (aplicado, equity, variação, TWR total e 12M)
-- [ ] T014 [P] [US1] Adicionar `get_allocation(wallet_id)` a `wallet_client.py`: `GET /summary/donutchart/{WALLET_ID}/all?groupBy=ticker` (alocação por ativo/classe)
-- [ ] T015 [P] [US1] Adicionar `get_positions(wallet_id, asset_type)` a `wallet_client.py`: validar `asset_type ∈ {Ticker, Fii, EtfInternational, Treasure, Crypto}` (case-sensitive da API; normalizar input do usuário para esses valores, senão `invalid_asset_type`); `GET /summary/actives/{WALLET_ID}/{asset_type}?raw=1&api_version=v2&start=0&length=50&order_column=equity_total&order_dir=desc`
-- [ ] T016 [US1] Registrar em `server.py` tools `get_wallet_summary()`, `get_wallet_allocation()`, `get_wallet_positions(asset_type)` com docstrings em inglês explicando quando usar, parâmetros e campos de retorno (research D8: docstring é o contrato com o modelo); indicadores não aplicáveis por classe são omitidos, nunca inventados; docstring de posições deve instruir o modelo a sinalizar que equity de `EtfInternational` envolve conversão cambial (US1 cenário 3)
-- [ ] T017 [US1] Teste de integração live opt-in em `tests/integration/test_live_api.py` (marker `live`): as 3 tools contra a carteira real `2061045` — resumo retorna equity > 0; posições das 5 classes retornam sem erro (algumas podem ser `[]`)
+- [X] T013 [US1] Adicionar `get_summary(wallet_id)` a `wallet_client.py`: `GET /summary/metrics/{WALLET_ID}?type=without-earnings&raw=1`, passthrough do payload no envelope (aplicado, equity, variação, TWR total e 12M)
+- [X] T014 [P] [US1] Adicionar `get_allocation(wallet_id)` a `wallet_client.py`: `GET /summary/donutchart/{WALLET_ID}/all?groupBy=ticker` (alocação por ativo/classe)
+- [X] T015 [P] [US1] Adicionar `get_positions(wallet_id, asset_type)` a `wallet_client.py`: validar `asset_type ∈ {Ticker, Fii, EtfInternational, Treasure, Crypto}` (case-sensitive da API; normalizar input do usuário para esses valores, senão `invalid_asset_type`); `GET /summary/actives/{WALLET_ID}/{asset_type}?raw=1&api_version=v2&start=0&length=50&order_column=equity_total&order_dir=desc`
+- [X] T016 [US1] Registrar em `server.py` tools `get_wallet_summary()`, `get_wallet_allocation()`, `get_wallet_positions(asset_type)` com docstrings em inglês explicando quando usar, parâmetros e campos de retorno (research D8: docstring é o contrato com o modelo); indicadores não aplicáveis por classe são omitidos, nunca inventados; docstring de posições deve instruir o modelo a sinalizar que equity de `EtfInternational` envolve conversão cambial (US1 cenário 3)
+- [X] T017 [US1] Teste de integração live opt-in em `tests/integration/test_live_api.py` (marker `live`): as 3 tools contra a carteira real `2061045` — resumo retorna equity > 0; posições das 5 classes retornam sem erro (algumas podem ser `[]`)
 
 **Checkpoint**: SC-001 (<30s por pergunta) e SC-002 (100% dos valores conferem com a fonte) validáveis no cliente. MVP pronto.
 
@@ -80,12 +80,12 @@ description: "Task list for feature implementation"
 
 ### Tests for User Story 2
 
-- [ ] T018 [P] [US2] Estender `tests/contract/test_tools_schemas.py`: fixture de posições (respx) DEVE conter `percent_wallet`, `percent_ideal` e flag `buy` em cada posição — teste falha se algum campo for descartado no passthrough (proteção contra o servidor "ajudar demais" filtrando payload)
+- [X] T018 [P] [US2] Estender `tests/contract/test_tools_schemas.py`: fixture de posições (respx) DEVE conter `percent_wallet`, `percent_ideal` e flag `buy` em cada posição — teste falha se algum campo for descartado no passthrough (proteção contra o servidor "ajudar demais" filtrando payload)
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Revisar e endurecer docstrings de `get_wallet_positions` e `get_wallet_allocation` em `server.py`: instruir explicitamente o modelo a comparar `percent_wallet` vs `percent_ideal` ordenando por magnitude do desvio, priorizar aportes em ativos abaixo do ideal com `buy` positivo, e nunca sugerir vendas não solicitadas
-- [ ] T020 [US2] Validação manual ponta a ponta (cenário quickstart Story 2): desvios com precisão de 0,1 p.p. (SC-003); carteira alinhada ao ideal → agente declara ausência de desvios sem forçar sugestões
+- [X] T019 [US2] Revisar e endurecer docstrings de `get_wallet_positions` e `get_wallet_allocation` em `server.py`: instruir explicitamente o modelo a comparar `percent_wallet` vs `percent_ideal` ordenando por magnitude do desvio, priorizar aportes em ativos abaixo do ideal com `buy` positivo, e nunca sugerir vendas não solicitadas
+- [X] T020 [US2] Validação manual ponta a ponta (cenário quickstart Story 2): desvios com precisão de 0,1 p.p. (SC-003); carteira alinhada ao ideal → agente declara ausência de desvios sem forçar sugestões
 
 **Checkpoint**: Análises de rebalanceamento corretas a partir de dados 100% passthrough.
 
@@ -103,14 +103,14 @@ description: "Task list for feature implementation"
 
 > Escrever PRIMEIRO, verificar que FALHAM antes da implementação.
 
-- [ ] T021 [P] [US3] Estender `tests/unit/test_memory_store.py`: `save_thesis` valida ticker uppercase e texto não vazio; múltiplas teses por ticker com histórico; `log_decision` cria com `outcome="pending"` e `kind ∈ {recommendation, user_decision}`; `record_decision_outcome` grava `outcome_at` e só aceita `accepted|rejected|postponed`; `log_insight` com `fingerprint` duplicado retorna `already_logged=true` SEM duplicar entrada (SC-005)
-- [ ] T022 [P] [US3] Estender `tests/contract/test_tools_schemas.py`: `get_session_context` retorna `{memory: {...}, triggered_alerts: [...], memory_status: "ok"|"unavailable"}`; com memory corrompida, `memory_status="unavailable"` e as demais tools continuam respondendo
+- [X] T021 [P] [US3] Estender `tests/unit/test_memory_store.py`: `save_thesis` valida ticker uppercase e texto não vazio; múltiplas teses por ticker com histórico; `log_decision` cria com `outcome="pending"` e `kind ∈ {recommendation, user_decision}`; `record_decision_outcome` grava `outcome_at` e só aceita `accepted|rejected|postponed`; `log_insight` com `fingerprint` duplicado retorna `already_logged=true` SEM duplicar entrada (SC-005)
+- [X] T022 [P] [US3] Estender `tests/contract/test_tools_schemas.py`: `get_session_context` retorna `{memory: {...}, triggered_alerts: [...], memory_status: "ok"|"unavailable"}`; com memory corrompida, `memory_status="unavailable"` e as demais tools continuam respondendo
 
 ### Implementation for User Story 3
 
-- [ ] T023 [US3] Implementar em `memory_store.py` operações: get/set `wallet_goal`; CRUD de `theses` (campos `id, ticker, text, created_at, updated_at`); CRUD de `rules` (`id, text, created_at`); `decisions` com máquina de desfecho (`outcome: pending → accepted|rejected|postponed`, gravando `outcome_at`); `insights_log` com dedupe por `fingerprint`
-- [ ] T024 [US3] Registrar em `server.py` tools `get_wallet_goal()`, `set_wallet_goal(text)`, `save_thesis(ticker, text)`, `get_theses(ticker=None)`, `save_rule(text)`, `get_rules()`, `log_decision(kind, content, ticker=None, rationale=None)`, `record_decision_outcome(decision_id, outcome, note=None)`, `log_insight(kind, fingerprint, summary)` — ids inexistentes → erro `not_found`; parâmetros inválidos → `invalid_params`; docstrings em inglês orientando o modelo a registrar decisões e desfechos (FR-008, FR-010)
-- [ ] T025 [US3] Registrar em `server.py` a tool `get_session_context()`: retorna digest completo (objetivo, teses por ticker, regras, decisões pendentes, insights recentes) + `memory_status`; docstring DEVE dizer "chamar obrigatoriamente no início de cada sessão" (FR-009); nesta fase, `triggered_alerts: []` (avaliação real vem na US6, dependente de cotações)
+- [X] T023 [US3] Implementar em `memory_store.py` operações: get/set `wallet_goal`; CRUD de `theses` (campos `id, ticker, text, created_at, updated_at`); CRUD de `rules` (`id, text, created_at`); `decisions` com máquina de desfecho (`outcome: pending → accepted|rejected|postponed`, gravando `outcome_at`); `insights_log` com dedupe por `fingerprint`
+- [X] T024 [US3] Registrar em `server.py` tools `get_wallet_goal()`, `set_wallet_goal(text)`, `save_thesis(ticker, text)`, `get_theses(ticker=None)`, `save_rule(text)`, `get_rules()`, `log_decision(kind, content, ticker=None, rationale=None)`, `record_decision_outcome(decision_id, outcome, note=None)`, `log_insight(kind, fingerprint, summary)` — ids inexistentes → erro `not_found`; parâmetros inválidos → `invalid_params`; docstrings em inglês orientando o modelo a registrar decisões e desfechos (FR-008, FR-010)
+- [X] T025 [US3] Registrar em `server.py` a tool `get_session_context()`: retorna digest completo (objetivo, teses por ticker, regras, decisões pendentes, insights recentes) + `memory_status`; docstring DEVE dizer "chamar obrigatoriamente no início de cada sessão" (FR-009); nesta fase, `triggered_alerts: []` (avaliação real vem na US6, dependente de cotações)
 
 **Checkpoint**: Dois chats consecutivos comprovam persistência (SC-004) e dedupe de insights (SC-005).
 
@@ -124,13 +124,13 @@ description: "Task list for feature implementation"
 
 ### Tests for User Story 4
 
-- [ ] T026 [P] [US4] Estender `tests/contract/test_tools_schemas.py`: `get_asset_quote("PETR4")` (respx) retorna preço/variações/Graham/Bazin/DY/setor no envelope; ticker inexistente (HTTP 404 ou payload vazio da fonte) → erro `ticker_not_found`; input `" petr4 "` é normalizado (trim+upper)
+- [X] T026 [P] [US4] Estender `tests/contract/test_tools_schemas.py`: `get_asset_quote("PETR4")` (respx) retorna preço/variações/Graham/Bazin/DY/setor no envelope; ticker inexistente (HTTP 404 ou payload vazio da fonte) → erro `ticker_not_found`; input `" petr4 "` é normalizado (trim+upper)
 
 ### Implementation for User Story 4
 
-- [ ] T027 [US4] Adicionar `get_quote(ticker)` a `wallet_client.py`: `GET /api/rest/assets/tickers/{ticker}` (base URL REST, não o proxy wallet); normalizar ticker (trim+upper); 404/vazio → `ticker_not_found` com sugestão de verificar grafia
-- [ ] T028 [US4] Registrar em `server.py` tool `get_asset_quote(ticker)` com docstring em inglês: declarar defasagem inerente da fonte (~15 min B3), instruir o modelo a SEMPRE informar `cached`/`fetched_at` ao usuário (FR-014), e a cruzar cotação com preço médio da posição quando o ativo estiver na carteira (chamando `get_wallet_positions`)
-- [ ] T029 [US4] Estender `tests/integration/test_live_api.py` (marker `live`): `get_asset_quote("PETR4")` retorna preço > 0 contra a API real
+- [X] T027 [US4] Adicionar `get_quote(ticker)` a `wallet_client.py`: `GET /api/rest/assets/tickers/{ticker}` (base URL REST, não o proxy wallet); normalizar ticker (trim+upper); 404/vazio → `ticker_not_found` com sugestão de verificar grafia
+- [X] T028 [US4] Registrar em `server.py` tool `get_asset_quote(ticker)` com docstring em inglês: declarar defasagem inerente da fonte (~15 min B3), instruir o modelo a SEMPRE informar `cached`/`fetched_at` ao usuário (FR-014), e a cruzar cotação com preço médio da posição quando o ativo estiver na carteira (chamando `get_wallet_positions`)
+- [X] T029 [US4] Estender `tests/integration/test_live_api.py` (marker `live`): `get_asset_quote("PETR4")` retorna preço > 0 contra a API real
 
 **Checkpoint**: SC-007 validável no cliente (cotação com defasagem declarada; erro claro para ticker inválido).
 
