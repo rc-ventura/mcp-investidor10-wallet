@@ -144,13 +144,13 @@ description: "Task list for feature implementation"
 
 ### Tests for User Story 5
 
-- [ ] T030 [P] [US5] Estender `tests/contract/test_tools_schemas.py`: `get_earnings()` sem datas → últimos 12 meses; `get_earnings("2026-10-01", "2026-01-01")` → erro `invalid_params` indicando inversão; `get_patrimony_history(0)` e `(-3)` → `invalid_params`; período sem proventos → `data` com total zero/vazio SEM erro
+- [X] T030 [P] [US5] Estender `tests/contract/test_tools_schemas.py`: `get_earnings()` sem datas → últimos 12 meses; `get_earnings("2026-10-01", "2026-01-01")` → erro `invalid_params` indicando inversão; `get_patrimony_history(0)` e `(-3)` → `invalid_params`; período sem proventos → `data` com total zero/vazio SEM erro
 
 ### Implementation for User Story 5
 
-- [ ] T031 [P] [US5] Adicionar `get_earnings(wallet_id, start_date=None, end_date=None)` a `wallet_client.py`: `GET /earnings/total-period/{WALLET_ID}?start_date=...&end_date=...`; validar formato `YYYY-MM-DD`; omitidas → últimos 12 meses; `start_date > end_date` → `invalid_params` sugerindo correção (nunca retorno silencioso)
-- [ ] T032 [P] [US5] Adicionar `get_patrimony_history(wallet_id, months)` a `wallet_client.py`: `GET /summary/barchart/{WALLET_ID}/{months}/all`; `months` inteiro > 0, senão `invalid_params` com exemplos (12, 24, 60)
-- [ ] T033 [US5] Registrar em `server.py` tools `get_earnings(start_date=None, end_date=None)` e `get_patrimony_history(months)` com docstrings em inglês: instruir o modelo a apresentar série separando aporte de valorização, a calcular YOC por ativo cruzando proventos com preço médio das posições, e a SEMPRE informar `cached`/`fetched_at` ao usuário (FR-014)
+- [X] T031 [P] [US5] Adicionar `get_earnings(wallet_id, start_date=None, end_date=None)` a `wallet_client.py`: `GET /earnings/total-period/{WALLET_ID}?start_date=...&end_date=...`; validar formato `YYYY-MM-DD`; omitidas → últimos 12 meses; `start_date > end_date` → `invalid_params` sugerindo correção (nunca retorno silencioso)
+- [X] T032 [P] [US5] Adicionar `get_patrimony_history(wallet_id, months)` a `wallet_client.py`: `GET /summary/barchart/{WALLET_ID}/{months}/all`; `months` inteiro > 0, senão `invalid_params` com exemplos (12, 24, 60)
+- [X] T033 [US5] Registrar em `server.py` tools `get_earnings(start_date=None, end_date=None)` e `get_patrimony_history(months)` com docstrings em inglês: instruir o modelo a apresentar série separando aporte de valorização, a calcular YOC por ativo cruzando proventos com preço médio das posições, e a SEMPRE informar `cached`/`fetched_at` ao usuário (FR-014)
 
 **Checkpoint**: Totais de proventos conferem com a fonte (SC-002); evolução patrimonial parametrizável.
 
@@ -168,14 +168,14 @@ description: "Task list for feature implementation"
 
 > Escrever PRIMEIRO, verificar que FALHAM antes da implementação.
 
-- [ ] T034 [P] [US6] Criar `tests/unit/test_alerts.py`: `direction=below` dispara quando `preço_atual <= limit_price`; `direction=above` quando `>=` (fronteira inclusiva); transição `active → triggered` grava `triggered_at` e `triggered_price` e é TERMINAL (2ª avaliação não redispara — SC-006); `active → cancelled` terminal; `limit_price <= 0` e `direction` inválida → `invalid_params`
+- [X] T034 [P] [US6] Criar `tests/unit/test_alerts.py`: `direction=below` dispara quando `preço_atual <= limit_price`; `direction=above` quando `>=` (fronteira inclusiva); transição `active → triggered` grava `triggered_at` e `triggered_price` e é TERMINAL (2ª avaliação não redispara — SC-006); `active → cancelled` terminal; `limit_price <= 0` e `direction` inválida → `invalid_params`
 
 ### Implementation for User Story 6
 
-- [ ] T035 [US6] Implementar em `memory_store.py` operações de `alerts`: `create_price_alert(ticker, direction, limit_price)` (state inicial `active`; `direction ∈ {above, below}`, `limit_price > 0`); `list_price_alerts(state=None)`; `cancel_price_alert(alert_id)` (só de `active`; já `triggered`/`cancelled` → `invalid_params`; inexistente → `not_found`); `evaluate_alerts(quotes: dict)` aplicando a máquina de estados do data-model.md
-- [ ] T036 [US6] Integrar avaliação a `get_session_context()` em `server.py`: para cada alerta `active`, buscar cotação via `get_quote` (reusando cache — 1 chamada por ticker no máximo), avaliar condição, persistir disparos e retornar em `triggered_alerts` com preço atual e data de registro; falha na cotação de um ticker NÃO aborta o bootstrap (alerta daquele ticker fica `active` com nota de verificação pendente)
-- [ ] T037 [US6] Registrar em `server.py` tools `create_price_alert(ticker, direction, limit_price)`, `list_price_alerts(state=None)`, `cancel_price_alert(alert_id)` com docstrings em inglês esclarecendo que o disparo ocorre na abertura de sessão (sem monitoramento contínuo — escopo da spec)
-- [ ] T038 [US6] Atualizar docstring de `get_asset_quote`/`get_wallet_positions` em `server.py` orientando geração de relatórios: combinar posição + indicadores + busca web do cliente, citar fontes, e declarar explicitamente ausência de notícias relevantes em vez de conteúdo genérico (cenário 3 da Story 6)
+- [X] T035 [US6] Implementar em `memory_store.py` operações de `alerts`: `create_price_alert(ticker, direction, limit_price)` (state inicial `active`; `direction ∈ {above, below}`, `limit_price > 0`); `list_price_alerts(state=None)`; `cancel_price_alert(alert_id)` (só de `active`; já `triggered`/`cancelled` → `invalid_params`; inexistente → `not_found`); `evaluate_alerts(quotes: dict)` aplicando a máquina de estados do data-model.md
+- [X] T036 [US6] Integrar avaliação a `get_session_context()` em `server.py`: para cada alerta `active`, buscar cotação via `get_quote` (reusando cache — 1 chamada por ticker no máximo), avaliar condição, persistir disparos e retornar em `triggered_alerts` com preço atual e data de registro; falha na cotação de um ticker NÃO aborta o bootstrap (alerta daquele ticker fica `active` com nota de verificação pendente)
+- [X] T037 [US6] Registrar em `server.py` tools `create_price_alert(ticker, direction, limit_price)`, `list_price_alerts(state=None)`, `cancel_price_alert(alert_id)` com docstrings em inglês esclarecendo que o disparo ocorre na abertura de sessão (sem monitoramento contínuo — escopo da spec)
+- [X] T038 [US6] Atualizar docstring de `get_asset_quote`/`get_wallet_positions` em `server.py` orientando geração de relatórios: combinar posição + indicadores + busca web do cliente, citar fontes, e declarar explicitamente ausência de notícias relevantes em vez de conteúdo genérico (cenário 3 da Story 6)
 
 **Checkpoint**: SC-006 validável: disparo único, na abertura, sem duplicados (cenário quickstart Story 6).
 
