@@ -3,7 +3,7 @@
 Servidor `investidor10-wallet`, transport stdio. Convenções gerais:
 
 - **Envelope de dados (tools de API)**: toda tool que consulta a fonte Investidor10 retorna `{ "cached": bool, "fetched_at": str (ISO-8601), "data": <payload> }`. O agente MUST informar ao usuário quando `cached=true` e a defasagem conhecida da fonte (~15 min B3).
-- **Erros**: falhas retornam `{ "error": { "code": str, "message": str } }` — nunca exceção crua nem valores fabricados. Códigos: `source_unavailable` (API fora/timeout), `unexpected_format` (schema mudou), `invalid_asset_type`, `ticker_not_found`, `invalid_params`, `memory_unavailable`, `not_found`.
+- **Erros**: falhas retornam `{ "error": { "code": str, "message": str } }` — nunca exceção crua nem valores fabricados. Códigos: `source_unavailable` (API fora/timeout), `unexpected_format` (schema mudou), `invalid_asset_type`, `ticker_not_found`, `asset_type_not_supported` (ticker válido, mas a fonte REST só cobre ações B3 — FIIs/ETFs int./cripto/tesouro retornam HTTP 410), `invalid_params`, `memory_unavailable`, `not_found`.
 - **Idioma**: docstrings e mensagens de código em inglês (decisão do usuário, 2026-10-10); a interação com o usuário permanece em pt-BR conforme a spec.
 
 ## A. Tools de dados da carteira e mercado (6)
