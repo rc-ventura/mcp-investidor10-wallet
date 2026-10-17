@@ -164,7 +164,12 @@ class WalletClient:
         )
 
     async def get_quote(self, ticker: str) -> dict:
-        """Market quote and fundamentals of one ticker (REST assets API)."""
+        """Market quote and fundamentals of one ticker (REST assets API).
+
+        This endpoint only covers B3 stocks (learning lesson 2026-10-15):
+        FIIs, international ETFs, crypto and treasury return HTTP 410 and map
+        to asset_type_not_supported — not to ticker_not_found.
+        """
         normalized = (ticker or "").strip().upper()
         if not normalized:
             raise SourceError("invalid_params", "ticker must not be empty")
@@ -176,7 +181,52 @@ class WalletClient:
                     "ticker_not_found",
                     f"Ticker '{normalized}' was not found — check the spelling",
                 ) from exc
+            if exc.code == "source_unavailable" and "410" in exc.message:
+                raise SourceError(
+                    "asset_type_not_supported",
+                    f"Quotes for '{normalized}' are not available on this source: the Investidor10 "
+                    "REST assets API only covers B3 stocks (FIIs, international ETFs, crypto and "
+                    "treasury are not supported). Use get_wallet_positions for wallet-held assets.",
+                ) from exc
             raise
+
+    async def get_earnings(self, start_date: str | None = None, end_date: str | None = None) -> dict:
+        """Earnings received in a period; defaults to the last 12 months."""
+        if start_date is None and end_date is None:
+            today = datetime.date.today()
+            start_date = (today - datetime.timedelta(days=365)).isoformat()
+            end_date = today.isoformat()
+        else:
+            start_date = self._validate_date(start_date, "start_date")
+            end_date = self._validate_date(end_date, "end_date")
+        if start_date > end_date:
+            raise SourceError(
+                "invalid_params",
+                f"start_date ({start_date}) must not be after end_date ({end_date}) — check the dates",
+            )
+        return await self.request(
+            f"/earnings/total-period/{self.wallet_id}",
+            params={"start_date": start_date, "end_date": end_date},
+        )
+
+    @staticmethod
+    def _validate_date(value: str | None, field: str) -> str:
+        if value is None:
+            raise SourceError("invalid_params", f"{field} is required when the other date is provided")
+        try:
+            return datetime.date.fromisoformat(value).isoformat()
+        except ValueError:
+            raise SourceError(
+                "invalid_params", f"{field} must be in YYYY-MM-DD format, got '{value}'"
+            ) from None
+
+    async def get_patrimony_history(self, months: int) -> dict:
+        """Monthly patrimony evolution (contributions vs capital gains)."""
+        if not isinstance(months, int) or months <= 0:
+            raise SourceError(
+                "invalid_params", f"months must be a positive integer (e.g. 12, 24, 60), got {months!r}"
+            )
+        return await self.request(f"/summary/barchart/{self.wallet_id}/{months}/all")
 
 
 wallet_client = WalletClient(WALLET_PROXY_BASE_URL)
