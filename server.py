@@ -105,6 +105,11 @@ async def get_wallet_positions(asset_type: str) -> dict:
     Presentation rules: compare percent_wallet vs percent_ideal when discussing
     rebalancing; for EtfInternational positions, remind the user that equity
     involves currency conversion; always mention `cached` and `fetched_at`.
+
+    For on-demand asset REPORTS (FR-012): start from the position data here,
+    add the current quote via get_asset_quote, then enrich with recent events
+    from your own web search, citing every source; if no relevant recent news
+    exists, say so explicitly instead of padding with generic content.
     """
     try:
         return await wallet_client.wallet_client.get_positions(asset_type)
@@ -126,7 +131,13 @@ async def get_asset_quote(ticker: str) -> dict:
     `cached`/`fetched_at` (the response is a data envelope). When the ticker is
     also in the wallet, cross the quote with the position's average price using
     get_wallet_positions. Unknown tickers return a ticker_not_found error with
-    a spelling suggestion — never guess another ticker.
+    a spelling suggestion — never guess another ticker. Non-B3 assets (FIIs,
+    international ETFs, crypto, treasury) return asset_type_not_supported.
+
+    For on-demand asset REPORTS (FR-012): combine this quote and the wallet
+    position (when held) with recent events found through your own web search,
+    citing every source; if no relevant recent news exists, say so explicitly
+    instead of padding the report with generic content.
     """
     try:
         return await wallet_client.rest_client.get_quote(ticker)
@@ -134,7 +145,110 @@ async def get_asset_quote(ticker: str) -> dict:
         return source_error_payload(exc)
 
 
+@mcp.tool
+async def get_earnings(start_date: str | None = None, end_date: str | None = None) -> dict:
+    """Earnings (dividends, interest, income) received by the wallet in a period.
+
+    Args:
+        start_date: YYYY-MM-DD. Omit both dates to get the last 12 months.
+        end_date: YYYY-MM-DD. Must be after start_date — an inverted range
+            returns an invalid_params error (never a silent empty result).
+
+    Presentation rules: present the total and per-asset breakdown for exactly
+    the requested window; a period without earnings is not an error — state it
+    plainly. To compute yield on cost, cross per-asset earnings with the
+    position's average price from get_wallet_positions. Always mention
+    `cached`/`fetched_at`.
+    """
+    try:
+        return await wallet_client.wallet_client.get_earnings(start_date, end_date)
+    except wallet_client.SourceError as exc:
+        return source_error_payload(exc)
+
+
+@mcp.tool
+async def get_patrimony_history(months: int) -> dict:
+    """Monthly patrimony evolution over a horizon, separating contributions
+    from capital gains.
+
+    Args:
+        months: Positive integer horizon (e.g. 12, 24, 60).
+
+    Presentation rules: show the monthly series splitting what was contributed
+    from what the market added; when the user asks "how did my patrimony
+    evolve", propose a horizon if none was given. Always mention
+    `cached`/`fetched_at`.
+    """
+    try:
+        return await wallet_client.wallet_client.get_patrimony_history(months)
+    except wallet_client.SourceError as exc:
+        return source_error_payload(exc)
+
+
+@mcp.tool
+async def create_price_alert(ticker: str, direction: str, limit_price: float) -> dict:
+    """Register a price alert for an asset. The alert is evaluated at the start
+    of the NEXT session by get_session_context — there is no continuous
+    monitoring outside sessions (scope of this product).
+
+    Args:
+        ticker: Asset ticker (uppercase-normalized).
+        direction: 'above' (notify when price >= limit) or 'below'
+            (notify when price <= limit). Boundaries are inclusive.
+        limit_price: Price threshold, must be greater than zero.
+
+    Note: quotes only exist for B3 stocks; alerts on other asset classes stay
+    active but are reported as pending check (asset_type_not_supported).
+    """
+    try:
+        return memory.create_price_alert(ticker, direction, limit_price)
+    except MEMORY_ERRORS as exc:
+        return _memory_or_param_error(exc)
+
+
+@mcp.tool
+async def list_price_alerts(state: str | None = None) -> dict:
+    """List registered price alerts, optionally filtered by state
+    ('active', 'triggered', 'cancelled').
+
+    Args:
+        state: Optional filter; omit to list all alerts.
+    """
+    try:
+        return {"alerts": memory.list_price_alerts(state)}
+    except MEMORY_ERRORS as exc:
+        return _memory_or_param_error(exc)
+
+
+@mcp.tool
+async def cancel_price_alert(alert_id: int) -> dict:
+    """Cancel an active price alert. Triggered or already-cancelled alerts
+    cannot be cancelled.
+
+    Args:
+        alert_id: The id returned by create_price_alert or list_price_alerts.
+    """
+    try:
+        cancelled = memory.cancel_price_alert(alert_id)
+    except MEMORY_ERRORS as exc:
+        return _memory_or_param_error(exc)
+    if cancelled is None:
+        return _not_found(f"Price alert {alert_id} not found")
+    return cancelled
+
+
 # ---------------------------------------------------------------------- memory tools
+
+
+def _parse_quote_price(data) -> float | None:
+    """Extract the current price from a quote payload, or None when unavailable."""
+    try:
+        raw = data["variation_day"]["last_quotation"]
+        if isinstance(raw, (int, float)):
+            return float(raw)
+        return float(str(raw).replace(",", "."))
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 @mcp.tool
@@ -143,16 +257,40 @@ async def get_session_context() -> dict:
     before answering anything about the wallet.
 
     Returns the full investor memory (goal, theses grouped by ticker, personal
-    rules, pending decisions, recently communicated insights) plus any price
-    alerts triggered since the last session. Use `pending_decisions` to follow
-    up on earlier recommendations and `recent_insights` to never repeat an
-    alert as if it were new. If memory_status is "unavailable", tell the user
-    memory could not be loaded and keep operating without it.
+    rules, pending decisions, recently communicated insights) AND evaluates the
+    active price alerts against current quotes: satisfied alerts are marked
+    'triggered' (persisted, terminal — they never fire again) and returned in
+    `triggered_alerts` so you can notify the user at the start of the session,
+    with the alert's registration date and the current price. Alerts whose
+    quote could not be fetched are returned in `pending_check` and remain
+    active. Use `pending_decisions` to follow up on earlier recommendations and
+    `recent_insights` to never repeat an alert as if it were new. If
+    memory_status is "unavailable", tell the user memory could not be loaded
+    and keep operating without it.
     """
     try:
-        return {"memory": memory.session_digest(), "triggered_alerts": [], "memory_status": "ok"}
+        digest = memory.session_digest()
     except MemoryUnavailableError:
-        return {"memory": None, "triggered_alerts": [], "memory_status": "unavailable"}
+        return {"memory": None, "triggered_alerts": [], "pending_check": [], "memory_status": "unavailable"}
+
+    quotes: dict = {}
+    pending_check: list = []
+    for alert in memory.list_price_alerts("active"):
+        ticker = alert["ticker"]
+        if ticker in quotes:
+            continue  # one quote per ticker, reused across its alerts
+        try:
+            envelope = await wallet_client.rest_client.get_quote(ticker)
+            quotes[ticker] = _parse_quote_price(envelope["data"])
+        except wallet_client.SourceError as exc:
+            pending_check.append({"ticker": ticker, "reason": exc.code})
+    triggered = memory.evaluate_alerts(quotes)
+    return {
+        "memory": digest,
+        "triggered_alerts": triggered,
+        "pending_check": pending_check,
+        "memory_status": "ok",
+    }
 
 
 @mcp.tool
