@@ -22,6 +22,9 @@ COLLECTIONS = ("theses", "rules", "decisions", "insights_log", "alerts")
 DECISION_KINDS = ("recommendation", "user_decision")
 DECISION_OUTCOMES = ("accepted", "rejected", "postponed")
 
+ALERT_DIRECTIONS = ("above", "below")
+ALERT_STATES = ("active", "triggered", "cancelled")
+
 
 class MemoryUnavailableError(Exception):
     """Raised when the memory store is in degraded mode.
@@ -239,6 +242,80 @@ class MemoryStore:
             },
         )
         return {"already_logged": False, "entry": entry}
+
+    # ---------------------------------------------------------------- price alerts
+
+    def create_price_alert(self, ticker: str, direction: str, limit_price) -> dict:
+        """Create an alert with state='active' (see data-model state machine)."""
+        self._require_available()
+        if direction not in ALERT_DIRECTIONS:
+            raise ValueError(f"Invalid direction '{direction}'. Valid directions: {', '.join(ALERT_DIRECTIONS)}")
+        try:
+            price = float(limit_price)
+        except (TypeError, ValueError):
+            raise ValueError("limit_price must be a number") from None
+        if price <= 0:
+            raise ValueError("limit_price must be greater than zero")
+        return self.add(
+            "alerts",
+            {
+                "ticker": self._clean_text(ticker, "ticker").upper(),
+                "direction": direction,
+                "limit_price": price,
+                "state": "active",
+                "triggered_at": None,
+                "triggered_price": None,
+            },
+        )
+
+    def list_price_alerts(self, state: str | None = None) -> list:
+        self._require_available()
+        alerts = self.get_all("alerts")
+        if state is None:
+            return alerts
+        if state not in ALERT_STATES:
+            raise ValueError(f"Invalid state '{state}'. Valid states: {', '.join(ALERT_STATES)}")
+        return [a for a in alerts if a.get("state") == state]
+
+    def cancel_price_alert(self, alert_id: int) -> dict | None:
+        """Cancel an active alert (terminal). Returns None when not found."""
+        self._require_available()
+        alert = self.find("alerts", alert_id)
+        if alert is None:
+            return None
+        if alert.get("state") != "active":
+            raise ValueError(f"Alert {alert_id} is already {alert.get('state')} and cannot be cancelled")
+        return self.update("alerts", alert_id, {"state": "cancelled"})
+
+    def evaluate_alerts(self, quotes: dict) -> list:
+        """Evaluate all active alerts against current quotes (session open only).
+
+        quotes maps ticker -> current price. Tickers absent from `quotes`
+        (check failed) are skipped and stay active. Triggers are terminal:
+        a triggered alert is persisted as 'triggered' and never fires again
+        (SC-006). Returns the list of alerts triggered by this evaluation.
+        """
+        self._require_available()
+        triggered = []
+        for alert in self.get_all("alerts"):
+            if alert.get("state") != "active":
+                continue
+            price = quotes.get(alert["ticker"])
+            if price is None:
+                continue
+            hit = (
+                price <= alert["limit_price"]
+                if alert["direction"] == "below"
+                else price >= alert["limit_price"]
+            )
+            if hit:
+                updated = self.update(
+                    "alerts",
+                    alert["id"],
+                    {"state": "triggered", "triggered_at": self.now_iso(), "triggered_price": price},
+                )
+                triggered.append(updated)
+        return triggered
 
     def session_digest(self, recent_insights_limit: int = 10) -> dict:
         """Digest of the investor memory for the session bootstrap (FR-009)."""

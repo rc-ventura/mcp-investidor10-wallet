@@ -177,6 +177,130 @@ class TestGetAssetQuote:
         assert "spelling" in payload["error"]["message"].lower()
 
 
+class TestEarningsAndHistory:
+    """T030/US5 — contract of earnings and patrimony history tools."""
+
+    async def test_get_earnings_without_dates_defaults_to_last_12_months(self):
+        with respx.mock:
+            route = respx.get(f"{PROXY}/earnings/total-period/2061045").respond(json={"total": 0.0})
+            wallet_client.wallet_client._cache.clear()
+            async with Client(mcp) as client:
+                result = await client.call_tool("get_earnings", {})
+        payload = result.data
+        assert "error" not in payload
+        params = route.calls[0].request.url.params
+        assert "start_date" in params and "end_date" in params
+
+    async def test_get_earnings_rejects_inverted_dates(self):
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "get_earnings", {"start_date": "2026-10-01", "end_date": "2026-01-01"}
+            )
+        assert result.data["error"]["code"] == "invalid_params"
+
+    async def test_get_earnings_rejects_malformed_dates(self):
+        async with Client(mcp) as client:
+            result = await client.call_tool("get_earnings", {"start_date": "01/10/2026"})
+        assert result.data["error"]["code"] == "invalid_params"
+
+    async def test_get_earnings_empty_period_is_not_an_error(self):
+        with respx.mock:
+            respx.get(f"{PROXY}/earnings/total-period/2061045").respond(json=[])
+            wallet_client.wallet_client._cache.clear()
+            async with Client(mcp) as client:
+                result = await client.call_tool(
+                    "get_earnings", {"start_date": "2026-01-01", "end_date": "2026-06-01"}
+                )
+        payload = result.data
+        assert "error" not in payload
+        assert payload["data"] == []
+
+    async def test_get_patrimony_history_validates_months(self):
+        async with Client(mcp) as client:
+            zero = await client.call_tool("get_patrimony_history", {"months": 0})
+            negative = await client.call_tool("get_patrimony_history", {"months": -3})
+        assert zero.data["error"]["code"] == "invalid_params"
+        assert negative.data["error"]["code"] == "invalid_params"
+
+    async def test_get_patrimony_history_returns_envelope(self):
+        with respx.mock:
+            respx.get(f"{PROXY}/summary/barchart/2061045/12/all").respond(json=[{"month": "2026-10"}])
+            wallet_client.wallet_client._cache.clear()
+            async with Client(mcp) as client:
+                result = await client.call_tool("get_patrimony_history", {"months": 12})
+        payload = result.data
+        assert {"cached", "fetched_at", "data"} <= set(payload)
+
+
+class TestPriceAlerts:
+    """T037/US6 — contract of the price alert tools and the session-open trigger."""
+
+    @pytest.fixture
+    def fresh_memory(self, tmp_path, monkeypatch):
+        store = MemoryStore(str(tmp_path / "memory.json"))
+        monkeypatch.setattr(server, "memory", store)
+        return store
+
+    async def test_create_and_list_alerts(self, fresh_memory):
+        async with Client(mcp) as client:
+            created = await client.call_tool(
+                "create_price_alert", {"ticker": "petr4", "direction": "below", "limit_price": 30.0}
+            )
+            listed = await client.call_tool("list_price_alerts", {})
+        alert = created.data
+        assert alert["ticker"] == "PETR4"
+        assert alert["state"] == "active"
+        assert [a["id"] for a in listed.data["alerts"]] == [alert["id"]]
+
+    async def test_create_price_alert_rejects_bad_direction(self, fresh_memory):
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "create_price_alert", {"ticker": "PETR4", "direction": "sideways", "limit_price": 30.0}
+            )
+        assert result.data["error"]["code"] == "invalid_params"
+
+    async def test_cancel_missing_alert_returns_not_found(self, fresh_memory):
+        async with Client(mcp) as client:
+            result = await client.call_tool("cancel_price_alert", {"alert_id": 999})
+        assert result.data["error"]["code"] == "not_found"
+
+    async def test_session_context_triggers_alert_once(self, fresh_memory):
+        fresh_memory.create_price_alert("PETR4", "below", 999.0)
+        quote = TestGetAssetQuote.QUOTE_PAYLOAD
+        with respx.mock:
+            route = respx.get(f"{wallet_client.REST_BASE_URL}/assets/tickers/PETR4").respond(json=quote)
+            wallet_client.rest_client._cache.clear()
+            async with Client(mcp) as client:
+                first = await client.call_tool("get_session_context", {})
+                second = await client.call_tool("get_session_context", {})
+        first_payload = first.data
+        assert len(first_payload["triggered_alerts"]) == 1
+        alert = first_payload["triggered_alerts"][0]
+        assert alert["state"] == "triggered"
+        assert alert["triggered_at"]
+        assert alert["triggered_price"] == float(quote["variation_day"]["last_quotation"])
+        # SC-006: it never fires again.
+        assert second.data["triggered_alerts"] == []
+        # The quote was fetched once for the first evaluation (cache reused).
+        assert route.call_count == 1
+
+    async def test_session_context_notes_alerts_it_could_not_check(self, fresh_memory):
+        fresh_memory.create_price_alert("MXRF11", "below", 999.0)
+        with respx.mock:
+            respx.get(f"{wallet_client.REST_BASE_URL}/assets/tickers/MXRF11").respond(status_code=410)
+            wallet_client.rest_client._cache.clear()
+            async with Client(mcp) as client:
+                result = await client.call_tool("get_session_context", {})
+        payload = result.data
+        assert payload["triggered_alerts"] == []
+        pending = payload["pending_check"]
+        assert len(pending) == 1
+        assert pending[0]["ticker"] == "MXRF11"
+        assert pending[0]["reason"] == "asset_type_not_supported"
+        # The alert remains active for a future check.
+        assert len(fresh_memory.list_price_alerts("active")) == 1
+
+
 class TestGetSessionContext:
     """T022 — contract of the session bootstrap tool and memory error mapping."""
 
