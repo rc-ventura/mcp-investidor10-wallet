@@ -185,10 +185,10 @@ description: "Task list for feature implementation"
 
 **Purpose**: Acabamento e validação integral
 
-- [ ] T039 [P] Completar `README.md`: configuração nos clientes (Claude Desktop JSON, `claude mcp add`, Devin CLI), env vars (`WALLET_ID`, `WALLET_MEMORY_PATH`, `WALLET_CACHE_TTL_SECONDS`), avisos de risco (API interna não documentada, delay B3, uso pessoal/educacional)
-- [ ] T040 [P] Revisão de erros: garantir que TODAS as tools retornam apenas envelope `{cached, fetched_at, data}` ou `{error: {code, message}}` — varredura em `server.py`/`wallet_client.py` contra contracts/mcp-tools.md
-- [ ] T041 Executar validação integral de `quickstart.md`: todos os cenários das 6 stories + edge cases (memória corrompida, rede fora) em um cliente MCP real
-- [ ] T042 Rodar `uv run pytest` completo (unit + contract) e `uv run pytest -m live` para regressão final
+- [X] T039 [P] Completar `README.md`: configuração nos clientes (Claude Desktop JSON, `claude mcp add`, Devin CLI), env vars (`WALLET_ID`, `WALLET_MEMORY_PATH`, `WALLET_CACHE_TTL_SECONDS`), avisos de risco (API interna não documentada, delay B3, uso pessoal/educacional)
+- [X] T040 [P] Revisão de erros: garantir que TODAS as tools retornam apenas envelope `{cached, fetched_at, data}` ou `{error: {code, message}}` — varredura em `server.py`/`wallet_client.py` contra contracts/mcp-tools.md
+- [X] T041 Executar validação integral de `quickstart.md`: todos os cenários das 6 stories + edge cases (memória corrompida, rede fora) em um cliente MCP real
+- [X] T042 Rodar `uv run pytest` completo (unit + contract) e `uv run pytest -m live` para regressão final
 
 ---
 

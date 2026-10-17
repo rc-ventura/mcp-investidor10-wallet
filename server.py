@@ -273,18 +273,28 @@ async def get_session_context() -> dict:
     except MemoryUnavailableError:
         return {"memory": None, "triggered_alerts": [], "pending_check": [], "memory_status": "unavailable"}
 
-    quotes: dict = {}
-    pending_check: list = []
-    for alert in memory.list_price_alerts("active"):
-        ticker = alert["ticker"]
-        if ticker in quotes:
-            continue  # one quote per ticker, reused across its alerts
-        try:
-            envelope = await wallet_client.rest_client.get_quote(ticker)
-            quotes[ticker] = _parse_quote_price(envelope["data"])
-        except wallet_client.SourceError as exc:
-            pending_check.append({"ticker": ticker, "reason": exc.code})
-    triggered = memory.evaluate_alerts(quotes)
+    try:
+        quotes: dict = {}
+        pending_check: list = []
+        for alert in memory.list_price_alerts("active"):
+            ticker = alert["ticker"]
+            if ticker in quotes:
+                continue  # one quote per ticker, reused across its alerts
+            try:
+                envelope = await wallet_client.rest_client.get_quote(ticker)
+                quotes[ticker] = _parse_quote_price(envelope["data"])
+            except wallet_client.SourceError as exc:
+                pending_check.append({"ticker": ticker, "reason": exc.code})
+        triggered = memory.evaluate_alerts(quotes)
+    except MemoryUnavailableError:
+        # The store degraded mid-session (e.g. file corrupted after boot):
+        # degrade gracefully instead of leaking an exception.
+        return {
+            "memory": digest,
+            "triggered_alerts": [],
+            "pending_check": [],
+            "memory_status": "unavailable",
+        }
     return {
         "memory": digest,
         "triggered_alerts": triggered,
