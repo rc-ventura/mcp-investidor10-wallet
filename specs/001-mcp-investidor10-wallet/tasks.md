@@ -255,3 +255,31 @@ description: "Task list for feature implementation"
 - Nunca fabricar valores em falha da fonte (FR-016) — erro estruturado sempre
 - Docstrings em inglês em TODAS as tools (são a interface com o LLM); interação com o usuário permanece pt-BR
 - Commit após cada fase/checkpoint
+
+---
+
+## Fixes do SDD Final Review — ciclo 2 (2026-10-17)
+
+- [X] C2-1 Rejeitar IDs ausentes/duplicados por coleção no load de `memory_store.py` (arquivo degrada com backup, sem sobrescrever o original)
+- [X] C2-2 Persistir todos os alertas satisfeitos em UMA gravação atômica em `evaluate_alerts` (falha na gravação não perde notificação — ADR-0002)
+- [X] C2-3 Conter limites numéricos malformados/oversized: helper `alert_is_valid` compartilhado; bootstrap reporta `invalid_alert` sem exceção crua
+- [X] C2-4 Validar tipos aninhados das respostas da fonte antes de cachear (`positions.data` lista, `earnings.sum` numérico) → `unexpected_format`
+- [X] C2-5 Servir cache expirado com idade explícita em HTTP 5xx (além de erros de transporte); 4xx continua erro explícito
+- [X] C2-6 Paginar `get_wallet_positions` em lotes de 50 até `total` (critério 100% dos ativos)
+- [X] C2-7 Payload vazio em `get_asset_quote` → `ticker_not_found` (T026); datas estritas `YYYY-MM-DD`; `WALLET_ID` numérico
+- [X] C2-8 Hardening de segurança: backup `.broken-*` com permissões 0600 (O_EXCL)
+- [X] C2-9 Documentar: contrato atualizado (paginação, pending_check, quote vazio, datas) e ADR-0002 criado
+- [X] C2-10 Testes de regressão: 162 unit/contract + 3 live, cobertura 97%
+
+---
+
+## Fixes do SDD Final Review — ciclo 3 (2026-10-17)
+
+- [X] C3-1 `get_summary`: `applied`/`equity` validados como numéricos (número finito ou string numérica finita — a fonte live envia strings; bool não conta) — presente mas inválido → `unexpected_format` sem cachear; teste de contrato com `{"applied": "not-a-number", "equity": 1000}` (fecha item obrigatório 4 do ciclo 2)
+- [X] C3-2 Paginação `get_positions`: dedupe por ticker (identidade da linha como fallback), parada em página sem progresso/curta/`total` atingido, teto fixo de 20 páginas removido, `merged["total"]` = linhas únicas coletadas; testes: fonte ignora `start`, sobreposição parcial, classe com 1050 posições, `total` ausente
+- [X] C3-3 Política de cache 5xx registrada no ADR-0003: bound `WALLET_CACHE_MAX_STALE_SECONDS` (default 86400) — entrada mais antiga → `source_unavailable`; testes de transporte e 503 dentro/fora do bound
+- [X] C3-4 Startup estruturado: `WALLET_ID` não numérico ou `WALLET_CACHE_TTL_SECONDS`/`WALLET_CACHE_MAX_STALE_SECONDS` inválidos → `SystemExit` com mensagem acionável, sem traceback; testes subprocess env-driven
+- [X] C3-5 `get_quote`: apenas payload genuinamente vazio (`{}`) → `ticker_not_found`; shape errada não vazia (array/null/string/número) → `unexpected_format`; testes para ambos
+- [X] C3-6 Ticker inválido persistido (regex) → `{"alert_id", "reason": "invalid_alert"}` via `TICKER_PATTERN` compartilhado entre `create_price_alert` e `alert_is_valid`; testes unit + contrato (lowercase continua válido)
+- [X] C3-7 Documentar: ADR-0003 criado; contrato atualizado (envelope 5xx, summary, paginação, quote); README com `WALLET_CACHE_MAX_STALE_SECONDS`
+- [X] C3-8 Testes de regressão: unit/contract completos + live + cobertura

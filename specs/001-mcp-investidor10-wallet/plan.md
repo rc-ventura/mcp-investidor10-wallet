@@ -1,6 +1,6 @@
 # Implementation Plan: Agente de Investimentos conectado à Carteira Investidor10
 
-**Branch**: `001-mcp-investidor10-wallet` | **Date**: 2026-10-10 | **Spec**: [spec.md](/Users/rafaelventura/CascadeProjects/mcp-investidor10-wallet/specs/001-mcp-investidor10-wallet/spec.md)
+**Branch**: `001-mcp-investidor10-wallet` | **Date**: 2026-10-10 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/001-mcp-investidor10-wallet/spec.md`
 
