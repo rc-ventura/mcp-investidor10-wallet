@@ -7,6 +7,9 @@ venv/
 dist/
 build/
 
+.coverage
+.coverage.*
+
 # Runtime state (local investor memory)
 memory.json
 memory.json.tmp

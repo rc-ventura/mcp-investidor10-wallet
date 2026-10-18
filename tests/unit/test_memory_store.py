@@ -3,6 +3,10 @@
 import datetime
 import glob
 import json
+import os
+import subprocess
+import sys
+from unittest.mock import patch
 
 import pytest
 
@@ -112,6 +116,98 @@ def test_unknown_future_version_degrades_without_backup(tmp_path):
     # Valid JSON with an unknown version is kept as-is: no .broken- backup needed.
     assert glob.glob(str(tmp_path / "memory.json.broken-*")) == []
     assert json.loads(path.read_text(encoding="utf-8"))["version"] == 99
+
+
+@pytest.mark.parametrize("data", [
+    {},
+    {"version": "1"},
+    {"version": True},
+    {"version": 1, "wallet_goal": None, "theses": {}, "rules": [], "decisions": [], "insights_log": [], "alerts": []},
+    {"version": 1, "wallet_goal": None, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [None]},
+    {"version": 1, "wallet_goal": None, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [{"id": "bad"}]},
+    {"version": 1, "wallet_goal": None, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [
+        {"id": 1, "ticker": "PETR4", "direction": "below", "limit_price": 30, "state": "active"},
+        {"id": 1, "ticker": "VALE3", "direction": "below", "limit_price": 20, "state": "active"},
+    ]},
+    {"version": 1, "wallet_goal": None, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [{"ticker": "PETR4"}]},
+])
+def test_invalid_schema_degrades_and_preserves_file(tmp_path, data):
+    path = tmp_path / "memory.json"
+    path.write_text(json.dumps(data))
+    store = MemoryStore(str(path))
+    assert not store.available
+    assert json.loads(path.read_text()) == data
+    assert len(glob.glob(str(path) + ".broken-*")) == 1
+
+
+def test_unreadable_file_degrades_without_crashing(tmp_path):
+    path = tmp_path / "memory.json"
+    path.write_text("private")
+    with patch("builtins.open", side_effect=PermissionError("denied")):
+        store = MemoryStore(str(path))
+    assert not store.available
+    assert path.read_text() == "private"
+
+
+def test_first_run_save_failure_degrades(tmp_path):
+    store = MemoryStore(str(tmp_path / "missing" / "memory.json"))
+    assert not store.available
+    with pytest.raises(MemoryUnavailableError):
+        store.get_wallet_goal()
+
+
+def test_save_failure_returns_memory_unavailable_without_overwriting_original(store, tmp_path, monkeypatch):
+    original = (tmp_path / "memory.json").read_text()
+    monkeypatch.setattr("memory_store.os.replace", lambda *args: (_ for _ in ()).throw(OSError("disk full")))
+    with pytest.raises(MemoryUnavailableError):
+        store.set_wallet_goal("Retirement")
+    assert not store.available
+    assert (tmp_path / "memory.json").read_text() == original
+    assert list(tmp_path.glob(".memory-*")) == []
+
+
+def test_save_does_not_follow_preexisting_tmp_symlink(store, tmp_path):
+    victim = tmp_path / "victim"
+    victim.write_text("untouched")
+    (tmp_path / "memory.json.tmp").symlink_to(victim)
+    store.save()
+    assert victim.read_text() == "untouched"
+
+
+def test_corrupt_backup_is_created_with_private_permissions(tmp_path):
+    path = tmp_path / "memory.json"
+    path.write_text("{broken")
+    MemoryStore(str(path))
+    backups = glob.glob(str(path) + ".broken-*")
+    assert len(backups) == 1
+    assert os.stat(backups[0]).st_mode & 0o777 == 0o600
+
+
+@pytest.mark.parametrize("content", ['{"version": NaN}', '{"version": 1, "wallet_goal": null, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [{"limit_price": Infinity}]}'])
+def test_nonstandard_numeric_constants_degrade(tmp_path, content):
+    path = tmp_path / "memory.json"
+    path.write_text(content)
+    assert not MemoryStore(str(path)).available
+    assert path.read_text() == content
+
+
+@pytest.mark.parametrize("content", [
+    "directory", "missing_parent", "invalid_json", '{"version": "1"}',
+    '{"version": 1}', "{}", '{"version": 2}',
+])
+def test_import_server_degrades_on_unusable_memory(tmp_path, content):
+    path = tmp_path / "memory.json"
+    if content == "directory":
+        path.mkdir()
+    elif content == "missing_parent":
+        path = tmp_path / "missing" / "memory.json"
+    else:
+        path.write_text("{corrupt" if content == "invalid_json" else content)
+    result = subprocess.run(
+        [sys.executable, "-c", "import server; assert not server.memory.available"],
+        env={**os.environ, "WALLET_MEMORY_PATH": str(path)}, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 # ----------------------------------------------------------------- domain operations

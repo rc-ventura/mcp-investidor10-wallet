@@ -7,13 +7,34 @@ the shared memory store, and the structured error helpers used by all tools.
 Specs: specs/001-mcp-investidor10-wallet/ (plan.md, contracts/mcp-tools.md)
 """
 
+import math
 import os
 
+import memory_store
 import wallet_client
 from fastmcp import FastMCP
+from fastmcp.exceptions import ValidationError
+from fastmcp.server.middleware import Middleware
+from fastmcp.tools import ToolResult
 from memory_store import MemoryStore, MemoryUnavailableError
 
 mcp = FastMCP("investidor10-wallet")
+
+
+class ParameterErrorMiddleware(Middleware):
+    async def on_call_tool(self, context, call_next) -> ToolResult:
+        try:
+            return await call_next(context)
+        except ValidationError:
+            return ToolResult(structured_content={
+                "error": {
+                    "code": "invalid_params",
+                    "message": f"Invalid parameters for {context.message.name}; check the tool schema",
+                }
+            })
+
+
+mcp.add_middleware(ParameterErrorMiddleware())
 
 memory = MemoryStore(os.getenv("WALLET_MEMORY_PATH", "memory.json"))
 
@@ -98,8 +119,8 @@ async def get_wallet_positions(asset_type: str) -> dict:
     Each position includes quantity, average price, current quote, equity,
     profitability, percent of wallet (percent_wallet), ideal percent
     (percent_ideal), fundamental indicators when the class provides them
-    (P/E, P/B, dividend yield, ROE) and the source's buy flag. A class with no
-    positions returns data as an empty list (not an error). Never invent
+    (P/E, P/B, dividend yield, ROE) and the source's buy flag. Positions are
+    in data.data; a class with no positions has data.data=[] (not an error). Never invent
     indicator values that the source did not provide.
 
     Presentation rules: compare percent_wallet vs percent_ideal when discussing
@@ -131,7 +152,7 @@ async def get_asset_quote(ticker: str) -> dict:
     `cached`/`fetched_at` (the response is a data envelope). When the ticker is
     also in the wallet, cross the quote with the position's average price using
     get_wallet_positions. Unknown tickers return a ticker_not_found error with
-    a spelling suggestion — never guess another ticker. Non-B3 assets (FIIs,
+    guidance to check spelling — never guess another ticker. Non-B3 assets (FIIs,
     international ETFs, crypto, treasury) return asset_type_not_supported.
 
     For on-demand asset REPORTS (FR-012): combine this quote and the wallet
@@ -154,10 +175,9 @@ async def get_earnings(start_date: str | None = None, end_date: str | None = Non
         end_date: YYYY-MM-DD. Must be after start_date — an inverted range
             returns an invalid_params error (never a silent empty result).
 
-    Presentation rules: present the total and per-asset breakdown for exactly
-    the requested window; a period without earnings is not an error — state it
-    plainly. To compute yield on cost, cross per-asset earnings with the
-    position's average price from get_wallet_positions. Always mention
+    Presentation rules: present the total (data.sum) for exactly the requested
+    window; this endpoint does not include per-asset earnings. A period without
+    earnings is not an error — state it plainly. Always mention
     `cached`/`fetched_at`.
     """
     try:
@@ -244,10 +264,14 @@ def _parse_quote_price(data) -> float | None:
     """Extract the current price from a quote payload, or None when unavailable."""
     try:
         raw = data["variation_day"]["last_quotation"]
+        if isinstance(raw, bool):
+            return None
         if isinstance(raw, (int, float)):
-            return float(raw)
-        return float(str(raw).replace(",", "."))
-    except (KeyError, TypeError, ValueError):
+            price = float(raw)
+        else:
+            price = float(str(raw).replace(",", "."))
+        return price if math.isfinite(price) and price > 0 else None
+    except (KeyError, TypeError, ValueError, OverflowError):
         return None
 
 
@@ -276,13 +300,22 @@ async def get_session_context() -> dict:
     try:
         quotes: dict = {}
         pending_check: list = []
+        attempted: set[str] = set()
         for alert in memory.list_price_alerts("active"):
-            ticker = alert["ticker"]
-            if ticker in quotes:
+            if not memory_store.alert_is_valid(alert):
+                pending_check.append({"alert_id": alert.get("id"), "reason": "invalid_alert"})
+                continue
+            ticker = alert["ticker"].strip().upper()
+            if ticker in attempted:
                 continue  # one quote per ticker, reused across its alerts
+            attempted.add(ticker)
             try:
                 envelope = await wallet_client.rest_client.get_quote(ticker)
-                quotes[ticker] = _parse_quote_price(envelope["data"])
+                price = _parse_quote_price(envelope.get("data"))
+                if price is None:
+                    pending_check.append({"ticker": ticker, "reason": "unexpected_format"})
+                else:
+                    quotes[ticker] = price
             except wallet_client.SourceError as exc:
                 pending_check.append({"ticker": ticker, "reason": exc.code})
         triggered = memory.evaluate_alerts(quotes)
