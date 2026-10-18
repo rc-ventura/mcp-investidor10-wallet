@@ -9,6 +9,8 @@ No frontend — the agent client is the interface. The server runs over stdio
 
 ## Status
 
+Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
 All 19 tools implemented (6 wallet/market data + 13 memory/alerts) — see
 [`specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md`](specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md)
 for the full contracts and
@@ -20,7 +22,7 @@ for the task history.
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync                                # install pinned dependencies
+uv sync                                        # install pinned dependencies
 WALLET_ID=2061045 uv run server.py     # run the MCP server over stdio
 ```
 
@@ -62,6 +64,7 @@ called; restart the client session to pick up new tools after an upgrade.
 | `WALLET_ID` | `2061045` | Public wallet ID on Investidor10 (FR-013) |
 | `WALLET_MEMORY_PATH` | `memory.json` | Path of the long-term memory store |
 | `WALLET_CACHE_TTL_SECONDS` | `600` | TTL for caching API responses (FR-014) |
+| `WALLET_CACHE_MAX_STALE_SECONDS` | `86400` | Max age of an expired cache entry served on 5xx/transport outage; older entries fail with `source_unavailable` (ADR-0003) |
 
 ## Tools (19)
 
@@ -81,6 +84,8 @@ uv run pytest -m live  # opt-in integration tests against the real API
 
 ## Data flow
 
+- Upstream API reference (unofficial, probed from the wallet frontend):
+  [`docs/api/`](docs/api/) — endpoints, params, auth model and quirks.
 - Wallet/market data comes from Investidor10's public (no-auth) API and is returned
   as `{"cached": bool, "fetched_at": ISO-8601, "data": ...}` so the agent always
   tells the user how fresh the data is. B3 quotes have an inherent ~15 min delay.

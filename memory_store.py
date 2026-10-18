@@ -11,10 +11,11 @@ Schema v1 (see specs/001-mcp-investidor10-wallet/data-model.md):
 """
 
 import datetime
-import glob
 import json
+import math
 import os
 import re
+import tempfile
 
 SCHEMA_VERSION = 1
 COLLECTIONS = ("theses", "rules", "decisions", "insights_log", "alerts")
@@ -24,6 +25,11 @@ DECISION_OUTCOMES = ("accepted", "rejected", "postponed")
 
 ALERT_DIRECTIONS = ("above", "below")
 ALERT_STATES = ("active", "triggered", "cancelled")
+
+# Single source of truth for ticker validity, shared by create_price_alert
+# and alert_is_valid (ADR-0003): 4-12 letters or digits, starting with a
+# letter, checked on the uppercase-normalized ticker.
+TICKER_PATTERN = re.compile(r"[A-Z][A-Z0-9]{3,11}")
 
 
 class MemoryUnavailableError(Exception):
@@ -41,6 +47,46 @@ def _empty_store() -> dict:
     return store
 
 
+def _valid_collection(entries) -> bool:
+    """A persisted collection must be a list of dicts with unique int ids >= 1."""
+    if not isinstance(entries, list):
+        return False
+    ids = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            return False
+        entry_id = entry.get("id")
+        if type(entry_id) is not int or entry_id < 1:
+            return False
+        ids.append(entry_id)
+    return len(ids) == len(set(ids))
+
+
+def alert_is_valid(alert: dict) -> bool:
+    """True when a persisted alert has a usable ticker, direction and limit.
+
+    Used by the session bootstrap (to report invalid alerts instead of raising)
+    and by evaluate_alerts (to skip them). Never raises for oversized numbers.
+    The ticker check uses the same pattern as create_price_alert, applied to
+    the normalized ticker so hand-edited lowercase tickers stay valid.
+    """
+    ticker = alert.get("ticker")
+    direction = alert.get("direction")
+    limit = alert.get("limit_price")
+    if not isinstance(ticker, str) or not TICKER_PATTERN.fullmatch(ticker.strip().upper()):
+        return False
+    if direction not in ALERT_DIRECTIONS:
+        return False
+    if type(alert.get("id")) is not int:
+        return False
+    if isinstance(limit, bool) or not isinstance(limit, (int, float)):
+        return False
+    try:
+        return math.isfinite(float(limit)) and float(limit) > 0
+    except (OverflowError, ValueError):
+        return False
+
+
 class MemoryStore:
     """JSON-file backed memory store with atomic persistence and degraded mode."""
 
@@ -53,46 +99,76 @@ class MemoryStore:
     # ------------------------------------------------------------------ load/save
 
     def _load(self) -> None:
-        if not os.path.exists(self.path):
-            # First run: create an empty v1 store on disk.
-            self.data = _empty_store()
-            self.save()
-            return
         try:
             with open(self.path, encoding="utf-8") as f:
                 loaded = json.load(f)
-            if not isinstance(loaded, dict) or loaded.get("version", 0) > SCHEMA_VERSION:
-                # Valid JSON, unknown schema version: refuse to interpret or
-                # rewrite it. Keep the file untouched and degrade.
-                self.available = False
-                return
-            self.data = loaded
-        except (json.JSONDecodeError, UnicodeDecodeError):
+            json.dumps(loaded, allow_nan=False)
+        except FileNotFoundError:
+            # First run: create an empty v1 store on disk.
+            try:
+                self.save()
+            except MemoryUnavailableError:
+                pass
+            return
+        except (OSError, ValueError, UnicodeDecodeError):
             # Corrupted file: preserve the original as a .broken-<timestamp>
             # backup before anything else could overwrite it, then degrade.
             self._backup_corrupt_file()
             self.available = False
+            return
+
+        if isinstance(loaded, dict) and type(loaded.get("version")) is int and loaded["version"] > SCHEMA_VERSION:
+            # Valid JSON, unknown schema version: refuse to interpret or
+            # rewrite it. Keep the file untouched and degrade.
+            self.available = False
+            return
+        if (
+            not isinstance(loaded, dict)
+            or type(loaded.get("version")) is not int
+            or loaded["version"] != SCHEMA_VERSION
+            or "wallet_goal" not in loaded
+            or not isinstance(loaded.get("wallet_goal"), (dict, type(None)))
+            or any(not _valid_collection(loaded.get(key)) for key in COLLECTIONS)
+        ):
+            self._backup_corrupt_file()
+            self.available = False
+            return
+        self.data = loaded
 
     def _backup_corrupt_file(self) -> None:
-        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         backup_path = f"{self.path}.broken-{stamp}"
         try:
-            if not glob.glob(backup_path):
-                with open(self.path, encoding="utf-8", errors="replace") as src:
-                    content = src.read()
-                with open(backup_path, "w", encoding="utf-8") as dst:
-                    dst.write(content)
+            with open(self.path, "rb") as src:
+                content = src.read()
+            fd = os.open(backup_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as dst:
+                dst.write(content)
         except OSError:
             # Backup is best-effort; degraded mode is still the safe outcome.
             pass
 
     def save(self) -> None:
-        """Persist the store atomically: write to a tmp file, then rename."""
+        """Persist the store atomically using a private temporary file."""
         self._require_available()
-        tmp_path = f"{self.path}.tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(self.data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, self.path)
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=os.path.dirname(os.path.abspath(self.path)),
+                prefix=".memory-", delete=False,
+            ) as f:
+                tmp_path = f.name
+                json.dump(self.data, f, ensure_ascii=False, indent=2, allow_nan=False)
+            os.replace(tmp_path, self.path)
+        except (OSError, ValueError) as exc:
+            self.available = False
+            raise MemoryUnavailableError(f"Memory store could not be saved at {self.path}: {exc}") from exc
+        finally:
+            if tmp_path is not None:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
     # ------------------------------------------------------------------ helpers
 
@@ -104,8 +180,8 @@ class MemoryStore:
     def _require_available(self) -> None:
         if not self.available:
             raise MemoryUnavailableError(
-                "Memory store is unavailable (corrupted file or unsupported schema "
-                f"version at {self.path}). The original file was preserved."
+                f"Memory store is unavailable (inaccessible or invalid file at {self.path}). "
+                "The original file was not overwritten."
             )
 
     def _collection(self, collection: str) -> list:
@@ -149,7 +225,9 @@ class MemoryStore:
 
     @staticmethod
     def _clean_text(value: str, field: str) -> str:
-        text = (value or "").strip()
+        if not isinstance(value, str):
+            raise ValueError(f"{field} must be text")
+        text = value.strip()
         if not text:
             raise ValueError(f"{field} must not be empty")
         return text
@@ -179,7 +257,7 @@ class MemoryStore:
         theses = self.get_all("theses")
         if ticker is None:
             return theses
-        normalized = ticker.strip().upper()
+        normalized = self._clean_text(ticker, "ticker").upper()
         return [t for t in theses if t.get("ticker") == normalized]
 
     def save_rule(self, text: str) -> dict:
@@ -199,6 +277,8 @@ class MemoryStore:
             entry["ticker"] = self._clean_text(ticker, "ticker").upper()
         else:
             entry["ticker"] = None
+        if rationale is not None and not isinstance(rationale, str):
+            raise ValueError("rationale must be text")
         entry["rationale"] = (rationale or "").strip() or None
         entry["date"] = self.now_iso()[:10]
         entry["outcome"] = "pending"
@@ -214,6 +294,8 @@ class MemoryStore:
             raise ValueError(
                 f"Invalid outcome '{outcome}'. Valid outcomes: {', '.join(DECISION_OUTCOMES)}"
             )
+        if note is not None and not isinstance(note, str):
+            raise ValueError("note must be text")
         return self.update(
             "decisions",
             decision_id,
@@ -251,15 +333,20 @@ class MemoryStore:
         if direction not in ALERT_DIRECTIONS:
             raise ValueError(f"Invalid direction '{direction}'. Valid directions: {', '.join(ALERT_DIRECTIONS)}")
         try:
+            if isinstance(limit_price, bool):
+                raise ValueError
             price = float(limit_price)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise ValueError("limit_price must be a number") from None
-        if price <= 0:
-            raise ValueError("limit_price must be greater than zero")
+        if not math.isfinite(price) or price <= 0:
+            raise ValueError("limit_price must be a finite number greater than zero")
+        normalized_ticker = self._clean_text(ticker, "ticker").upper()
+        if not TICKER_PATTERN.fullmatch(normalized_ticker):
+            raise ValueError("ticker must be 4-12 letters or digits, starting with a letter")
         return self.add(
             "alerts",
             {
-                "ticker": self._clean_text(ticker, "ticker").upper(),
+                "ticker": normalized_ticker,
                 "direction": direction,
                 "limit_price": price,
                 "state": "active",
@@ -293,28 +380,28 @@ class MemoryStore:
         quotes maps ticker -> current price. Tickers absent from `quotes`
         (check failed) are skipped and stay active. Triggers are terminal:
         a triggered alert is persisted as 'triggered' and never fires again
-        (SC-006). Returns the list of alerts triggered by this evaluation.
+        (SC-006). All satisfied alerts are persisted in ONE atomic save, so a
+        save failure leaves the file untouched and every alert still active
+        for the next session — no partially delivered notification is possible
+        (see docs/adrs/0002-memory-persistence-and-alert-delivery.md).
         """
         self._require_available()
         triggered = []
         for alert in self.get_all("alerts"):
-            if alert.get("state") != "active":
+            if alert.get("state") != "active" or not alert_is_valid(alert):
                 continue
-            price = quotes.get(alert["ticker"])
+            price = quotes.get(alert["ticker"].strip().upper())
             if price is None:
                 continue
-            hit = (
-                price <= alert["limit_price"]
-                if alert["direction"] == "below"
-                else price >= alert["limit_price"]
-            )
+            limit = float(alert["limit_price"])
+            hit = price <= limit if alert["direction"] == "below" else price >= limit
             if hit:
-                updated = self.update(
-                    "alerts",
-                    alert["id"],
-                    {"state": "triggered", "triggered_at": self.now_iso(), "triggered_price": price},
+                alert.update(
+                    {"state": "triggered", "triggered_at": self.now_iso(), "triggered_price": price}
                 )
-                triggered.append(updated)
+                triggered.append(alert)
+        if triggered:
+            self.save()
         return triggered
 
     def session_digest(self, recent_insights_limit: int = 10) -> dict:
@@ -328,5 +415,5 @@ class MemoryStore:
             "theses": theses_by_ticker,
             "rules": self.get_rules(),
             "pending_decisions": [d for d in self.get_all("decisions") if d.get("outcome") == "pending"],
-            "recent_insights": self.get_all("insights_log")[-recent_insights_limit:],
+            "recent_insights": self.get_all("insights_log")[-recent_insights_limit:] if recent_insights_limit else [],
         }
