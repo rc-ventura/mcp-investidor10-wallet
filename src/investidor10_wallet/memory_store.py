@@ -1,15 +1,3 @@
-"""Long-term memory store for the investor agent.
-
-Persists the investor's knowledge base (goal, theses, rules, decisions,
-insight log, price alerts) to a single local JSON file with a versioned
-schema. Writes are atomic (tmp + rename) and a corrupted or future-versioned
-file degrades the store into an explicitly unavailable mode instead of
-crashing the MCP server or losing data.
-
-Schema v1 (see specs/001-mcp-investidor10-wallet/data-model.md):
-    version, wallet_goal, theses, rules, decisions, insights_log, alerts
-"""
-
 import datetime
 import json
 import math
@@ -26,9 +14,8 @@ DECISION_OUTCOMES = ("accepted", "rejected", "postponed")
 ALERT_DIRECTIONS = ("above", "below")
 ALERT_STATES = ("active", "triggered", "cancelled")
 
-# Single source of truth for ticker validity, shared by create_price_alert
-# and alert_is_valid (ADR-0003): 4-12 letters or digits, starting with a
-# letter, checked on the uppercase-normalized ticker.
+# Ticker validity check shared by create_price_alert and alert_is_valid:
+# 4-12 letters or digits, starting with a letter, on the uppercase ticker.
 TICKER_PATTERN = re.compile(r"[A-Z][A-Z0-9]{3,11}")
 
 
@@ -73,7 +60,9 @@ def alert_is_valid(alert: dict) -> bool:
     ticker = alert.get("ticker")
     direction = alert.get("direction")
     limit = alert.get("limit_price")
-    if not isinstance(ticker, str) or not TICKER_PATTERN.fullmatch(ticker.strip().upper()):
+    if not isinstance(ticker, str) or not TICKER_PATTERN.fullmatch(
+        ticker.strip().upper()
+    ):
         return False
     if direction not in ALERT_DIRECTIONS:
         return False
@@ -117,7 +106,11 @@ class MemoryStore:
             self.available = False
             return
 
-        if isinstance(loaded, dict) and type(loaded.get("version")) is int and loaded["version"] > SCHEMA_VERSION:
+        if (
+            isinstance(loaded, dict)
+            and type(loaded.get("version")) is int
+            and loaded["version"] > SCHEMA_VERSION
+        ):
             # Valid JSON, unknown schema version: refuse to interpret or
             # rewrite it. Keep the file untouched and degrade.
             self.available = False
@@ -154,15 +147,20 @@ class MemoryStore:
         tmp_path = None
         try:
             with tempfile.NamedTemporaryFile(
-                mode="w", encoding="utf-8", dir=os.path.dirname(os.path.abspath(self.path)),
-                prefix=".memory-", delete=False,
+                mode="w",
+                encoding="utf-8",
+                dir=os.path.dirname(os.path.abspath(self.path)),
+                prefix=".memory-",
+                delete=False,
             ) as f:
                 tmp_path = f.name
                 json.dump(self.data, f, ensure_ascii=False, indent=2, allow_nan=False)
             os.replace(tmp_path, self.path)
         except (OSError, ValueError) as exc:
             self.available = False
-            raise MemoryUnavailableError(f"Memory store could not be saved at {self.path}: {exc}") from exc
+            raise MemoryUnavailableError(
+                f"Memory store could not be saved at {self.path}: {exc}"
+            ) from exc
         finally:
             if tmp_path is not None:
                 try:
@@ -267,11 +265,17 @@ class MemoryStore:
         return self.get_all("rules")
 
     def log_decision(
-        self, kind: str, content: str, ticker: str | None = None, rationale: str | None = None
+        self,
+        kind: str,
+        content: str,
+        ticker: str | None = None,
+        rationale: str | None = None,
     ) -> dict:
         self._require_available()
         if kind not in DECISION_KINDS:
-            raise ValueError(f"Invalid decision kind '{kind}'. Valid kinds: {', '.join(DECISION_KINDS)}")
+            raise ValueError(
+                f"Invalid decision kind '{kind}'. Valid kinds: {', '.join(DECISION_KINDS)}"
+            )
         entry = {"kind": kind, "content": self._clean_text(content, "content")}
         if ticker is not None:
             entry["ticker"] = self._clean_text(ticker, "ticker").upper()
@@ -299,11 +303,15 @@ class MemoryStore:
         return self.update(
             "decisions",
             decision_id,
-            {"outcome": outcome, "outcome_note": (note or "").strip() or None, "outcome_at": self.now_iso()},
+            {
+                "outcome": outcome,
+                "outcome_note": (note or "").strip() or None,
+                "outcome_at": self.now_iso(),
+            },
         )
 
     def log_insight(self, kind: str, fingerprint: str, summary: str) -> dict:
-        """Log a communicated insight; dedupes by fingerprint (SC-005).
+        """Log a communicated insight; dedupes by fingerprint.
 
         Returns {"already_logged": False, "entry": ...} for new insights or
         {"already_logged": True, "existing": ...} when the fingerprint exists —
@@ -328,10 +336,12 @@ class MemoryStore:
     # ---------------------------------------------------------------- price alerts
 
     def create_price_alert(self, ticker: str, direction: str, limit_price) -> dict:
-        """Create an alert with state='active' (see data-model state machine)."""
+        """Create an alert with state='active'."""
         self._require_available()
         if direction not in ALERT_DIRECTIONS:
-            raise ValueError(f"Invalid direction '{direction}'. Valid directions: {', '.join(ALERT_DIRECTIONS)}")
+            raise ValueError(
+                f"Invalid direction '{direction}'. Valid directions: {', '.join(ALERT_DIRECTIONS)}"
+            )
         try:
             if isinstance(limit_price, bool):
                 raise ValueError
@@ -342,7 +352,9 @@ class MemoryStore:
             raise ValueError("limit_price must be a finite number greater than zero")
         normalized_ticker = self._clean_text(ticker, "ticker").upper()
         if not TICKER_PATTERN.fullmatch(normalized_ticker):
-            raise ValueError("ticker must be 4-12 letters or digits, starting with a letter")
+            raise ValueError(
+                "ticker must be 4-12 letters or digits, starting with a letter"
+            )
         return self.add(
             "alerts",
             {
@@ -361,7 +373,9 @@ class MemoryStore:
         if state is None:
             return alerts
         if state not in ALERT_STATES:
-            raise ValueError(f"Invalid state '{state}'. Valid states: {', '.join(ALERT_STATES)}")
+            raise ValueError(
+                f"Invalid state '{state}'. Valid states: {', '.join(ALERT_STATES)}"
+            )
         return [a for a in alerts if a.get("state") == state]
 
     def cancel_price_alert(self, alert_id: int) -> dict | None:
@@ -371,7 +385,9 @@ class MemoryStore:
         if alert is None:
             return None
         if alert.get("state") != "active":
-            raise ValueError(f"Alert {alert_id} is already {alert.get('state')} and cannot be cancelled")
+            raise ValueError(
+                f"Alert {alert_id} is already {alert.get('state')} and cannot be cancelled"
+            )
         return self.update("alerts", alert_id, {"state": "cancelled"})
 
     def evaluate_alerts(self, quotes: dict) -> list:
@@ -379,11 +395,10 @@ class MemoryStore:
 
         quotes maps ticker -> current price. Tickers absent from `quotes`
         (check failed) are skipped and stay active. Triggers are terminal:
-        a triggered alert is persisted as 'triggered' and never fires again
-        (SC-006). All satisfied alerts are persisted in ONE atomic save, so a
-        save failure leaves the file untouched and every alert still active
-        for the next session — no partially delivered notification is possible
-        (see docs/adrs/0002-memory-persistence-and-alert-delivery.md).
+        a triggered alert is persisted as 'triggered' and never fires again.
+        All satisfied alerts are persisted in ONE atomic save, so a save
+        failure leaves the file untouched and every alert still active for
+        the next session — no partially delivered notification is possible.
         """
         self._require_available()
         triggered = []
@@ -397,7 +412,11 @@ class MemoryStore:
             hit = price <= limit if alert["direction"] == "below" else price >= limit
             if hit:
                 alert.update(
-                    {"state": "triggered", "triggered_at": self.now_iso(), "triggered_price": price}
+                    {
+                        "state": "triggered",
+                        "triggered_at": self.now_iso(),
+                        "triggered_price": price,
+                    }
                 )
                 triggered.append(alert)
         if triggered:
@@ -405,7 +424,7 @@ class MemoryStore:
         return triggered
 
     def session_digest(self, recent_insights_limit: int = 10) -> dict:
-        """Digest of the investor memory for the session bootstrap (FR-009)."""
+        """Digest of the investor memory for the session bootstrap."""
         self._require_available()
         theses_by_ticker: dict = {}
         for thesis in self.get_all("theses"):
@@ -414,6 +433,10 @@ class MemoryStore:
             "wallet_goal": self.data.get("wallet_goal"),
             "theses": theses_by_ticker,
             "rules": self.get_rules(),
-            "pending_decisions": [d for d in self.get_all("decisions") if d.get("outcome") == "pending"],
-            "recent_insights": self.get_all("insights_log")[-recent_insights_limit:] if recent_insights_limit else [],
+            "pending_decisions": [
+                d for d in self.get_all("decisions") if d.get("outcome") == "pending"
+            ],
+            "recent_insights": self.get_all("insights_log")[-recent_insights_limit:]
+            if recent_insights_limit
+            else [],
         }
