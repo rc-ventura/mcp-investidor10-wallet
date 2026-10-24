@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Build
+        run: uv build
+      - name: Check changelog section
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          grep -q "## \[${version}\]" CHANGELOG.md || {
+            echo "CHANGELOG.md does not have a [${version}] section"; exit 1; }
+      - name: Smoke test the wheel
+        run: |
+          python -m venv /tmp/smoke-venv
+          /tmp/smoke-venv/bin/pip install --quiet dist/*.whl
+          env -u WALLET_ID /tmp/smoke-venv/bin/python -c "import investidor10_wallet, investidor10_wallet.server; assert investidor10_wallet.__version__ == '${GITHUB_REF_NAME#v}'"
+          set +e
+          err_out=$(env -u WALLET_ID /tmp/smoke-venv/bin/mcp-investidor10-wallet 2>&1 >/dev/null)
+          rc=$?
+          set -e
+          test "$rc" -eq 1 || { echo "expected exit 1 without WALLET_ID, got $rc"; exit 1; }
+          echo "$err_out" | grep -q "WALLET_ID não configurado" || { echo "missing PT-BR guidance: $err_out"; exit 1; }
+          echo "$err_out" | grep -q "investidor10.com.br/carteira" || { echo "missing URL guidance: $err_out"; exit 1; }
+          init_req='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"release-smoke","version":"0.1.0"}}}'
+          stdio_out=$(printf '%s\n' "$init_req" | env WALLET_ID=2061045 HOME=/tmp/smoke-home HTTPS_PROXY=http://127.0.0.1:1 HTTP_PROXY=http://127.0.0.1:1 /tmp/smoke-venv/bin/mcp-investidor10-wallet)
+          echo "$stdio_out" | grep -q '"investidor10-wallet"' || { echo "expected initialize response on stdout, got: $stdio_out"; exit 1; }
+          test -d /tmp/smoke-home/.investidor10 || { echo "expected canonical dir /tmp/smoke-home/.investidor10"; exit 1; }
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

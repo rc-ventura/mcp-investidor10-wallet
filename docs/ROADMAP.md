@@ -22,23 +22,25 @@ Princípios que orientam este roadmap (decisões já tomadas, não reabrir):
 
 ## Fase 0 — Correções de produto (bloqueiam distribuição)
 
-- [ ] **Remover o WALLET_ID pessoal do default** — hoje
+> Entregue no ciclo 002 (spec `specs/002-distribution-readiness/`, 18/10/2026).
+
+- [x] **Remover o WALLET_ID pessoal do default** — hoje
   `wallet_client.py` usa `2061045` quando a env não está definida. Produto
   não pode nascer com a carteira do autor como default: exigir `WALLET_ID` na
   env e abortar startup com instrução clara de como achar o ID (está na URL
   pública da carteira).
-- [ ] **Empacotar no PyPI** — entry point + `uvx mcp-investidor10-wallet`
+- [x] **Empacotar no PyPI** — entry point + `uvx mcp-investidor10-wallet`
   como install de 1 linha (é o que reduz fricção de verdade; hoje exige
   clonar o repo). Inclui pre-commit/CI e versionamento semântico. Pré-
   requisito: item abaixo (path de memória estável — com `uvx` não existe
   repo dir, e o default relativo `memory.json` quebra).
-- [ ] **Path de memória estável por usuário** — o default relativo
+- [x] **Path de memória estável por usuário** — o default relativo
   `memory.json` só funciona porque amarra ao diretório do repo (funciona em
   terminal e desktop, ambos com `uv --directory`). Para produto, o default
   deve ser um local estável por usuário (ex.: `~/.investidor10/memory.json`
   ou `platformdirs.user_data_dir`) — e todos os clientes passam a
   compartilhar o mesmo arquivo (reforça o file lock da Fase 1).
-- [ ] **Onboarding de primeira execução** — validar o WALLET_ID (fetch +
+- [x] **Onboarding de primeira execução** — validar o WALLET_ID (fetch +
   erro amigável), explicar que a carteira precisa ser pública, docs PT-BR.
   Incluir o gotcha de desktop: apps GUI no macOS não herdam o PATH do
   shell — a config precisa do **caminho absoluto do `uv`** (ex. 
@@ -127,6 +129,24 @@ Princípios que orientam este roadmap (decisões já tomadas, não reabrir):
   motivo para tocar nelas (já passaram 4 ciclos verdes) nem schema de
   memory.json via pydantic — shape é a parte fácil, a semântica de degrade
   (backup `.broken-*`, modo indisponível) continua custom.
+- [ ] **Remover a migração legada `./memory.json` → canônico** — a
+  máquina inteira (ramos `MIGRADO`/`CANONICO_WINS`, `_atomic_copy`,
+  verificação de inode, backup `legacy-<timestamp>`, guarda
+  `cwd == canonical`) é código de transição da Fase 0 e virou dead code:
+  o único usuário migrou em 18/10/2026 (`./memory.json` →
+  `~/.investidor10/memory.json`) e `memory.json` está no `.gitignore`.
+  Removê-la elimina toda a superfície TOCTOU/symlink da migração e faz o
+  bootstrap **parar de inspecionar o cwd** — um `memory.json` stray
+  passa a ser ignorado em vez de absorvido no canônico. Manter:
+  `_ensure_canonical_dir` + `_ensure_not_symlink` no canônico e o
+  `WALLET_MEMORY_PATH` verbatim. `resolve_memory_path()` colapsa para
+  override → garantir `~/.investidor10` (0700) → retornar canônico.
+  Impacto: altera contratos da spec 002
+  (`contracts/packaging-and-config.md`) e remove testes de migração;
+  ADR-0010 já registra a remoção como condição de invalidação nº 1 —
+  decidir se antecipa agora (single-user já migrado) ou gateia no 1.0.0
+  conforme o texto original. Se adiada, o hardening da ADR-0010 §3–4
+  segue válido até lá.
 
 ## Fase 2 — Valor de produto (oriundo das learning lessons)
 
@@ -171,6 +191,32 @@ Princípios que orientam este roadmap (decisões já tomadas, não reabrir):
   exatamente o que atualizar manualmente no site. **Não** é um segundo MCP
   de escrita — escrita via API não-documentada em registro financeiro é
   anti-feature.
+- [ ] **Spike: multi-carteira (reserva × investimento)** — motivação real de
+  sessão (24/10/2026): a reserva de emergência (~16% do patrimônio, em
+  Tesouro Selic) entrou na soma da classe Tesouro e distorceu a análise de
+  alocação — corrigido na conversa com regra de memória, não por feature.
+  Cenário do usuário: carteiras separadas no Investidor10 (reserva de
+  emergência × aposentadoria). Investigar **antes** de prometer escopo:
+  - **Pergunta de API — RESOLVIDA (24/10/2026)**: cada carteira é um ID
+    público isolado; `summary/metrics`, `summary/donutchart` e
+    `summary/actives` respondem HTTP 200 com o mesmo envelope para a
+    segunda carteira (ID 2076291). Não há auth nem endpoint de "listar
+    carteiras" — aceitar N IDs basta;
+  - **Caso de borda descoberto**: posições podem se repetir entre
+    carteiras — a mesma posição de Tesouro Selic 2031 (0,86 título) está
+    registrada tanto na carteira principal quanto na de reserva do
+    usuário. Uma view consolidada precisa de dedup (mesmo ticker +
+    quantidade), senão conta o patrimônio em dobro;
+  - **Config**: `WALLET_IDS` (lista) na env + parâmetro `wallet` opcional
+    nas tools de carteira (default = primeira); ou `wallet` como filtro
+    sobre uma única config;
+  - **Memória**: rules/theses provavelmente globais; `wallet_goal`,
+    posições e análises de alocação são **por carteira** — decidir schema
+    (chave por wallet_id) sem quebrar o memory.json atual;
+  - **Alternativa leve (avaliar primeiro)**: tag de papel da posição na
+    memória local (ex.: `role=reserva`) excluindo da análise de alocação —
+    resolve o caso real de hoje sem multi-carteira. O spike decide se
+    multi-carteira é over-engineering frente a essa opção.
 
 ## Fase 3 — Distribuição
 

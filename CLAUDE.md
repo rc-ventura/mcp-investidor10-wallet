@@ -14,6 +14,9 @@
 | [0006](./docs/adrs/0006-embedded-memory-and-deterministic-bootstrap.md) | Embedded domain memory with a deterministic session bootstrap | Accepted | 2026-10-17 |
 | [0007](./docs/adrs/0007-passthrough-envelope-and-structured-errors.md) | Source passthrough with data envelope and structured errors | Accepted | 2026-10-17 |
 | [0008](./docs/adrs/0008-stateless-mcp-protocol-and-explicit-state.md) | Stateless MCP protocol (revision 2026-07-28) — explicit state alignment | Accepted | 2026-10-17 |
+| [0009](./docs/adrs/0009-idioma-das-mensagens-operador-vs-modelo.md) | Idioma das mensagens: operador em PT-BR, modelo em inglês | Accepted | 2026-10-18 |
+| [0010](./docs/adrs/0010-ciclo-de-vida-do-bootstrap-e-migracao.md) | Semântica do ciclo de vida do bootstrap e endurecimento da migração | Accepted | 2026-10-18 |
+| [0011](./docs/adrs/0011-estrategia-de-distribuicao-e-release.md) | Estratégia de distribuição e release — PyPI via `uvx`, src layout, versionamento 0.x e pipeline OIDC | Accepted | 2026-10-18 |
 
 ## Learning Lessons
 

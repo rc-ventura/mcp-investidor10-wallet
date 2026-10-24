@@ -42,6 +42,7 @@ O erro não é "ticker inexistente" — é **seção da API não coberta**. No s
 ```python
 REST_BASE_URL = "https://investidor10.com.br/api/rest"
 
+
 async def get_quote(self, ticker: str) -> dict:
     normalized = (ticker or "").strip().upper()
     return await self.request(f"/assets/tickers/{normalized}")  # só ações
