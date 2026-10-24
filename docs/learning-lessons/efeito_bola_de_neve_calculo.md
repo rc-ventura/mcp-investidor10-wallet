@@ -45,9 +45,10 @@ GET https://investidor10.com.br/api/rest/assets/fiis/{ticker}
 ```
 
 ```python
-pays = [p["amount_paid"] for p in d["payments"]
-        if p["type"] == "DIV" and p["amount_paid"]]
-recorrente = piso_dos_ultimos_6(pays)   # não média cega
+pays = [
+    p["amount_paid"] for p in d["payments"] if p["type"] == "DIV" and p["amount_paid"]
+]
+recorrente = piso_dos_ultimos_6(pays)  # não média cega
 cotas = math.ceil(price / recorrente)
 ```
 

@@ -35,21 +35,29 @@ E o `total` mesclado deve ser **derivado do que foi coletado** (`len(rows)`), nu
 seen: set = set()
 rows: list = []
 while True:
-    start = len(rows)                      # avança pelo que REALMENTE coletamos
+    start = len(rows)  # avança pelo que REALMENTE coletamos
     envelope = await self.request(...)
     page = envelope["data"]
     ...
     added = 0
     for row in page["data"]:
         ticker = row.get("ticker") if isinstance(row, dict) else None
-        identity = f"ticker:{ticker}" if ticker else json.dumps(row, sort_keys=True, default=str)
+        identity = (
+            f"ticker:{ticker}"
+            if ticker
+            else json.dumps(row, sort_keys=True, default=str)
+        )
         if identity not in seen:
             seen.add(identity)
             rows.append(row)
             added += 1
-    if added == 0 or len(page["data"]) < page_size or (total is not None and len(rows) >= total):
+    if (
+        added == 0
+        or len(page["data"]) < page_size
+        or (total is not None and len(rows) >= total)
+    ):
         break
-merged["total"] = len(rows)                # nunca reivindica mais linhas do que data contém
+merged["total"] = len(rows)  # nunca reivindica mais linhas do que data contém
 ```
 
 ## Exemplos no projeto

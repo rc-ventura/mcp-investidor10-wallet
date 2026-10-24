@@ -9,7 +9,8 @@ These hit investidor10.com.br and are excluded from the default pytest run
 import pytest
 from fastmcp import Client
 
-from server import mcp
+from investidor10_wallet import bootstrap, wallet_client
+from investidor10_wallet.server import mcp
 
 pytestmark = pytest.mark.live
 
@@ -25,7 +26,9 @@ async def test_live_wallet_summary_returns_data():
 async def test_live_all_asset_classes_respond_without_error():
     async with Client(mcp) as client:
         for asset_type in ("Ticker", "Fii", "EtfInternational", "Treasure", "Crypto"):
-            result = await client.call_tool("get_wallet_positions", {"asset_type": asset_type})
+            result = await client.call_tool(
+                "get_wallet_positions", {"asset_type": asset_type}
+            )
             payload = result.data
             assert "error" not in payload, f"{asset_type}: {payload}"
 
@@ -37,3 +40,14 @@ async def test_live_asset_quote_returns_positive_price():
     assert "error" not in payload, payload
     last = float(payload["data"]["variation_day"]["last_quotation"])
     assert last > 0
+
+
+async def test_live_probe_classifies_missing_wallet_as_404():
+    with pytest.raises(SystemExit) as excinfo:
+        await wallet_client.validate_wallet("99999999999")
+    message = str(excinfo.value)
+    assert bootstrap.WALLET_NOT_FOUND_MESSAGE.format(wallet_id="99999999999") == message
+
+
+async def test_live_probe_accepts_configured_wallet():
+    await wallet_client.validate_wallet(wallet_client.WALLET_ID)

@@ -14,8 +14,8 @@ import httpx
 import pytest
 import respx
 
-import wallet_client
-from wallet_client import SourceError, WalletClient
+from investidor10_wallet import bootstrap, wallet_client
+from investidor10_wallet.wallet_client import SourceError, WalletClient
 
 BASE = "https://api.example.test"
 PATH = "/summary/metrics/1234567"
@@ -28,7 +28,9 @@ def make_client(**kwargs) -> WalletClient:
 
 @respx.mock
 async def test_cache_hit_within_ttl_avoids_second_request():
-    route = respx.get(f"{BASE}{PATH}").mock(return_value=httpx.Response(200, json=PAYLOAD))
+    route = respx.get(f"{BASE}{PATH}").mock(
+        return_value=httpx.Response(200, json=PAYLOAD)
+    )
     client = make_client(ttl_seconds=600)
 
     first = await client.request(PATH)
@@ -43,12 +45,14 @@ async def test_cache_hit_within_ttl_avoids_second_request():
 
 @respx.mock
 async def test_cache_entry_expires_after_ttl():
-    route = respx.get(f"{BASE}{PATH}").mock(return_value=httpx.Response(200, json=PAYLOAD))
+    route = respx.get(f"{BASE}{PATH}").mock(
+        return_value=httpx.Response(200, json=PAYLOAD)
+    )
     client = make_client(ttl_seconds=600)
 
     await client.request(PATH)
     # Force the cached entry to be older than the TTL.
-    cache_key = (BASE, PATH, tuple())
+    cache_key = (BASE, PATH, ())
     _, fetched_at, data = client._cache[cache_key]
     client._cache[cache_key] = (time.monotonic() - 9999, fetched_at, data)
 
@@ -81,7 +85,9 @@ async def test_http_500_raises_source_unavailable():
 
 @respx.mock
 async def test_non_json_body_raises_unexpected_format():
-    respx.get(f"{BASE}{PATH}").mock(return_value=httpx.Response(200, content=b"<html>surprise</html>"))
+    respx.get(f"{BASE}{PATH}").mock(
+        return_value=httpx.Response(200, content=b"<html>surprise</html>")
+    )
     client = make_client()
 
     with pytest.raises(SourceError) as excinfo:
@@ -91,12 +97,14 @@ async def test_non_json_body_raises_unexpected_format():
 
 @respx.mock
 async def test_source_failure_serves_stale_cache_within_max_stale():
-    route = respx.get(f"{BASE}{PATH}").mock(return_value=httpx.Response(200, json=PAYLOAD))
+    route = respx.get(f"{BASE}{PATH}").mock(
+        return_value=httpx.Response(200, json=PAYLOAD)
+    )
     client = make_client(ttl_seconds=600, max_stale_seconds=7200)
 
     first = await client.request(PATH)
     # Expire the entry in the client cache, then make the source fail.
-    cache_key = (BASE, PATH, tuple())
+    cache_key = (BASE, PATH, ())
     _, fetched_at, data = client._cache[cache_key]
     client._cache[cache_key] = (time.monotonic() - 3600, fetched_at, data)
     route.mock(side_effect=httpx.ConnectTimeout("boom"))
@@ -109,11 +117,13 @@ async def test_source_failure_serves_stale_cache_within_max_stale():
 
 @respx.mock
 async def test_http_503_serves_stale_cache_within_max_stale():
-    route = respx.get(f"{BASE}{PATH}").mock(return_value=httpx.Response(200, json=PAYLOAD))
+    route = respx.get(f"{BASE}{PATH}").mock(
+        return_value=httpx.Response(200, json=PAYLOAD)
+    )
     client = make_client(ttl_seconds=600, max_stale_seconds=7200)
 
     first = await client.request(PATH)
-    cache_key = (BASE, PATH, tuple())
+    cache_key = (BASE, PATH, ())
     _, fetched_at, data = client._cache[cache_key]
     client._cache[cache_key] = (time.monotonic() - 3600, fetched_at, data)
     route.mock(return_value=httpx.Response(503))
@@ -129,11 +139,13 @@ async def test_http_503_serves_stale_cache_within_max_stale():
 async def test_source_failure_beyond_max_stale_raises_source_unavailable(failure):
     """The 5xx/transport fallback is bounded (ADR-0003): a cache entry older
     than WALLET_CACHE_MAX_STALE_SECONDS must never be served as data."""
-    route = respx.get(f"{BASE}{PATH}").mock(return_value=httpx.Response(200, json=PAYLOAD))
+    route = respx.get(f"{BASE}{PATH}").mock(
+        return_value=httpx.Response(200, json=PAYLOAD)
+    )
     client = make_client(ttl_seconds=600, max_stale_seconds=3600)
 
     await client.request(PATH)
-    cache_key = (BASE, PATH, tuple())
+    cache_key = (BASE, PATH, ())
     _, fetched_at, data = client._cache[cache_key]
     client._cache[cache_key] = (time.monotonic() - 9999, fetched_at, data)
     if failure == "transport_error":
@@ -156,7 +168,9 @@ async def test_http_503_without_cache_raises_source_unavailable():
 
 @respx.mock
 async def test_required_keys_missing_raises_unexpected_format():
-    respx.get(f"{BASE}{PATH}").mock(return_value=httpx.Response(200, json={"applied": 1}))
+    respx.get(f"{BASE}{PATH}").mock(
+        return_value=httpx.Response(200, json={"applied": 1})
+    )
     client = make_client()
 
     with pytest.raises(SourceError) as excinfo:
@@ -172,12 +186,15 @@ async def test_summary_schema_drift_returns_unexpected_format():
     assert excinfo.value.code == "unexpected_format"
 
 
-@pytest.mark.parametrize("payload", [
-    {"applied": "not-a-number", "equity": 1000},
-    {"applied": 1000, "equity": "nan"},
-    {"applied": True, "equity": 1000},
-    {"applied": 1000, "equity": []},
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"applied": "not-a-number", "equity": 1000},
+        {"applied": 1000, "equity": "nan"},
+        {"applied": True, "equity": 1000},
+        {"applied": 1000, "equity": []},
+    ],
+)
 @respx.mock
 async def test_summary_rejects_present_but_invalid_numeric_values(payload):
     """Present-but-invalid `applied`/`equity` must fail as unexpected_format
@@ -190,10 +207,13 @@ async def test_summary_rejects_present_but_invalid_numeric_values(payload):
     assert client._cache == {}
 
 
-@pytest.mark.parametrize("payload", [
-    {"applied": 96801.55, "equity": 108560.23},
-    {"applied": "96801.5575437", "equity": "108560.232569"},  # live source shape
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"applied": 96801.55, "equity": 108560.23},
+        {"applied": "96801.5575437", "equity": "108560.232569"},  # live source shape
+    ],
+)
 @respx.mock
 async def test_summary_accepts_valid_numeric_values(payload):
     respx.get(f"{BASE}/summary/metrics/1234567").respond(json=payload)
@@ -202,14 +222,22 @@ async def test_summary_accepts_valid_numeric_values(payload):
     assert envelope["data"] == payload
 
 
-@pytest.mark.parametrize("path,payload,method,args", [
-    ("/summary/donutchart/1234567/all", {}, "get_allocation", ()),
-    ("/summary/actives/1234567/Ticker", [], "get_positions", ("Ticker",)),
-    ("/summary/actives/1234567/Ticker", {"total": 0, "data": None}, "get_positions", ("Ticker",)),
-    ("/earnings/total-period/1234567", {}, "get_earnings", ()),
-    ("/earnings/total-period/1234567", {"sum": True}, "get_earnings", ()),
-    ("/summary/barchart/1234567/12/all", {}, "get_patrimony_history", (12,)),
-])
+@pytest.mark.parametrize(
+    "path,payload,method,args",
+    [
+        ("/summary/donutchart/1234567/all", {}, "get_allocation", ()),
+        ("/summary/actives/1234567/Ticker", [], "get_positions", ("Ticker",)),
+        (
+            "/summary/actives/1234567/Ticker",
+            {"total": 0, "data": None},
+            "get_positions",
+            ("Ticker",),
+        ),
+        ("/earnings/total-period/1234567", {}, "get_earnings", ()),
+        ("/earnings/total-period/1234567", {"sum": True}, "get_earnings", ()),
+        ("/summary/barchart/1234567/12/all", {}, "get_patrimony_history", (12,)),
+    ],
+)
 @respx.mock
 async def test_wallet_endpoints_reject_schema_drift(path, payload, method, args):
     respx.get(f"{BASE}{path}").respond(json=payload)
@@ -228,17 +256,18 @@ def test_wallet_client_rejects_non_numeric_wallet_id():
         WalletClient(BASE, wallet_id="ABC?raw=1#frag")
 
 
-def test_env_float_rejects_non_numeric_value(monkeypatch):
-    monkeypatch.setenv("WALLET_CACHE_TTL_SECONDS", "soon")
+def test_env_float_rejects_non_numeric_value():
     with pytest.raises(SystemExit) as excinfo:
-        wallet_client._env_float("WALLET_CACHE_TTL_SECONDS", "600")
+        bootstrap.load_config({"WALLET_ID": "123", "WALLET_CACHE_TTL_SECONDS": "soon"})
     assert "WALLET_CACHE_TTL_SECONDS" in str(excinfo.value)
 
 
 @pytest.mark.parametrize("bad", ["-5", "nan", "inf", "-inf"])
 def test_env_float_rejects_negative_and_nonfinite_values(bad):
     with pytest.raises(SystemExit):
-        wallet_client._env_float("WALLET_CACHE_MAX_STALE_SECONDS", bad)
+        bootstrap.load_config(
+            {"WALLET_ID": "123", "WALLET_CACHE_MAX_STALE_SECONDS": bad}
+        )
 
 
 @respx.mock
@@ -246,23 +275,42 @@ async def test_http_4xx_on_wallet_proxy_mentions_wallet_id():
     url = f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/1234567"
     respx.get(url).mock(return_value=httpx.Response(404))
     with pytest.raises(SourceError) as excinfo:
-        await WalletClient(wallet_client.WALLET_PROXY_BASE_URL).request("/summary/metrics/1234567")
+        await WalletClient(wallet_client.WALLET_PROXY_BASE_URL).request(
+            "/summary/metrics/1234567"
+        )
     assert "check WALLET_ID" in excinfo.value.message
 
 
-@pytest.mark.parametrize("env_overrides,needle", [
-    ({"WALLET_ID": "ABC?raw=1#frag"}, "WALLET_ID"),
-    ({"WALLET_CACHE_TTL_SECONDS": "soon"}, "WALLET_CACHE_TTL_SECONDS"),
-    ({"WALLET_CACHE_MAX_STALE_SECONDS": "tomorrow"}, "WALLET_CACHE_MAX_STALE_SECONDS"),
-    ({"WALLET_CACHE_TTL_SECONDS": "-5"}, "WALLET_CACHE_TTL_SECONDS"),
-])
-def test_invalid_env_config_fails_with_actionable_message_no_traceback(env_overrides, needle):
+@pytest.mark.parametrize(
+    "env_overrides,needle",
+    [
+        ({"WALLET_ID": "ABC?raw=1#frag"}, "WALLET_ID"),
+        ({"WALLET_CACHE_TTL_SECONDS": "soon"}, "WALLET_CACHE_TTL_SECONDS"),
+        (
+            {"WALLET_CACHE_MAX_STALE_SECONDS": "tomorrow"},
+            "WALLET_CACHE_MAX_STALE_SECONDS",
+        ),
+        ({"WALLET_CACHE_TTL_SECONDS": "-5"}, "WALLET_CACHE_TTL_SECONDS"),
+    ],
+)
+def test_invalid_env_config_fails_with_actionable_message_no_traceback(
+    env_overrides, needle
+):
     """Misconfigured env must fail startup with a clear, actionable message —
     not a raw import-time traceback (mirrors the memory degraded-mode
     philosophy)."""
     result = subprocess.run(
-        [sys.executable, "-c", "import wallet_client"],
-        env={**os.environ, **env_overrides}, capture_output=True, text=True,
+        [sys.executable, "-c", "from investidor10_wallet.server import main; main()"],
+        check=False,
+        env={
+            **os.environ,
+            **env_overrides,
+            "PYTHONPATH": os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..", "src")
+            ),
+        },
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 1
     assert needle in result.stderr
@@ -271,14 +319,17 @@ def test_invalid_env_config_fails_with_actionable_message_no_traceback(env_overr
 
 def test_to_payload_shape():
     err = SourceError("unexpected_format", "bad body")
-    assert err.to_payload() == {"error": {"code": "unexpected_format", "message": "bad body"}}
+    assert err.to_payload() == {
+        "error": {"code": "unexpected_format", "message": "bad body"}
+    }
 
 
-@pytest.mark.parametrize("ticker", ["ABC?raw=1#frag", "../other/endpoint", "ABC\nD", None, 123])
+@pytest.mark.parametrize(
+    "ticker", ["ABC?raw=1#frag", "../other/endpoint", "ABC\nD", None, 123]
+)
 async def test_quote_rejects_unsafe_ticker_without_request(ticker):
-    with respx.mock:
-        with pytest.raises(SourceError) as excinfo:
-            await make_client().get_quote(ticker)
+    with respx.mock, pytest.raises(SourceError) as excinfo:
+        await make_client().get_quote(ticker)
     assert excinfo.value.code == "invalid_params"
 
 
@@ -312,7 +363,9 @@ async def test_nonempty_wrong_shape_quote_payload_maps_to_unexpected_format(payl
 @pytest.mark.parametrize("value", ["n/a", "NaN", "Infinity", None, True])
 @respx.mock
 async def test_quote_rejects_unparseable_price(value):
-    respx.get(f"{BASE}/assets/tickers/PETR4").respond(json={"variation_day": {"last_quotation": value}})
+    respx.get(f"{BASE}/assets/tickers/PETR4").respond(
+        json={"variation_day": {"last_quotation": value}}
+    )
     with pytest.raises(SourceError) as excinfo:
         await make_client().get_quote("PETR4")
     assert excinfo.value.code == "unexpected_format"
@@ -358,6 +411,7 @@ async def test_positions_paginates_until_source_total():
 async def test_positions_dedupe_when_source_ignores_start():
     """A source that ignores `start` must not double-count holdings (SC-002):
     the same 50 rows on both pages yield 50 unique rows, not 100."""
+
     def rows(count):
         return [{"ticker": f"T{i}", "quantity": 1} for i in range(count)]
 
@@ -394,6 +448,7 @@ async def test_positions_dedupe_overlapping_pages():
 async def test_positions_collects_beyond_old_thousand_row_cap():
     """The fixed max_pages cap is gone: a class with 1050 positions is fully
     collected (progress-guarded until total)."""
+
     def rows(start, count):
         return [{"ticker": f"T{i}", "quantity": 1} for i in range(start, start + count)]
 
@@ -403,7 +458,10 @@ async def test_positions_collects_beyond_old_thousand_row_cap():
         start = int(request.url.params["start"])
         remaining = 1050 - start
         count = min(50, remaining)
-        return httpx.Response(200, json={"total": 1050, "data": rows(start, count), "weighted": {}, "draw": 0})
+        return httpx.Response(
+            200,
+            json={"total": 1050, "data": rows(start, count), "weighted": {}, "draw": 0},
+        )
 
     route.side_effect = responder
     envelope = await make_client().get_positions("Ticker")
@@ -427,19 +485,28 @@ async def test_positions_stops_on_short_page_when_total_missing():
     assert envelope["data"]["total"] == 57
 
 
-@pytest.mark.parametrize("today,start", [
-    (datetime.date(2024, 2, 29), "2023-02-28"),
-    (datetime.date(2026, 10, 17), "2025-10-17"),
-])
+@pytest.mark.parametrize(
+    "today,start",
+    [
+        (datetime.date(2024, 2, 29), "2023-02-28"),
+        (datetime.date(2026, 10, 17), "2025-10-17"),
+    ],
+)
 async def test_default_earnings_uses_calendar_year(monkeypatch, today, start):
     class FixedDate(datetime.date):
         @classmethod
         def today(cls):
             return today
 
-    monkeypatch.setattr(wallet_client, "datetime", SimpleNamespace(date=FixedDate, datetime=datetime.datetime))
+    monkeypatch.setattr(
+        wallet_client,
+        "datetime",
+        SimpleNamespace(date=FixedDate, datetime=datetime.datetime),
+    )
     with respx.mock:
-        route = respx.get(f"{BASE}/earnings/total-period/1234567").respond(json={"sum": 0.0})
+        route = respx.get(f"{BASE}/earnings/total-period/1234567").respond(
+            json={"sum": 0.0}
+        )
         await make_client().get_earnings()
     assert route.calls[0].request.url.params["start_date"] == start
     assert route.calls[0].request.url.params["end_date"] == today.isoformat()
