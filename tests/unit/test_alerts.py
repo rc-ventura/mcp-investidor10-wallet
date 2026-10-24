@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-import memory_store
-from memory_store import MemoryStore, MemoryUnavailableError
+from investidor10_wallet import memory_store
+from investidor10_wallet.memory_store import MemoryStore, MemoryUnavailableError
 
 
 @pytest.fixture
@@ -129,7 +129,10 @@ def test_evaluate_alerts_failed_save_persists_nothing(tmp_path, monkeypatch):
     store = MemoryStore(str(tmp_path / "memory.json"))
     store.create_price_alert("PETR4", "below", 30.0)
     store.create_price_alert("VALE3", "below", 20.0)
-    monkeypatch.setattr("memory_store.os.replace", lambda *a: (_ for _ in ()).throw(OSError("disk full")))
+    monkeypatch.setattr(
+        "investidor10_wallet.memory_store.os.replace",
+        lambda *a: (_ for _ in ()).throw(OSError("disk full")),
+    )
     with pytest.raises(MemoryUnavailableError):
         store.evaluate_alerts({"PETR4": 10.0, "VALE3": 10.0})
     # The failed save persisted nothing: every alert is still active for the

@@ -10,12 +10,13 @@ from unittest.mock import patch
 
 import pytest
 
-from memory_store import MemoryStore, MemoryUnavailableError
+from investidor10_wallet.memory_store import MemoryStore, MemoryUnavailableError
 
 
 @pytest.fixture
 def store(tmp_path):
     return MemoryStore(str(tmp_path / "memory.json"))
+
 
 SCHEMA_COLLECTIONS = ("theses", "rules", "decisions", "insights_log", "alerts")
 
@@ -51,7 +52,9 @@ def test_add_assigns_monotonic_ids_per_collection_and_persists(tmp_path):
 
 def test_add_stamps_local_timezone_iso_timestamp(tmp_path):
     store = MemoryStore(str(tmp_path / "memory.json"))
-    entry = store.add("insights_log", {"kind": "concentration_alert", "fingerprint": "PETR4:15.2>8.0"})
+    entry = store.add(
+        "insights_log", {"kind": "concentration_alert", "fingerprint": "PETR4:15.2>8.0"}
+    )
     assert "created_at" in entry
     parsed = datetime.datetime.fromisoformat(entry["created_at"])
     assert parsed.utcoffset() is not None
@@ -64,7 +67,11 @@ def test_find_and_update_persist_changes(tmp_path):
     assert store.find("theses", entry["id"])["text"] == "original"
     assert store.find("theses", 999) is None
 
-    updated = store.update("theses", entry["id"], {"text": "revised", "updated_at": "2026-10-10T12:00:00-03:00"})
+    updated = store.update(
+        "theses",
+        entry["id"],
+        {"text": "revised", "updated_at": "2026-10-10T12:00:00-03:00"},
+    )
     assert updated["text"] == "revised"
     assert store.find("theses", entry["id"])["text"] == "revised"
 
@@ -106,7 +113,15 @@ def test_corrupted_file_degrades_without_crash_and_creates_backup(tmp_path):
 
 def test_unknown_future_version_degrades_without_backup(tmp_path):
     path = tmp_path / "memory.json"
-    future = {"version": 99, "wallet_goal": None, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": []}
+    future = {
+        "version": 99,
+        "wallet_goal": None,
+        "theses": [],
+        "rules": [],
+        "decisions": [],
+        "insights_log": [],
+        "alerts": [],
+    }
     path.write_text(json.dumps(future), encoding="utf-8")
 
     store = MemoryStore(str(path))
@@ -118,19 +133,74 @@ def test_unknown_future_version_degrades_without_backup(tmp_path):
     assert json.loads(path.read_text(encoding="utf-8"))["version"] == 99
 
 
-@pytest.mark.parametrize("data", [
-    {},
-    {"version": "1"},
-    {"version": True},
-    {"version": 1, "wallet_goal": None, "theses": {}, "rules": [], "decisions": [], "insights_log": [], "alerts": []},
-    {"version": 1, "wallet_goal": None, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [None]},
-    {"version": 1, "wallet_goal": None, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [{"id": "bad"}]},
-    {"version": 1, "wallet_goal": None, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [
-        {"id": 1, "ticker": "PETR4", "direction": "below", "limit_price": 30, "state": "active"},
-        {"id": 1, "ticker": "VALE3", "direction": "below", "limit_price": 20, "state": "active"},
-    ]},
-    {"version": 1, "wallet_goal": None, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [{"ticker": "PETR4"}]},
-])
+@pytest.mark.parametrize(
+    "data",
+    [
+        {},
+        {"version": "1"},
+        {"version": True},
+        {
+            "version": 1,
+            "wallet_goal": None,
+            "theses": {},
+            "rules": [],
+            "decisions": [],
+            "insights_log": [],
+            "alerts": [],
+        },
+        {
+            "version": 1,
+            "wallet_goal": None,
+            "theses": [],
+            "rules": [],
+            "decisions": [],
+            "insights_log": [],
+            "alerts": [None],
+        },
+        {
+            "version": 1,
+            "wallet_goal": None,
+            "theses": [],
+            "rules": [],
+            "decisions": [],
+            "insights_log": [],
+            "alerts": [{"id": "bad"}],
+        },
+        {
+            "version": 1,
+            "wallet_goal": None,
+            "theses": [],
+            "rules": [],
+            "decisions": [],
+            "insights_log": [],
+            "alerts": [
+                {
+                    "id": 1,
+                    "ticker": "PETR4",
+                    "direction": "below",
+                    "limit_price": 30,
+                    "state": "active",
+                },
+                {
+                    "id": 1,
+                    "ticker": "VALE3",
+                    "direction": "below",
+                    "limit_price": 20,
+                    "state": "active",
+                },
+            ],
+        },
+        {
+            "version": 1,
+            "wallet_goal": None,
+            "theses": [],
+            "rules": [],
+            "decisions": [],
+            "insights_log": [],
+            "alerts": [{"ticker": "PETR4"}],
+        },
+    ],
+)
 def test_invalid_schema_degrades_and_preserves_file(tmp_path, data):
     path = tmp_path / "memory.json"
     path.write_text(json.dumps(data))
@@ -156,9 +226,14 @@ def test_first_run_save_failure_degrades(tmp_path):
         store.get_wallet_goal()
 
 
-def test_save_failure_returns_memory_unavailable_without_overwriting_original(store, tmp_path, monkeypatch):
+def test_save_failure_returns_memory_unavailable_without_overwriting_original(
+    store, tmp_path, monkeypatch
+):
     original = (tmp_path / "memory.json").read_text()
-    monkeypatch.setattr("memory_store.os.replace", lambda *args: (_ for _ in ()).throw(OSError("disk full")))
+    monkeypatch.setattr(
+        "investidor10_wallet.memory_store.os.replace",
+        lambda *args: (_ for _ in ()).throw(OSError("disk full")),
+    )
     with pytest.raises(MemoryUnavailableError):
         store.set_wallet_goal("Retirement")
     assert not store.available
@@ -183,7 +258,13 @@ def test_corrupt_backup_is_created_with_private_permissions(tmp_path):
     assert os.stat(backups[0]).st_mode & 0o777 == 0o600
 
 
-@pytest.mark.parametrize("content", ['{"version": NaN}', '{"version": 1, "wallet_goal": null, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [{"limit_price": Infinity}]}'])
+@pytest.mark.parametrize(
+    "content",
+    [
+        '{"version": NaN}',
+        '{"version": 1, "wallet_goal": null, "theses": [], "rules": [], "decisions": [], "insights_log": [], "alerts": [{"limit_price": Infinity}]}',
+    ],
+)
 def test_nonstandard_numeric_constants_degrade(tmp_path, content):
     path = tmp_path / "memory.json"
     path.write_text(content)
@@ -191,10 +272,18 @@ def test_nonstandard_numeric_constants_degrade(tmp_path, content):
     assert path.read_text() == content
 
 
-@pytest.mark.parametrize("content", [
-    "directory", "missing_parent", "invalid_json", '{"version": "1"}',
-    '{"version": 1}', "{}", '{"version": 2}',
-])
+@pytest.mark.parametrize(
+    "content",
+    [
+        "directory",
+        "missing_parent",
+        "invalid_json",
+        '{"version": "1"}',
+        '{"version": 1}',
+        "{}",
+        '{"version": 2}',
+    ],
+)
 def test_import_server_degrades_on_unusable_memory(tmp_path, content):
     path = tmp_path / "memory.json"
     if content == "directory":
@@ -204,8 +293,21 @@ def test_import_server_degrades_on_unusable_memory(tmp_path, content):
     else:
         path.write_text("{corrupt" if content == "invalid_json" else content)
     result = subprocess.run(
-        [sys.executable, "-c", "import server; assert not server.memory.available"],
-        env={**os.environ, "WALLET_MEMORY_PATH": str(path)}, capture_output=True, text=True,
+        [
+            sys.executable,
+            "-c",
+            "from investidor10_wallet import server; assert not server.memory.available",
+        ],
+        check=False,
+        env={
+            **os.environ,
+            "WALLET_MEMORY_PATH": str(path),
+            "PYTHONPATH": os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..", "src")
+            ),
+        },
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0, result.stderr
 
@@ -256,8 +358,10 @@ def test_rules_save_and_list(store):
 
 def test_log_decision_defaults_to_pending(store):
     decision = store.log_decision(
-        "recommendation", "Reduce concentration in PETR4 (15.2% vs 8% ideal)",
-        ticker="petr4", rationale="Sector concentration risk",
+        "recommendation",
+        "Reduce concentration in PETR4 (15.2% vs 8% ideal)",
+        ticker="petr4",
+        rationale="Sector concentration risk",
     )
     assert decision["kind"] == "recommendation"
     assert decision["ticker"] == "PETR4"
@@ -271,7 +375,9 @@ def test_log_decision_defaults_to_pending(store):
 
 def test_record_decision_outcome_transitions_and_stamps(store):
     decision = store.log_decision("recommendation", "Add to MXRF11 below ideal")
-    updated = store.record_decision_outcome(decision["id"], "rejected", note="Not this month")
+    updated = store.record_decision_outcome(
+        decision["id"], "rejected", note="Not this month"
+    )
     assert updated["outcome"] == "rejected"
     assert updated["outcome_note"] == "Not this month"
     assert updated["outcome_at"]
@@ -282,11 +388,15 @@ def test_record_decision_outcome_transitions_and_stamps(store):
 
 
 def test_log_insight_dedupes_by_fingerprint(store):
-    first = store.log_insight("concentration_alert", "PETR4:15.2>8.0", "PETR4 concentration alert shown")
+    first = store.log_insight(
+        "concentration_alert", "PETR4:15.2>8.0", "PETR4 concentration alert shown"
+    )
     assert first["already_logged"] is False
     assert first["entry"]["fingerprint"] == "PETR4:15.2>8.0"
 
-    duplicate = store.log_insight("concentration_alert", "PETR4:15.2>8.0", "would repeat the alert")
+    duplicate = store.log_insight(
+        "concentration_alert", "PETR4:15.2>8.0", "would repeat the alert"
+    )
     assert duplicate["already_logged"] is True
     assert duplicate["existing"]["fingerprint"] == "PETR4:15.2>8.0"
     # SC-005: the duplicate insight was NOT appended.

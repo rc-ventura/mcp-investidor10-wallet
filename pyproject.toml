@@ -1,24 +1,52 @@
 [project]
 name = "mcp-investidor10-wallet"
-version = "0.1.0"
+dynamic = ["version"]
 description = "MCP server that exposes an Investidor10 public wallet, with long-term investor memory and price alerts"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp==4.0.10",
     "httpx==0.28.1",
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+]
+
+[project.scripts]
+mcp-investidor10-wallet = "investidor10_wallet.server:main"
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/investidor10_wallet/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/investidor10_wallet"]
 
 [dependency-groups]
 dev = [
+    "pre-commit==4.6.0",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "respx==0.23.1",
+    "ruff==0.17.0",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-pythonpath = ["."]
+pythonpath = ["src"]
 addopts = '-m "not live"'
 markers = [
     "live: integration tests that hit the real Investidor10 API (deselected by default; opt-in with -m live)",
 ]
+
+[tool.ruff.lint]
+# ValueError is deliberate where callers map it to the invalid_params error
+# code; switching to TypeError (TRY004) would change the tool contract.
+ignore = ["TRY004"]
