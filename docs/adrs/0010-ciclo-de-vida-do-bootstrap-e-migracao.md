@@ -67,6 +67,15 @@ O ciclo 1 de revisão da spec 002 (`reports/sdd-final-review/002/cycle-1-2026101
 
 - `_LazyMemory` adiciona uma pequena camada de indireção para chamadas de tools fora de `main()` (ex.: suíte de testes de contrato via `Client(mcp)`), eliminada em produção assim que `main()` substitui `server.memory` pela instância concreta de `MemoryStore`.
 
+### Residual acceptances (SDD cycle 2)
+
+Achados do relatório do ciclo 2 que permanecem aceitos como estado — não são decisões novas, mas residuais do endurecimento acima, registrados aqui para não serem re-derivados:
+
+1. **Probe aceita qualquer HTTP 200 sem validar o body** (`wallet_client.py`): um captive-portal ou 200 de lixo passa como `ok` em `validate_wallet`. Aceito: o pior caso é o servidor subir e a primeira tool de dados falhar com `unexpected_format` estruturado (ADR-0007) — degradação projetada, não silêncio. Validar o shape do payload é hardening deferido.
+2. **Janelas TOCTOU residuais**: dois check-then-act que o código não fecha — `os.lstat` → `os.chmod` em `_ensure_canonical_dir` e `_ensure_not_symlink(canonical)` → `open()` posterior em `MemoryStore._load`. Fechados pelo threat model single-user (ADR-0004 §2), não pelo código; aceitos como INFO.
+3. **Guarda `cwd == canonical` usa `abspath`, não `realpath`**: um intermediário symlink no caminho escapa da igualdade e poderia entrar no ramo de conflito indevidamente. Fast-follow junto ao endurecimento opcional do override (nota da decisão 6).
+4. **Import lê `WALLET_ID` do ambiente** (`wallet_client.py`, nível de módulo): leitura pura, sem validação, rede ou disco — consistente com a pureza de import (decisão 1), que proíbe side effects, não leitura.
+
 ### Conditions that invalidate this decision
 
 This decision should be **revisited** if:

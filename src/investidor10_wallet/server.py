@@ -1,22 +1,13 @@
-"""MCP server: Investidor10 wallet agent with long-term investor memory.
-
-Runs over stdio (the agent client spawns this process; no network exposed).
-Tool registration happens per user story; this module owns the app instance,
-the shared memory store, and the structured error helpers used by all tools.
-
-Specs: specs/001-mcp-investidor10-wallet/ (plan.md, contracts/mcp-tools.md)
-"""
-
+import asyncio
 import math
-import os
 
-import memory_store
-import wallet_client
 from fastmcp import FastMCP
 from fastmcp.exceptions import ValidationError
 from fastmcp.server.middleware import Middleware
 from fastmcp.tools import ToolResult
-from memory_store import MemoryStore, MemoryUnavailableError
+
+from . import bootstrap, memory_store, wallet_client
+from .memory_store import MemoryStore, MemoryUnavailableError
 
 mcp = FastMCP("investidor10-wallet")
 
@@ -26,17 +17,30 @@ class ParameterErrorMiddleware(Middleware):
         try:
             return await call_next(context)
         except ValidationError:
-            return ToolResult(structured_content={
-                "error": {
-                    "code": "invalid_params",
-                    "message": f"Invalid parameters for {context.message.name}; check the tool schema",
+            return ToolResult(
+                structured_content={
+                    "error": {
+                        "code": "invalid_params",
+                        "message": f"Invalid parameters for {context.message.name}; check the tool schema",
+                    }
                 }
-            })
+            )
 
 
 mcp.add_middleware(ParameterErrorMiddleware())
 
-memory = MemoryStore(os.getenv("WALLET_MEMORY_PATH", "memory.json"))
+
+class _LazyMemory:
+    def __init__(self) -> None:
+        self._store: MemoryStore | None = None
+
+    def __getattr__(self, name: str):
+        if self._store is None:
+            self._store = MemoryStore(bootstrap.resolve_memory_path())
+        return getattr(self._store, name)
+
+
+memory: MemoryStore | _LazyMemory = _LazyMemory()
 
 
 def source_error_payload(exc: wallet_client.SourceError) -> dict:
@@ -48,7 +52,7 @@ def memory_error_payload(exc: MemoryUnavailableError) -> dict:
     """Convert a memory-store failure into the structured error envelope.
 
     The agent should inform the user and keep operating without memory
-    (spec edge case: corrupted memory must not disable the other tools).
+    (corrupted memory must not disable the other tools).
     """
     return {"error": {"code": "memory_unavailable", "message": str(exc)}}
 
@@ -90,9 +94,9 @@ async def get_wallet_summary() -> dict:
 async def get_wallet_allocation() -> dict:
     """Wallet allocation broken down by asset (ticker) and by asset class.
 
-    Use together with get_wallet_positions to analyze rebalancing (FR-007):
+    Use together with get_wallet_positions to analyze rebalancing:
     compare each position's percent_wallet against its percent_ideal, order the
-    deviations by magnitude (SC-003, 0.1 percentage-point precision), and when
+    deviations by magnitude (0.1 percentage-point precision), and when
     suggesting new contributions prioritize assets below their ideal percent
     that carry a positive `buy` flag from the source. Never suggest selling an
     asset unless the user explicitly asks for it; if the wallet is aligned with
@@ -127,7 +131,7 @@ async def get_wallet_positions(asset_type: str) -> dict:
     rebalancing; for EtfInternational positions, remind the user that equity
     involves currency conversion; always mention `cached` and `fetched_at`.
 
-    For on-demand asset REPORTS (FR-012): start from the position data here,
+    For on-demand asset REPORTS: start from the position data here,
     add the current quote via get_asset_quote, then enrich with recent events
     from your own web search, citing every source; if no relevant recent news
     exists, say so explicitly instead of padding with generic content.
@@ -155,7 +159,7 @@ async def get_asset_quote(ticker: str) -> dict:
     guidance to check spelling — never guess another ticker. Non-B3 assets (FIIs,
     international ETFs, crypto, treasury) return asset_type_not_supported.
 
-    For on-demand asset REPORTS (FR-012): combine this quote and the wallet
+    For on-demand asset REPORTS: combine this quote and the wallet
     position (when held) with recent events found through your own web search,
     citing every source; if no relevant recent news exists, say so explicitly
     instead of padding the report with generic content.
@@ -167,7 +171,9 @@ async def get_asset_quote(ticker: str) -> dict:
 
 
 @mcp.tool
-async def get_earnings(start_date: str | None = None, end_date: str | None = None) -> dict:
+async def get_earnings(
+    start_date: str | None = None, end_date: str | None = None
+) -> dict:
     """Earnings (dividends, interest, income) received by the wallet in a period.
 
     Args:
@@ -295,7 +301,12 @@ async def get_session_context() -> dict:
     try:
         digest = memory.session_digest()
     except MemoryUnavailableError:
-        return {"memory": None, "triggered_alerts": [], "pending_check": [], "memory_status": "unavailable"}
+        return {
+            "memory": None,
+            "triggered_alerts": [],
+            "pending_check": [],
+            "memory_status": "unavailable",
+        }
 
     try:
         quotes: dict = {}
@@ -303,7 +314,9 @@ async def get_session_context() -> dict:
         attempted: set[str] = set()
         for alert in memory.list_price_alerts("active"):
             if not memory_store.alert_is_valid(alert):
-                pending_check.append({"alert_id": alert.get("id"), "reason": "invalid_alert"})
+                pending_check.append(
+                    {"alert_id": alert.get("id"), "reason": "invalid_alert"}
+                )
                 continue
             ticker = alert["ticker"].strip().upper()
             if ticker in attempted:
@@ -313,7 +326,9 @@ async def get_session_context() -> dict:
                 envelope = await wallet_client.rest_client.get_quote(ticker)
                 price = _parse_quote_price(envelope.get("data"))
                 if price is None:
-                    pending_check.append({"ticker": ticker, "reason": "unexpected_format"})
+                    pending_check.append(
+                        {"ticker": ticker, "reason": "unexpected_format"}
+                    )
                 else:
                     quotes[ticker] = price
             except wallet_client.SourceError as exc:
@@ -438,7 +453,9 @@ async def log_decision(
 
 
 @mcp.tool
-async def record_decision_outcome(decision_id: int, outcome: str, note: str | None = None) -> dict:
+async def record_decision_outcome(
+    decision_id: int, outcome: str, note: str | None = None
+) -> dict:
     """Record the outcome of a logged decision when the user tells what they
     did about it. Outcomes: 'accepted', 'rejected', 'postponed'.
 
@@ -475,5 +492,15 @@ async def log_insight(kind: str, fingerprint: str, summary: str) -> dict:
         return _memory_or_param_error(exc)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Run the server: validate config, prepare memory, probe wallet, and serve stdio."""
+    global memory
+    config = bootstrap.load_config()
+    wallet_client.configure(config)
+    memory = MemoryStore(bootstrap.resolve_memory_path())
+    asyncio.run(wallet_client.validate_wallet(wallet_client.WALLET_ID))
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()
