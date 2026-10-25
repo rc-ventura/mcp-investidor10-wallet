@@ -32,9 +32,12 @@ idênticos em forma, zero lógica de escrita de arquivo para manter.
 **Fontes verificadas**:
 - Claude Code: `claude mcp add <name> [--scope user|project|local] -- <command>`
   (README deste projeto, documento da invocação que funciona).
-- Devin CLI: `devin mcp add` conforme README; a config cai nos arquivos
-  `mcp_config*` (`docs/extensibility/mcp/configuration.mdx`, lido localmente
-  em 2026-10-24).
+- Devin CLI: `devin mcp add -s user carteira -e WALLET_ID=<id> -- uvx
+  mcp-investidor10-wallet` — flags verificadas na versão instalada via
+  `devin mcp add --help` em 2026-10-24: `-s/--scope user` grava em
+  `~/.config/devin/mcp_config.json` e `-e/--env` injeta variáveis; `devin mcp
+  list` lista os servidores (learning lesson
+  `docs/learning-lessons/devin_mcp_add_user_scope.md`).
 - Codex CLI: `codex mcp add <name> --env VAR=VAL -- <command>` e
   `codex mcp list` — docs oficiais (`learn.chatgpt.com/docs/extend/mcp`,
   buscado em 2026-10-24). Config em `~/.codex/config.toml` sob
@@ -145,8 +148,9 @@ escrita na memória segue o ADR-0002 (a memória é do usuário).
 
 ## D5 — Escopo de instalação para as CLIs
 
-**Decision**: escopo user em todas (`claude mcp add --scope user`, config
-user-level do Devin, `gemini mcp add -s user`). Registro em escopo de projeto
+**Decision**: escopo user em todas (`claude mcp add --scope user`,
+`devin mcp add -s user`, `gemini mcp add -s user`; o Codex grava por padrão
+em `~/.codex/config.toml`, que é user-level). Registro em escopo de projeto
 permanece opção manual documentada.
 
 **Rationale**: a carteira é pessoal e por máquina (a memória em
@@ -155,9 +159,6 @@ essa fronteira.
 
 ## Verificações abertas (fase de implementação)
 
-- Confirmar o comportamento do flag de user scope do `devin mcp add` via
-  `devin mcp add --help` na versão instalada (docs mostram arquivos de config
-  de projeto; localização do arquivo user-level a confirmar).
 - Testar a carga do plugin nos dois clientes e confirmar ativação dos hooks
   (hooks do Devin são fail-open por design).
 - Confirmar que a expansão `${WALLET_ID}` no `.mcp.json` compartilhado

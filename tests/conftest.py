@@ -23,6 +23,9 @@ def fake_bin_dir(tmp_path, monkeypatch):
             'if [ "$1" = "mcp" ] && [ "$2" = "list" ]; then\n'
             f'  [ -f "{bin_dir}/mcp-list.out" ] && cat "{bin_dir}/mcp-list.out"\n'
             "fi\n"
+            f'if [ -f "{bin_dir}/exit-code" ]; then\n'
+            f'  exit "$(cat "{bin_dir}/exit-code")"\n'
+            "fi\n"
             "exit 0\n"
         )
         script.chmod(script.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
