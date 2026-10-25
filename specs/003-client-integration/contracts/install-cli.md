@@ -35,7 +35,7 @@ da inicialização do servidor; todo o resto permanece servidor MCP.
 | Cliente | Comando executado | Detecção de existência |
 |---|---|---|
 | Claude Code | `claude mcp add carteira --scope user -- env WALLET_ID=<id> uvx mcp-investidor10-wallet` | `claude mcp list` |
-| Devin CLI | `devin mcp add carteira -- env WALLET_ID=<id> uvx mcp-investidor10-wallet` (user scope; flag exata confirmada na implementação) | `devin mcp list` |
+| Devin CLI | `devin mcp add -s user carteira -e WALLET_ID=<id> -- uvx mcp-investidor10-wallet` (flags verificadas em 2026-10-24 — learning lesson) | `devin mcp list` |
 | Codex CLI | `codex mcp add carteira --env WALLET_ID=<id> -- uvx mcp-investidor10-wallet` | `codex mcp list` |
 | Gemini CLI | `gemini mcp add -s user -e WALLET_ID=<id> carteira uvx mcp-investidor10-wallet` | `gemini mcp list` |
 

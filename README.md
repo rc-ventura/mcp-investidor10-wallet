@@ -75,7 +75,7 @@ claude mcp add carteira -- env WALLET_ID=SEU_ID uvx mcp-investidor10-wallet
 **Devin CLI**:
 
 ```bash
-devin mcp add carteira -- env WALLET_ID=SEU_ID uvx mcp-investidor10-wallet
+devin mcp add -s user carteira -e WALLET_ID=SEU_ID -- uvx mcp-investidor10-wallet
 ```
 
 O cliente reinicia o servidor a cada sessão; depois de uma atualização,
