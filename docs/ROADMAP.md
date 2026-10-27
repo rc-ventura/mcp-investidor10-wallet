@@ -20,6 +20,50 @@ Princípios que orientam este roadmap (decisões já tomadas, não reabrir):
 
 ---
 
+## Matriz MoSCoW (priorização de 27/10/2026)
+
+Critério: o produto 0.2.0 já está publicado e é usável para o mantenedor.
+**Must** = sem isso não se divulga a terceiros com segurança (perda de dado,
+números sem verificação, risco de privacidade não documentado). **Should** =
+alto valor, mas o produto funciona sem. **Could** = ganho incremental ou
+motivado por um caso de uso único. **Won't (agora)** = só faz sentido com
+outros usuários ou depende de fator externo; reavaliar depois.
+
+| Prioridade | Item | Fase | Por quê |
+|---|---|---|---|
+| **Must** | File lock no `memory.json` | 1 | O instalador (spec 003) agora põe o servidor em até 4 clientes; escritas concorrentes se perdem (last-write-wins) |
+| **Must** | Doc de privacidade | 1 | O ID da carteira é a credencial e o mascaramento do site é cosmético; precisa estar escrito antes de divulgar |
+| **Must** | Spec 004 — verificação determinística de cálculos | 4 | Maior lacuna de confiança: números financeiros calculados na LLM sem checagem (Constituição II) |
+| **Should** | Changelog append-only da memória (`memory.json.log`) | 1 | Escrita válida porém errada do modelo hoje é invisível e irrecuperável; ~25 linhas |
+| **Should** | Sinal duplo de erro (`is_error` + envelope) | 1 | No protocolo, o erro aparece como sucesso |
+| **Should** | Action semanal de live tests | 1 | A API upstream é não-documentada; é o risco #1 de produção (ADR-0005) |
+| **Should** | `get_entries` — log de lançamentos | 2 | Endpoint já validado; responde "o que comprei e quando" sem aproximação |
+| **Should** | Tool de projeção de renda recorrente (bola de neve) | 2 | Lição validada; evita o erro de usar DY médio |
+| **Should** | Skill "monitor de juro longo" | 4 | Motivação real e pequena; vale para os 4 clientes (SKILL.md) |
+| **Could** | `instructions=` no FastMCP | 1 | Melhora a descoberta; não muda comportamento |
+| **Could** | Validação de payloads via pydantic | 1 | Decisão de design para as tools novas |
+| **Could** | Remover a migração legada `./memory.json` | 1 | Dead code de transição; limpeza |
+| **Could** | `get_earnings_detailed` | 2 | O detalhe por ativo existe na API; hoje só o total é exposto |
+| **Could** | Roteamento de cotação por tipo de ativo | 2 | Cobre FIIs; o resto depende de fonte externa |
+| **Could** | Alertas compostos e gatilhos por indicador | 2 | Depende de baseline real e de fonte de cotação |
+| **Could** | Snapshot de posições para diff entre sessões | 2 | Útil, mas `get_entries` cobre parte do caso |
+| **Could** | Coleção `trades` na memória | 2 | Caso de uso do mantenedor; `decisions` serve de contorno |
+| **Won't (agora)** | `WALLET_MASK_VALUES` | 1 | Só importa com outros usuários ou LLM local |
+| **Won't (agora)** | Avaliação Ollama local + nota na doc | 1/3 | Depende do mask e de privacidade total como requisito |
+| **Won't (agora)** | Reconciliação corretora↔carteira | 2 | Grande; read-only; reavaliar após `get_entries` |
+| **Won't (agora)** | Spike multi-carteira | 2 | Contornado por regra de memória |
+| **Won't (agora)** | Listagem em MCP registries | 3 | Gargalo é o ToS da API não-documentada, não o técnico |
+| **Won't (agora)** | Claude Desktop / extensão `.mcpb` | — | Adiado de propósito na spec 003 (research.md D3) |
+
+Nota: o item "CHANGELOG" da Fase 1 já foi atendido (`CHANGELOG.md` existe
+desde a 0.1.0) e pode ser marcado `[x]`. Os itens "Fora de escopo" ao final
+do documento seguem valendo e não entram na matriz.
+
+**Sequência sugerida:** PR único de file lock + doc de privacidade (0.2.1),
+depois a spec 004; os Should entram por ordem de risco (live tests primeiro).
+
+---
+
 ## Fase 0 — Correções de produto (bloqueiam distribuição)
 
 > Entregue no ciclo 002 (spec `specs/002-distribution-readiness/`, 18/10/2026).
