@@ -132,7 +132,7 @@ de um único repo.
 - [x] T023 [P] Atualizar `CHANGELOG.md` com seção `## [0.2.0] - <data>` (Keep a Changelog PT-BR, feat→minor conforme ADR-0011) cobrindo assistente de instalação (4 CLIs) e plugin; bump de versão para `0.2.0` em `src/investidor10_wallet/__init__.py`
 - [x] T024 [P] Criar `docs/adrs/0012-integracao-automatica-de-clientes.md` consolidando D1–D5 de research.md (comandos nativos por CLI incl. Codex, três manifestos de plugin, adiamento do Desktop para spec futura, escopo user, execução sequencial em lotes) com as mesmas seções dos ADRs vizinhos; atualizar a tabela de ADRs em `CLAUDE.md`
 - [x] T025 [P] Rodar os gates: `uv run ruff check` + `uv run ruff format --check` + `uv run pytest` (não-live) verdes; pre-commit passa; CI matrix verde (3.11/3.12/3.13 × ubuntu/macos)
-- [ ] T026 Executar o `specs/003-client-integration/quickstart.md` completo (V1–V4) e preencher evidências; criar PR cujo corpo referencia `specs/003-client-integration/spec.md` e roda a review SDD (QA + Segurança + Tech Leader)
+- [x] T026 Executar o `specs/003-client-integration/quickstart.md` completo (V1–V4) e preencher evidências; criar PR cujo corpo referencia `specs/003-client-integration/spec.md` e roda a review SDD (QA + Segurança + Tech Leader)
 
 ---
 
