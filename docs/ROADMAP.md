@@ -20,47 +20,53 @@ Princípios que orientam este roadmap (decisões já tomadas, não reabrir):
 
 ---
 
-## Matriz MoSCoW (priorização de 27/10/2026)
+## Matriz MoSCoW (priorização de 27/10/2026, revisada)
 
-Critério: o produto 0.2.0 já está publicado e é usável para o mantenedor.
-**Must** = sem isso não se divulga a terceiros com segurança (perda de dado,
-números sem verificação, risco de privacidade não documentado). **Should** =
-alto valor, mas o produto funciona sem. **Could** = ganho incremental ou
-motivado por um caso de uso único. **Won't (agora)** = só faz sentido com
-outros usuários ou depende de fator externo; reavaliar depois.
+Critério: o produto 0.2.0 já está publicado e é usável pelo mantenedor.
+Decisão do mantenedor (27/10/2026): **tudo que é distribuição do produto
+vem na frente**; Claude Desktop é um upgrade do produto e o Devin Desktop
+entra no mesmo teste. **Must** = necessário para distribuir com segurança
+(alcance, privacidade, não perder dado). **Should** = alto valor, o produto
+funciona sem. **Could** = ganho incremental ou de caso de uso único.
+**Won't (agora)** = só faz sentido com mais usuários ou depende de fator
+externo; reavaliar depois.
 
 | Prioridade | Item | Fase | Por quê |
 |---|---|---|---|
-| **Must** | File lock no `memory.json` | 1 | O instalador (spec 003) agora põe o servidor em até 4 clientes; escritas concorrentes se perdem (last-write-wins) |
-| **Must** | Doc de privacidade | 1 | O ID da carteira é a credencial e o mascaramento do site é cosmético; precisa estar escrito antes de divulgar |
-| **Must** | Spec 004 — verificação determinística de cálculos | 4 | Maior lacuna de confiança: números financeiros calculados na LLM sem checagem (Constituição II) |
-| **Should** | Changelog append-only da memória (`memory.json.log`) | 1 | Escrita válida porém errada do modelo hoje é invisível e irrecuperável; ~25 linhas |
+| **Must** | Claude Desktop — extensão `.mcpb` como asset de release | 3 | Principal canal de quem não usa CLI; assistente de instalação não alcança apps GUI (research.md D3, spec 003) |
+| **Must** | Devin Desktop — testar registro do MCP e carga do plugin | 3 | Mesmo upgrade de alcance; formato ainda não verificado |
+| **Must** | Validação de distribuição em máquina limpa (V2 real, Codex via TUI, Gemini) | 3 | Pendências aceitas da spec 003; hoje só há dry-run e contrato |
+| **Must** | Doc de privacidade | 1 | Pré-requisito de divulgar: o ID da carteira é a credencial e o mascaramento do site é cosmético |
+| **Must** | File lock no `memory.json` | 1 | Com Desktop + CLIs, mais processos escrevem no mesmo arquivo; last-write-wins perde dado |
+| **Must** | Listagem em MCP registries (Smithery, PulseMCP, diretório Anthropic) | 3 | É distribuição; **antes de submeter, decidir o risco do ToS** da API não-documentada (ADR-0005) |
+| **Should** | Spec 004 — verificação determinística de cálculos | 4 | Maior lacuna de confiança; sobe de Must por ordem de decisão (distribuição primeiro), não por importância |
+| **Should** | Modo privacidade `WALLET_MASK_VALUES` | 1 | Passa a fazer sentido ao distribuir; env var, nunca parâmetro de tool |
+| **Should** | Action semanal de live tests | 1 | A API upstream é não-documentada; risco #1 de produção, cresce com mais usuários |
+| **Should** | Changelog append-only da memória (`memory.json.log`) | 1 | Escrita válida porém errada do modelo hoje é invisível; ~25 linhas |
 | **Should** | Sinal duplo de erro (`is_error` + envelope) | 1 | No protocolo, o erro aparece como sucesso |
-| **Should** | Action semanal de live tests | 1 | A API upstream é não-documentada; é o risco #1 de produção (ADR-0005) |
-| **Should** | `get_entries` — log de lançamentos | 2 | Endpoint já validado; responde "o que comprei e quando" sem aproximação |
-| **Should** | Tool de projeção de renda recorrente (bola de neve) | 2 | Lição validada; evita o erro de usar DY médio |
-| **Should** | Skill "monitor de juro longo" | 4 | Motivação real e pequena; vale para os 4 clientes (SKILL.md) |
-| **Could** | `instructions=` no FastMCP | 1 | Melhora a descoberta; não muda comportamento |
+| **Should** | `get_entries` — log de lançamentos | 2 | Endpoint já validado; responde "o que comprei e quando" |
+| **Should** | Tool de projeção de renda recorrente (bola de neve) | 2 | Lição validada; evita usar DY médio |
+| **Should** | Skill "monitor de juro longo" | 4 | Motivação real e pequena; vale para os 4 clientes |
+| **Could** | `instructions=` no FastMCP | 1 | Melhora a descoberta; ajuda nos registries |
 | **Could** | Validação de payloads via pydantic | 1 | Decisão de design para as tools novas |
-| **Could** | Remover a migração legada `./memory.json` | 1 | Dead code de transição; limpeza |
+| **Could** | Remover a migração legada `./memory.json` | 1 | Dead code de transição |
 | **Could** | `get_earnings_detailed` | 2 | O detalhe por ativo existe na API; hoje só o total é exposto |
 | **Could** | Roteamento de cotação por tipo de ativo | 2 | Cobre FIIs; o resto depende de fonte externa |
 | **Could** | Alertas compostos e gatilhos por indicador | 2 | Depende de baseline real e de fonte de cotação |
-| **Could** | Snapshot de posições para diff entre sessões | 2 | Útil, mas `get_entries` cobre parte do caso |
+| **Could** | Snapshot de posições para diff entre sessões | 2 | `get_entries` cobre parte do caso |
 | **Could** | Coleção `trades` na memória | 2 | Caso de uso do mantenedor; `decisions` serve de contorno |
-| **Won't (agora)** | `WALLET_MASK_VALUES` | 1 | Só importa com outros usuários ou LLM local |
 | **Won't (agora)** | Avaliação Ollama local + nota na doc | 1/3 | Depende do mask e de privacidade total como requisito |
-| **Won't (agora)** | Reconciliação corretora↔carteira | 2 | Grande; read-only; reavaliar após `get_entries` |
+| **Won't (agora)** | Reconciliação corretora↔carteira | 2 | Grande; reavaliar após `get_entries` |
 | **Won't (agora)** | Spike multi-carteira | 2 | Contornado por regra de memória |
-| **Won't (agora)** | Listagem em MCP registries | 3 | Gargalo é o ToS da API não-documentada, não o técnico |
-| **Won't (agora)** | Claude Desktop / extensão `.mcpb` | — | Adiado de propósito na spec 003 (research.md D3) |
 
 Nota: o item "CHANGELOG" da Fase 1 já foi atendido (`CHANGELOG.md` existe
 desde a 0.1.0) e pode ser marcado `[x]`. Os itens "Fora de escopo" ao final
 do documento seguem valendo e não entram na matriz.
 
-**Sequência sugerida:** PR único de file lock + doc de privacidade (0.2.1),
-depois a spec 004; os Should entram por ordem de risco (live tests primeiro).
+**Sequência sugerida:** (1) doc de privacidade + file lock num PR (0.2.1);
+(2) spec 005 de distribuição Desktop — `.mcpb` do Claude Desktop e teste do
+Devin Desktop; (3) validação em máquina limpa e submissão aos registries;
+(4) spec 004; os demais Should por ordem de risco (live tests primeiro).
 
 ---
 
@@ -320,6 +326,15 @@ depois a spec 004; os Should entram por ordem de risco (live tests primeiro).
 
 ## Fase 3 — Distribuição
 
+- [ ] **Claude Desktop — extensão `.mcpb`** — pacote distribuído como asset
+  de release (pesquisa em `specs/003-client-integration/research.md` D3);
+  precisa de spec própria (005). O assistente de instalação não alcança
+  apps GUI.
+- [ ] **Devin Desktop — teste de registro do MCP e do plugin** — verificar
+  o formato antes de prometer suporte; registrar divergências em
+  `docs/learning-lessons/`.
+- [ ] **Validação em máquina limpa** — `uvx ... install` real (V2.2/V2.4 do
+  quickstart da spec 003), plugin no Codex via TUI e Gemini CLI.
 - [ ] **Listagem em MCP registries** (Smithery, PulseMCP, diretório
   Anthropic) — após Fase 0. Posicionar como ferramenta comunitária/pessoal:
   o gating real não é técnico, é o ToS da API não-documentada.
