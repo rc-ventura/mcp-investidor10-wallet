@@ -1,5 +1,6 @@
 import asyncio
 import math
+import sys
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ValidationError
@@ -493,7 +494,11 @@ async def log_insight(kind: str, fingerprint: str, summary: str) -> dict:
 
 
 def main() -> None:
-    """Run the server: validate config, prepare memory, probe wallet, and serve stdio."""
+    """Run the server, or the install assistant when argv starts with 'install'."""
+    if len(sys.argv) > 1 and sys.argv[1] == "install":
+        from .installer import cli
+
+        raise SystemExit(cli.run(sys.argv[2:]))
     global memory
     config = bootstrap.load_config()
     wallet_client.configure(config)

@@ -54,7 +54,10 @@ operator error.
 8. **Dependency posture**: fastmcp and httpx pinned (research D9). The Oct-2026
    FastMCP GHSAs in range for 4.0.10 affect client/OpenAPI surfaces this server
    never instantiates — accepted as scoped risk with a scheduled tested upgrade
-   to >=4.1.0 as hardening.
+   to >=4.1.0 as hardening. Atualizado 2026-10-27: upgrade para
+   `fastmcp==4.0.11` executado no ciclo spec 003 (patch que corrige o GHSA
+   crítico do client — superfície que este servidor não instancia), com suíte
+   completa verde; a meta >=4.1.0 permanece como hardening agendado.
 
 ## Consequences
 

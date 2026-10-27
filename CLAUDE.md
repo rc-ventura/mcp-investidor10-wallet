@@ -17,6 +17,7 @@
 | [0009](./docs/adrs/0009-idioma-das-mensagens-operador-vs-modelo.md) | Idioma das mensagens: operador em PT-BR, modelo em inglês | Accepted | 2026-10-18 |
 | [0010](./docs/adrs/0010-ciclo-de-vida-do-bootstrap-e-migracao.md) | Semântica do ciclo de vida do bootstrap e endurecimento da migração | Accepted | 2026-10-18 |
 | [0011](./docs/adrs/0011-estrategia-de-distribuicao-e-release.md) | Estratégia de distribuição e release — PyPI via `uvx`, src layout, versionamento 0.x e pipeline OIDC | Accepted | 2026-10-18 |
+| [0012](./docs/adrs/0012-integracao-automatica-de-clientes.md) | Integração automática de clientes — assistente de instalação e plugin de comportamento (bundle em 4 CLIs) | Accepted | 2026-10-26 |
 
 ## Learning Lessons
 
@@ -26,3 +27,6 @@
 - [API upstream tem detalhe de proventos por ativo — o MCP só expõe o total agregado](./docs/learning-lessons/earnings_list_detalhe_proventos_por_ativo.md) — 2026-10-17
 - [Efeito bola de neve: usar rendimento recorrente atual, nunca DY médio](./docs/learning-lessons/efeito_bola_de_neve_calculo.md) — 2026-10-17
 - [Endpoints paginados podem ignorar `start`: proteja o merge com dedupe e guarda de progresso](./docs/learning-lessons/paginacao_merge_guardar_dedupe_e_progresso.md) — 2026-10-17
+- [Endpoint de lançamentos existe: `/entries/{id}/{seção}` retorna compras/vendas ordem a ordem](./docs/learning-lessons/entries_endpoint_log_lancamentos.md) — 2026-10-26
+- [Devin CLI `mcp add` tem flags de user scope e env — baseline do README estava incompleto](./docs/learning-lessons/devin_mcp_add_user_scope.md) — 2026-10-24
+- [Formato real de plugin do Claude Code (versão instalada) diverge do publicado](./docs/learning-lessons/claude_plugin_formato_verificado.md) — 2026-10-24

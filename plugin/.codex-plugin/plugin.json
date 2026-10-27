@@ -1,0 +1,6 @@
+{
+  "name": "investidor10-carteira",
+  "version": "0.1.0",
+  "description": "Comportamento do agente investidor: skills, guardião de disciplina, persona e lembrete de memória",
+  "skills": "./skills"
+}

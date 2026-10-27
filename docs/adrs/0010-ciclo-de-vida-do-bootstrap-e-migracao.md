@@ -83,6 +83,15 @@ This decision should be **revisited** if:
 1. A migração automática de `./memory.json` for removida em uma versão major futura (ex.: `1.0.0`) após o período de transição da Fase 0.
 2. O backend de persistência migrar de JSON para SQLite (Fase futura do ROADMAP), alterando a semântica de criação e migração de arquivo.
 
+### Emenda 2026-10-27 (spec 003)
+
+O instalador (`installer/cli.py`) herda o probe de validação de carteira
+(`validate_wallet`). Semântica registrada: o instalador aplica **gate de
+dígitos próprio** (`re.fullmatch(r"[0-9]+", id)`) antes de construir
+qualquer URL, e mantém o fail-open do probe (5xx/transporte → avisa e
+prossegue) — mesma postura do servidor, agora explícita também para o
+caminho do instalador. Falhas definitivas (404/401/403) abortam com exit 3.
+
 ## References
 
 - ADR-0002 (fronteira de persistência da memória e escrita atômica)

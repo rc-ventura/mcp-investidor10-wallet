@@ -1,0 +1,13 @@
+{
+  "name": "investidor10",
+  "owner": {
+    "name": "rc-ventura"
+  },
+  "plugins": [
+    {
+      "name": "investidor10-carteira",
+      "description": "Comportamento do agente investidor: prompts, guardião de disciplina e lembrete de memória",
+      "source": "./plugin"
+    }
+  ]
+}

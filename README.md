@@ -1,9 +1,11 @@
 # mcp-investidor10-wallet
 
-Servidor MCP que conecta um agente (Claude Desktop, Claude Code, Devin) a uma
-carteira pública do [Investidor10](https://investidor10.com.br), com memória
-de longo prazo do investidor (teses, regras, decisões, insights) e alertas de
-preço.
+Assistente de investimentos que conecta um agente (Claude Code, Devin CLI,
+Codex, Gemini CLI) a uma carteira pública do
+[Investidor10](https://investidor10.com.br), com memória de longo prazo do
+investidor (teses, regras, decisões, insights), alertas de preço e um
+**plugin de comportamento** (skills, guardião de disciplina, persona e
+lembrete de memória).
 
 Sem frontend — a interface é o cliente do agente. O servidor roda sobre stdio
 (o cliente inicia o processo; nenhuma porta é exposta).
@@ -15,22 +17,68 @@ Sem frontend — a interface é o cliente do agente. O servidor roda sobre stdio
 
 ## Status
 
-Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Roadmap: [docs/ROADMAP.md](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/docs/ROADMAP.md).
 
 As 19 tools estão implementadas (6 de dados da carteira/mercado + 13 de
 memória/alertas) — contratos completos em
-[`specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md`](specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md).
+[specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md).
 
-## Instalação e execução (1 linha)
+## Instalação automática (recomendada)
 
 Pré-requisito: [uv](https://docs.astral.sh/uv/) (que traz Python 3.11+).
 
+Um comando instala o **produto completo** — registra o servidor MCP **e**
+instala o plugin de comportamento nos CLIs de agente presentes na máquina
+(Claude Code, Devin CLI, Codex, Gemini CLI):
+
 ```bash
-WALLET_ID=SEU_ID uvx mcp-investidor10-wallet
+uvx mcp-investidor10-wallet install
 ```
 
-Sem clonar repositório: o `uvx` baixa o pacote do PyPI e executa o servidor
-em stdio.
+O assistente pergunta apenas o ID da carteira (ver abaixo), valida que ela é
+pública e cuida do resto, com relatório em PT-BR.
+
+Opções:
+
+| Flag | Efeito |
+|---|---|
+| `--mcp-only` | Registra apenas o servidor MCP (sem o plugin) — modo técnico |
+| `--dry-run` | Simula e relata o que faria, sem alterar nada |
+| `--clients claude,devin,codex,gemini` | Restringe os clientes alvo |
+| `--wallet-id <id>` | Informa o ID sem pergunta (scripts/CI) |
+| `--yes` | Pula confirmações de rotina |
+
+### O plugin de comportamento
+
+O bundle inclui, além do servidor:
+
+- **3 skills** (`/analise-da-carteira`, `/check-de-tese`,
+  `/resumo-de-dividendos`) — roteiros com as regras do produto embutidas
+  (bootstrap da memória, atraso de ~15 min das cotações, rendimento
+  recorrente e nunca DY médio);
+- **guardião de disciplina** — subagente read-only que confronta decisões de
+  investimento com as regras e teses que você salvou na memória;
+- **persona** — instruções de papel injetadas no início de cada sessão;
+- **lembrete de memória** — ao fim da sessão, propõe registrar decisões
+  discutidas (sempre com sua confirmação; nunca grava sozinho).
+
+Instalação manual do plugin (sem o assistente):
+
+```bash
+# Claude Code
+claude plugin marketplace add rc-ventura/mcp-investidor10-wallet
+claude plugin install investidor10-carteira@investidor10
+
+# Devin CLI
+devin plugins install rc-ventura/mcp-investidor10-wallet#plugin -y
+
+# Codex CLI
+codex plugin marketplace add rc-ventura/mcp-investidor10-wallet
+codex plugin add investidor10-carteira@investidor10
+
+# Gemini CLI
+gemini extensions install https://github.com/rc-ventura/mcp-investidor10-wallet
+```
 
 ### Onde encontrar o seu `WALLET_ID`
 
@@ -45,7 +93,7 @@ https://investidor10.com.br/carteira/SEU_ID
 tiver o ID consegue ler os valores da carteira (o botão de mascarar do site
 é apenas cosmético — a API continua retornando tudo).
 
-## Configuração nos clientes
+## Configuração manual (sem o assistente)
 
 O cliente do agente inicia o servidor como processo filho; por isso o
 comando configurado precisa existir no ambiente do cliente.
@@ -69,13 +117,25 @@ apps GUI no macOS **não herdam o PATH do shell**: use o caminho absoluto do
 **Claude Code**:
 
 ```bash
-claude mcp add carteira -- env WALLET_ID=SEU_ID uvx mcp-investidor10-wallet
+claude mcp add carteira --scope user -- env WALLET_ID=SEU_ID uvx mcp-investidor10-wallet
 ```
 
 **Devin CLI**:
 
 ```bash
-devin mcp add carteira -- env WALLET_ID=SEU_ID uvx mcp-investidor10-wallet
+devin mcp add -s user carteira -e WALLET_ID=SEU_ID -- uvx mcp-investidor10-wallet
+```
+
+**Codex CLI**:
+
+```bash
+codex mcp add carteira --env WALLET_ID=SEU_ID -- uvx mcp-investidor10-wallet
+```
+
+**Gemini CLI**:
+
+```bash
+gemini mcp add -s user -e WALLET_ID=SEU_ID carteira uvx mcp-investidor10-wallet
 ```
 
 O cliente reinicia o servidor a cada sessão; depois de uma atualização,
@@ -134,10 +194,10 @@ uv run pytest -m live  # integração opt-in contra a API real
   mudar ou passar a exigir autenticação sem aviso.
 - **Cobertura de cotação**: `get_asset_quote` só cobre ações B3; FIIs, ETFs
   internacionais, cripto e tesouro retornam `asset_type_not_supported` (ver
-  [learning lesson](docs/learning-lessons/get_asset_quote_apenas_acoes_b3.md)).
+  [learning lesson](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/docs/learning-lessons/get_asset_quote_apenas_acoes_b3.md)).
   Ativos dessas classes na carteira aparecem via `get_wallet_positions`.
 - **Detalhe de proventos**: `get_earnings` retorna o total do período; a
   tabela por pagamento existe no upstream e é candidata a uma tool futura
-  (ver [learning lesson](docs/learning-lessons/earnings_list_detalhe_proventos_por_ativo.md)).
+  (ver [learning lesson](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/docs/learning-lessons/earnings_list_detalhe_proventos_por_ativo.md)).
 - **Cotações com atraso** (~15 min na B3) — o agente deve sempre mencionar.
 - **Uso pessoal/educacional**: o agente sugere, nunca executa ordens.
