@@ -39,7 +39,7 @@ externo; reavaliar depois.
 | **Must** | Doc de privacidade | 1 | Pré-requisito de divulgar: o ID da carteira é a credencial e o mascaramento do site é cosmético |
 | **Must** | File lock no `memory.json` | 1 | Com Desktop + CLIs, mais processos escrevem no mesmo arquivo; last-write-wins perde dado |
 | **Must** | Listagem em MCP registries (Smithery, PulseMCP, diretório Anthropic) | 3 | É distribuição; **antes de submeter, decidir o risco do ToS** da API não-documentada (ADR-0005) |
-| **Should** | Spec 004 — verificação determinística de cálculos | 4 | Maior lacuna de confiança; sobe de Must por ordem de decisão (distribuição primeiro), não por importância |
+| **Should** | Spec 006 — verificação determinística de cálculos | 4 | Maior lacuna de confiança; fica depois da distribuição por ordem de decisão, não por importância |
 | **Should** | Modo privacidade `WALLET_MASK_VALUES` | 1 | Passa a fazer sentido ao distribuir; env var, nunca parâmetro de tool |
 | **Should** | Action semanal de live tests | 1 | A API upstream é não-documentada; risco #1 de produção, cresce com mais usuários |
 | **Should** | Changelog append-only da memória (`memory.json.log`) | 1 | Escrita válida porém errada do modelo hoje é invisível; ~25 linhas |
@@ -63,10 +63,18 @@ Nota: o item "CHANGELOG" da Fase 1 já foi atendido (`CHANGELOG.md` existe
 desde a 0.1.0) e pode ser marcado `[x]`. Os itens "Fora de escopo" ao final
 do documento seguem valendo e não entram na matriz.
 
-**Sequência sugerida:** (1) doc de privacidade + file lock num PR (0.2.1);
-(2) spec 005 de distribuição Desktop — `.mcpb` do Claude Desktop e teste do
-Devin Desktop; (3) validação em máquina limpa e submissão aos registries;
-(4) spec 004; os demais Should por ordem de risco (live tests primeiro).
+**Numeração e sequência (decisão do mantenedor, 27/10/2026):**
+1. **Spec 004 — Hardening** (Fase 1 inteira, exceto Ollama): file lock, doc de
+   privacidade, `WALLET_MASK_VALUES`, changelog append-only da memória, sinal
+   duplo de erro, action semanal de live tests e os itens menores
+   (`instructions=`, pydantic, remoção da migração legada). Vem primeiro
+   porque o Desktop da 005 aumenta o número de processos sobre o mesmo
+   `memory.json`.
+2. **Spec 005 — Distribuição Desktop**: `.mcpb` do Claude Desktop, teste do
+   Devin Desktop e validação em máquina limpa (V2 real, Codex, Gemini);
+   depois, a submissão aos registries.
+3. **Spec 006 — Verificação determinística de cálculos** (desenho em 3
+   camadas já aprovado); os demais Should da Fase 2 por ordem de risco.
 
 ---
 
@@ -98,6 +106,8 @@ Devin Desktop; (3) validação em máquina limpa e submissão aos registries;
   connect" no Claude Desktop.
 
 ## Fase 1 — Robustez e confiança
+
+> Escopo da **spec 004 (Hardening)**, decisão de 27/10/2026.
 
 - [ ] **File lock no memory.json** — dois clientes (ex.: Claude Desktop +
   Devin) spawnam dois processos sobre o mesmo arquivo; `os.replace` atômico
@@ -326,9 +336,11 @@ Devin Desktop; (3) validação em máquina limpa e submissão aos registries;
 
 ## Fase 3 — Distribuição
 
+> Claude Desktop, Devin Desktop e validação em máquina limpa são a **spec 005**.
+
 - [ ] **Claude Desktop — extensão `.mcpb`** — pacote distribuído como asset
   de release (pesquisa em `specs/003-client-integration/research.md` D3);
-  precisa de spec própria (005). O assistente de instalação não alcança
+  é a spec 005. O assistente de instalação não alcança
   apps GUI.
 - [ ] **Devin Desktop — teste de registro do MCP e do plugin** — verificar
   o formato antes de prometer suporte; registrar divergências em
@@ -375,7 +387,7 @@ Devin Desktop; (3) validação em máquina limpa e submissão aos registries;
   `.codex-plugin/plugin.json` sobre as mesmas skills) e Gemini
   (`gemini-extension.json` + `commands/*.toml` espelhando as skills);
   skills SKILL.md são o denominador comum verificado nos 4.
-- [ ] **Spec 004 — Verificação determinística de cálculos** — o agente
+- [ ] **Spec 006 — Verificação determinística de cálculos** — o agente
   hoje calcula números financeiros na LLM, sem verificação. Desenho em 3
   camadas aprovado:
   1. **Tool `check_calculation` no servidor** (determinística): o modelo
