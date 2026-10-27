@@ -134,6 +134,8 @@ class CodexAdapter(ClientAdapter):
     label = "Codex"
 
     def plugin_install_commands(self) -> list[list[str]]:
+        if shutil.which(self.binary) is None:
+            return []
         proc = _run([self.binary, "plugin", "--help"])
         if proc.returncode != 0:
             return []

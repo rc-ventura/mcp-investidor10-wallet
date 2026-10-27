@@ -70,7 +70,7 @@ def test_collision_update_reruns_add(fake_bin_dir, monkeypatch):
     assert "mcp add" in (fake_bin_dir / "calls.log").read_text()
 
 
-def test_plugin_install_commands_use_canonical_sources():
+def test_plugin_install_commands_use_canonical_sources(fake_bin_dir):
     assert clients.ClaudeAdapter().plugin_install_commands() == [
         [
             "claude",
@@ -109,3 +109,8 @@ def test_failed_registration_reports_pt_br(fake_bin_dir):
     outcome = clients.ClaudeAdapter().register(_registration())
     assert outcome.status == "failed"
     assert "falha" in outcome.message
+
+
+def test_codex_plugin_commands_empty_without_binary(monkeypatch, tmp_path):
+    monkeypatch.setenv("PATH", str(tmp_path))
+    assert clients.CodexAdapter().plugin_install_commands() == []
