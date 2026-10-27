@@ -30,8 +30,7 @@ raiz, `.mcp.json`, `AGENTS.md` (regra always-on).
   Skills (3, expostas como `/investidor10-carteira:*`), Agents (1),
   Hook `Stop` (o Devin leu `hooks/hooks.json` em formato wrapper do Claude),
   MCP (1, com `WALLET_ID=${WALLET_ID}`). **Um conjunto de assets serve os
-  dois clientes** — restrição que permanece: `commands/` é lido só pelo
-  Claude; skills/ é o denominador comum.
+  dois clientes**; skills/ é o denominador comum.
 - Limites documentados: hooks de plugin são **best-effort/fail-open** (não
   confiar neles como guardrail crítico); subagentes de plugin carregam
   apenas no CLI/Desktop locais, não em sessões cloud; configs MCP de plugin
@@ -44,6 +43,15 @@ raiz, `.mcp.json`, `AGENTS.md` (regra always-on).
 `devin plugins install <source> [-y] [--local]`, `devin plugins list`,
 `devin plugins info <name>` (skills, hooks, rules), `devin plugins remove`.
 `--local` instala só na máquina sem adicionar aos plugins pessoais.
+
+## Commands: não existe primitivo separado (verificado 2026-10-26)
+
+O Devin CLI não tem o conceito de "custom commands" à parte: **skills são os
+commands do usuário** — cada skill de plugin aparece como slash command
+`/<plugin>:<skill>` (verificado na instalação real: `/investidor10-carteira:analise-da-carteira`
+etc.). Coerente com o Claude Code pós-merge (v2.1.3): o primitivo de
+invocação do usuário é a skill. O `commands/*.toml` do nosso plugin é
+específico do Gemini e **não** é lido pelo Devin.
 
 ## Conclusões para o produto
 

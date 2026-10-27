@@ -54,6 +54,16 @@ Pontos relevantes:
 | Sub-agents | `agents/*.md` — **feature em preview** |
 | Políticas | `policies/*.toml` (tier 2 do Policy Engine; `allow`/yolo de extensão são ignorados por segurança) |
 
+## Commands: primitivo ativo no Gemini (verificado 2026-10-26)
+
+Ao contrário do Claude Code — onde commands foram **fundidos nas skills**
+(v2.1.3) e a skill já é o command do usuário — no Gemini os dois papéis são
+separados: `skills/` são invocadas pelo **agente** (agent skills) e
+`commands/*.toml` são o primitivo de invocação pelo **usuário** (`/deploy`).
+Por isso o nosso plugin envia commands TOML **apenas** para o Gemini:
+espelham as 3 skills para dar ao usuário a invocação manual que nos outros
+clientes as skills já entregam.
+
 ## Compatibilidade com Claude/Devin
 
 - **Não há compatibilidade de formato direta**: o manifesto e os formatos
