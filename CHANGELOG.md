@@ -6,6 +6,41 @@ e o projeto adota [versionamento semântico](https://semver.org/lang/pt-BR/).
 Enquanto a versão for 0.x: mudanças de comportamento (features) incrementam o
 minor; correções incrementam o patch.
 
+## [0.2.0] - 2026-10-26
+
+Assistente de instalação e plugin de comportamento — o produto passa a ser o
+bundle (MCP + plugin) distribuído por um único comando.
+
+### Adicionado
+
+- **Assistente de instalação** (`mcp-investidor10-wallet install`): detecta
+  os CLIs de agente presentes (Claude Code, Devin CLI, Codex, Gemini CLI),
+  valida o `WALLET_ID` e registra o servidor `carteira` via comando nativo
+  de cada cliente (escopo user), com protocolo interativo de colisão de
+  alias, idempotência, `--dry-run` e relatório em PT-BR.
+- **Bundle por padrão**: o assistente instala o plugin de comportamento após
+  o registro (`--mcp-only` registra apenas o servidor — modo técnico).
+- **Plugin de comportamento** (`plugin/`, instalável nos 4 clientes):
+  - 3 skills (`/analise-da-carteira`, `/check-de-tese`,
+    `/resumo-de-dividendos`) com as regras do produto embutidas;
+  - subagente `guardiao-de-disciplina` (read-only, confronta decisões com
+    regras/teses salvas);
+  - persona do assistente via hook `SessionStart` (`additionalContext`);
+  - lembrete de memória via hook `Stop` (propõe `log_decision`/
+    `log_insight` com confirmação; fail-open);
+  - manifestos finos por cliente (`.claude-plugin`, `.devin-plugin`,
+    `.codex-plugin`, `gemini-extension.json`) + `commands/*.toml` para o
+    Gemini + marketplace do Claude Code.
+- Pesquisa de formato de plugins dos 4 clientes em `docs/research/plugins-*`.
+
+### Alterado
+
+- Configuração manual do Devin CLI documentada com as flags verificadas
+  (`devin mcp add -s user carteira -e WALLET_ID=…`) — learning lesson nova.
+- README reestruturado: instalação automática como caminho principal,
+  configuração manual rebaixada, links relativos corrigidos para URLs
+  absolutas (quebravam na página do PyPI).
+
 ## [0.1.0] - 2026-10-18
 
 Primeira release pública — prontidão para distribuição (Fase 0 do ROADMAP).
