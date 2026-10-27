@@ -330,6 +330,24 @@ Princípios que orientam este roadmap (decisões já tomadas, não reabrir):
   3. **Subagente "auditor de números"** (read-only + tool): refaz o cálculo
      de forma independente e compara, para sessões de decisão.
   Exige ADR + learning lesson (mudança de contrato de tools).
+- [ ] **Skill "monitor de juro longo" (cruzamento de fontes)** — motivação
+  real de 26-27/10/2026: não há cotação de Tesouro/DI na API do
+  Investidor10 (410 em `/assets/tickers`, IMAB11 idem), então o alerta de
+  juro é manual por natureza. A skill embute o fluxo validado em sessão:
+  1. carregar baseline da memória (regras #3/#4 — DI jan/2031 e juros
+     reais >2040);
+  2. consultar taxa atual em **duas fontes cruzadas** —
+     `taxasdotesouro.com` (leitura intraday por título) × CSV oficial do
+     Tesouro Transparente (`PrecoTaxaTesouroDireto.csv`, verdade diária);
+     ANBIMA como terceira quando o tema for curva de atacado;
+  3. reportar delta vs baseline (subiu/caiu e quanto) e enquadrar na
+     regra do ciclo MtM: taxa subiu → "fundo" potencial (checar se TD
+     está vendendo indexados — suspensões tornam o fundo não executável);
+     taxa caiu → ganho já capturado;
+  4. instrumentos de referência fixos: IPCA+ 2050 sem juros (duration
+     máxima ~24a), IPCA+ 2040, Renda+ 2065 — explicar que acima de 2040
+     não existe DI, é juro real de NTN-B.
+  Vale para os 4 clientes do bundle (SKILL.md é o denominador comum).
 
 ---
 

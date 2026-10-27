@@ -145,7 +145,18 @@ def run(argv: list[str]) -> int:
         for adapter, outcome in zip(detected, session.outcomes):
             if outcome.status == "failed":
                 continue
-            for command in adapter.plugin_install_commands():
+            commands = adapter.plugin_install_commands()
+            if not commands:
+                session.plugin_outcomes.append(
+                    RegisterOutcome(
+                        adapter.client_id,
+                        "failed",
+                        f"{adapter.label}: plugin não suportado nesta versão do CLI "
+                        "(Codex requer v0.122+); atualize e rode o assistente novamente.",
+                    )
+                )
+                continue
+            for command in commands:
                 proc = _run(command)
                 if proc.returncode == 0:
                     session.plugin_outcomes.append(
