@@ -70,6 +70,40 @@ def test_collision_update_reruns_add(fake_bin_dir, monkeypatch):
     assert "mcp add" in (fake_bin_dir / "calls.log").read_text()
 
 
+def test_plugin_install_commands_use_canonical_sources():
+    assert clients.ClaudeAdapter().plugin_install_commands() == [
+        [
+            "claude",
+            "plugin",
+            "marketplace",
+            "add",
+            "rc-ventura/mcp-investidor10-wallet",
+        ],
+        ["claude", "plugin", "install", "investidor10-carteira@investidor10"],
+    ]
+    assert clients.DevinAdapter().plugin_install_commands() == [
+        [
+            "devin",
+            "plugins",
+            "install",
+            "rc-ventura/mcp-investidor10-wallet#plugin",
+            "-y",
+        ]
+    ]
+    assert clients.CodexAdapter().plugin_install_commands() == [
+        ["codex", "plugin", "marketplace", "add", "rc-ventura/mcp-investidor10-wallet"],
+        ["codex", "plugin", "add", "investidor10-carteira@investidor10"],
+    ]
+    assert clients.GeminiAdapter().plugin_install_commands() == [
+        [
+            "gemini",
+            "extensions",
+            "install",
+            "https://github.com/rc-ventura/mcp-investidor10-wallet",
+        ]
+    ]
+
+
 def test_failed_registration_reports_pt_br(fake_bin_dir):
     (fake_bin_dir / "exit-code").write_text("1")
     outcome = clients.ClaudeAdapter().register(_registration())

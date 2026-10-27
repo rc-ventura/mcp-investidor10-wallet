@@ -26,6 +26,9 @@ class ClientAdapter:
     def add_command(self, reg: ClientRegistration) -> list[str]:
         raise NotImplementedError
 
+    def plugin_install_commands(self) -> list[list[str]]:
+        raise NotImplementedError
+
     def register(self, reg: ClientRegistration) -> RegisterOutcome:
         exists = self.list_existing()
         if exists:
@@ -63,6 +66,18 @@ class ClaudeAdapter(ClientAdapter):
     binary = "claude"
     label = "Claude Code"
 
+    def plugin_install_commands(self) -> list[list[str]]:
+        return [
+            [
+                self.binary,
+                "plugin",
+                "marketplace",
+                "add",
+                "rc-ventura/mcp-investidor10-wallet",
+            ],
+            [self.binary, "plugin", "install", "investidor10-carteira@investidor10"],
+        ]
+
     def add_command(self, reg: ClientRegistration) -> list[str]:
         return [
             self.binary,
@@ -83,6 +98,17 @@ class DevinAdapter(ClientAdapter):
     client_id = "devin"
     binary = "devin"
     label = "Devin CLI"
+
+    def plugin_install_commands(self) -> list[list[str]]:
+        return [
+            [
+                self.binary,
+                "plugins",
+                "install",
+                "rc-ventura/mcp-investidor10-wallet#plugin",
+                "-y",
+            ]
+        ]
 
     def add_command(self, reg: ClientRegistration) -> list[str]:
         return [
@@ -105,6 +131,18 @@ class CodexAdapter(ClientAdapter):
     binary = "codex"
     label = "Codex"
 
+    def plugin_install_commands(self) -> list[list[str]]:
+        return [
+            [
+                self.binary,
+                "plugin",
+                "marketplace",
+                "add",
+                "rc-ventura/mcp-investidor10-wallet",
+            ],
+            [self.binary, "plugin", "add", "investidor10-carteira@investidor10"],
+        ]
+
     def add_command(self, reg: ClientRegistration) -> list[str]:
         return [
             self.binary,
@@ -123,6 +161,16 @@ class GeminiAdapter(ClientAdapter):
     client_id = "gemini"
     binary = "gemini"
     label = "Gemini CLI"
+
+    def plugin_install_commands(self) -> list[list[str]]:
+        return [
+            [
+                self.binary,
+                "extensions",
+                "install",
+                "https://github.com/rc-ventura/mcp-investidor10-wallet",
+            ]
+        ]
 
     def add_command(self, reg: ClientRegistration) -> list[str]:
         return [

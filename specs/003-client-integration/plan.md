@@ -12,18 +12,21 @@ cliente" em "um comando conecta tudo", em três frentes independentes:
 1. **Completar a publicação** (FR-001): operação sobre o pipeline existente —
    projeto no PyPI, trusted publishing OIDC, environment `pypi` no GitHub,
    push da tag `v0.1.0`. Sem mudança de código. (Concluída em 2026-10-24.)
-2. **Assistente de instalação `install`** (US1/P1, FR-002…005): subcomando
-   stdlib-only do próprio pacote que detecta clientes presentes (**Claude
-   Code, Devin CLI, Codex, Gemini CLI**), valida o `WALLET_ID` reutilizando
-   `wallet_client` e registra via **comando nativo de gestão de MCP de cada
-   CLI** (`claude/devin/codex/gemini mcp add`, escopo user), sempre
-   idempotente e em PT-BR.
+2. **Assistente de instalação `install`** (US1/P1, FR-002…005, FR-010):
+   subcomando stdlib-only do próprio pacote que detecta clientes presentes
+   (**Claude Code, Devin CLI, Codex, Gemini CLI**), valida o `WALLET_ID`
+   reutilizando `wallet_client`, registra via **comando nativo de gestão de
+   MCP de cada CLI** (`claude/devin/codex/gemini mcp add`, escopo user) e
+   **instala o bundle por padrão** (plugin de comportamento via comandos
+   nativos de instalação de plugin, com `--mcp-only` como escape) — sempre
+   idempotente e em PT-BR. O produto é o bundle; o MCP sozinho é o modo
+   técnico.
 3. **Plugin de comportamento** (US2/P2, FR-006…010): mesmo repositório,
-   assets em `plugin/` (3 prompts, subagente guardião de disciplina, hook
-   `Stop` que propõe registro na memória sem nunca gravar sozinho) + três
-   manifestos finos (`.claude-plugin/plugin.json`,
-   `.claude-plugin/marketplace.json`, `.devin-plugin/plugin.json`) sobre o
-   mesmo conteúdo + `.mcp.json` com `${WALLET_ID}`.
+   assets em `plugin/` (3 skills compartilhadas, subagente guardião de
+   disciplina, hooks de persona e de memória) + **um manifesto fino por
+   cliente** (Claude Code, Devin CLI, Codex, Gemini) + marketplace do
+   Claude Code. **O plugin não registra servidor MCP** — conexão exclusiva
+   do assistente de instalação (decisões de design 2026-10-24).
 
 **Fora do escopo (spec futura dedicada, decisão 2026-10-24)**: Claude
 Desktop, extensão `.mcpb`, Devin Desktop e demais apps desktop — exigem
@@ -109,21 +112,27 @@ src/investidor10_wallet/
     ├── cli.py              # parse de args, orquestração, relatório PT-BR
     └── clients.py          # adapters por CLI (claude/devin/codex/gemini)
 
-plugin/                     # NOVO — assets de comportamento (US2), fora do wheel
-├── commands/
-│   ├── analise-da-carteira.md
-│   ├── check-de-tese.md
-│   └── resumo-de-dividendos.md
+plugin/                     # NOVO — raiz do plugin (US2), fora do wheel
+├── .claude-plugin/plugin.json  # manifesto Claude (sem mcpServers)
+├── .devin-plugin/plugin.json   # manifesto Devin (mesmos metadados)
+├── .codex-plugin/plugin.json   # manifesto Codex (skills: "./skills")
+├── gemini-extension.json       # manifesto Gemini
+├── skills/
+│   ├── analise-da-carteira/SKILL.md
+│   ├── check-de-tese/SKILL.md
+│   └── resumo-de-dividendos/SKILL.md
+├── commands/                   # custom commands do Gemini (espelho das skills)
+│   ├── analise-da-carteira.toml
+│   ├── check-de-tese.toml
+│   └── resumo-de-dividendos.toml
 ├── agents/
 │   └── guardiao-de-disciplina.md
-├── hooks/
-│   ├── hooks.json          # evento Stop → lembrete de registro (proposição)
-│   └── stop-memory-reminder.sh
-└── .mcp.json               # servidor carteira com ${WALLET_ID}
+└── hooks/
+    ├── hooks.json              # SessionStart (persona) + Stop (lembrete)
+    ├── session-start-persona.sh
+    └── stop-memory-reminder.sh
 
-.claude-plugin/plugin.json      # NOVO — manifesto Claude (paths explícitos → plugin/)
-.claude-plugin/marketplace.json # NOVO — canal de instalação `plugin marketplace add`
-.devin-plugin/plugin.json       # NOVO — manifesto Devin (mesmos assets)
+.claude-plugin/marketplace.json # NOVO — canal `plugin marketplace add` (source ./plugin)
 
 tests/
 ├── unit/
@@ -134,10 +143,11 @@ tests/
 ```
 
 **Structure Decision**: layout de pacote único existente (Option 1).
-`plugin/`, `.claude-plugin/` e `.devin-plugin/` ficam na raiz do repo **fora
-do wheel** (o build hatchling já restringe a `src/investidor10_wallet`),
-separando "motor" de "comportamento" dentro do mesmo repositório (FR-009) sem
-poluir o pacote publicado.
+`plugin/` (raiz do plugin com layout canônico e manifestos dentro) e
+`.claude-plugin/marketplace.json` ficam fora do wheel (o build hatchling já
+restringe a `src/investidor10_wallet`), separando "motor" de "comportamento"
+dentro do mesmo repositório (FR-009) sem poluir o pacote publicado. Layout
+validado por carga real nos dois clientes (T021).
 
 ## Complexity Tracking
 

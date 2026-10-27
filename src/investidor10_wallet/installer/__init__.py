@@ -24,4 +24,5 @@ class RegisterOutcome:
 class InstallerSession:
     wallet_id: str
     outcomes: list[RegisterOutcome] = field(default_factory=list)
+    plugin_outcomes: list[RegisterOutcome] = field(default_factory=list)
     requested: set[str] = field(default_factory=set)

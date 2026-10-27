@@ -31,9 +31,10 @@
 
 ## Notes
 
-- FR-009 (local do plugin) e FR-010 (default do install) foram clarificados
-  com o usuário em 2026-10-24: plugin no mesmo repositório; install registra
-  apenas o MCP por padrão e plugin é opt-in explícito.
+- FR-009 (local do plugin) foi clarificado com o usuário em 2026-10-24:
+  plugin no mesmo repositório. FR-010 revisada em 2026-10-24: o assistente
+  instala o **bundle (MCP + plugin) por padrão** e `--mcp-only` é o escape
+  para só dados — produto = plugin, não o MCP.
 - Escopo revisado em 2026-10-24: apenas CLIs (Claude Code, Devin CLI, Codex,
   Gemini CLI). Claude Desktop / extensão `.mcpb` / apps desktop foram
   REMOVIDOS desta feature — spec futura dedicada. FRs renumerados para

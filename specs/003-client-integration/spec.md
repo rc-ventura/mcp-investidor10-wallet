@@ -17,8 +17,9 @@ fazer a configuração manual por cliente (hoje cada CLI tem formato e
 peculiaridades próprias). Ele roda **um** assistente de instalação, responde
 uma pergunta (o identificador público da carteira) e o assistente detecta
 quais CLIs de agente existem na máquina — **Claude Code, Devin CLI, Codex e
-Gemini CLI** — e registra o servidor em cada um encontrado, usando o comando
-nativo de gestão de MCP de cada CLI.
+Gemini CLI** — registra o servidor em cada um encontrado (comando nativo de
+MCP) **e instala o plugin de comportamento junto** (o bundle = produto
+completo). Quem quer só os dados usa `--mcp-only`.
 
 **Why this priority**: É o MVP de distribuição — sem ele, cada usuário
 técnico repete 4 configurações manuais com formatos diferentes. Desbloqueia
@@ -45,6 +46,13 @@ arquivo. Funciona mesmo se só um CLI existir na máquina.
 4. **Given** nenhum CLI de agente instalado, **When** o usuário roda o
    assistente, **Then** ele recebe orientação clara em PT-BR de que nenhum
    cliente foi detectado e o que fazer em seguida.
+5. **Given** o assistente rodado sem a flag `--mcp-only`, **When** o registro
+   do servidor termina, **Then** o plugin de comportamento é instalado nos
+   mesmos clientes (um comando = produto completo), com relatório por
+   cliente.
+6. **Given** o assistente rodado com `--mcp-only`, **When** o registro
+   termina, **Then** nenhum comando de instalação de plugin é executado —
+   apenas o servidor fica registrado (modo técnico).
 
 ---
 
@@ -58,24 +66,28 @@ conjunto de ativos — prompts reutilizáveis (ex.: "/análise da carteira",
 de compra com as regras salvas pelo investidor — o check do trabalho
 principal) e hooks de sessão (ex.: no fim da sessão, lembrar o agente de
 registrar decisões/insights na memória do investidor — **sempre sugerindo e
-pedindo confirmação, nunca gravando sozinho**). A instalação do plugin no
-Claude Code e no Devin CLI usa o mesmo artefato, sem dupla manutenção.
+pedindo confirmação, nunca gravando sozinho**), e a persona do assistente
+injetada no início de cada sessão. A instalação nos quatro clientes (Claude
+Code, Devin CLI, Codex, Gemini CLI) usa o mesmo conjunto de assets, com um
+manifesto fino por cliente.
 
 **Why this priority**: O diferencial do produto não são os dados da carteira
 (qualquer MCP de dados oferece isso) — é a memória de longo prazo do
 investidor. O plugin materializa esse diferencial como comportamento do
 agente. É P2 porque entrega valor que se soma ao P1 (na jornada típica o MCP
 já foi conectado pelo assistente), sem que sua implementação ou teste
-dependam dele.
+dependam dele. Decisões de design fechadas com o mantenedor em 2026-10-24:
+persona via hook de início de sessão; plugin sem registro de MCP; extensão
+aos quatro clientes.
 
-**Independent Test**: Instalar somente o plugin num cliente compatível e
-verificar que os prompts, subagentes e hooks ficam disponíveis e
-funcionais — independentemente de como o MCP foi registrado antes.
+**Independent Test**: Instalar somente o plugin num cliente compatível (com
+o MCP já registrado pelo assistente) e verificar que as skills, o subagente,
+a persona de início de sessão e o hook ficam disponíveis e funcionais.
 
 **Acceptance Scenarios**:
 
-1. **Given** o plugin instalado, **When** o usuário lista os comandos do
-   agente, **Then** os prompts do pacote aparecem como comandos utilizáveis.
+1. **Given** o plugin instalado, **When** o usuário lista os comandos/skills
+   do agente, **Then** as skills do pacote aparecem utilizáveis.
 2. **Given** o plugin instalado e regras salvas na memória do investidor,
    **When** o usuário discute uma decisão de investimento e aciona o
    subagente guardião, **Then** ele recebe uma verificação da decisão contra
@@ -83,9 +95,13 @@ funcionais — independentemente de como o MCP foi registrado antes.
 3. **Given** o plugin instalado, **When** uma sessão termina com decisões
    discutidas e não registradas, **Then** o hook faz o agente propor o
    registro na memória e **aguarda confirmação do usuário** antes de gravar.
-4. **Given** o mesmo artefato de plugin, **When** instalado no Claude Code e
-   no Devin CLI, **Then** ambos os clientes carregam os mesmos ativos de
-   comportamento sem variantes específicas por cliente.
+4. **Given** uma sessão iniciada com o plugin instalado, **When** o agente
+   começa a operar, **Then** ele recebe a persona do assistente de
+   investimentos injetada pelo hook de início de sessão (papel, bootstrap,
+   cuidados com cotações e memória).
+5. **Given** o mesmo conjunto de assets, **When** instalado nos quatro
+   clientes alvo, **Then** todos carregam as mesmas skills sem variantes de
+   conteúdo específicas por cliente.
 
 ---
 
@@ -127,14 +143,17 @@ funcionais — independentemente de como o MCP foi registrado antes.
   exibindo instrução de correção em caso de falha.
 - **FR-005**: O assistente DEVE ser idempotente: reexecução na mesma máquina
   não duplica entradas e não corrompe configurações existentes.
-- **FR-006**: O produto DEVE empacotar um plugin único (manifesto + ativos)
-  que atenda ao mesmo tempo Claude Code e Devin CLI — o formato escolhido
-  DEVE ser legível por ambos (formato Claude de plugin ou spec aberta
-  Agent Plugins), sem manutenção de duas variantes.
-- **FR-007**: O plugin DEVE empacotar: o registro do servidor MCP, prompts do
-  produto, ao menos um subagente de verificação ao trabalho principal
-  (guardião de disciplina) e um hook de fim de sessão que **propõe** registro
-  na memória do investidor.
+- **FR-006**: O produto DEVE empacotar um plugin único (manifestos + ativos)
+  que atenda aos **quatro clientes alvo** (Claude Code, Devin CLI, Codex,
+  Gemini CLI) — skills como denominador comum (formato SKILL.md idêntico nos
+  quatro), com um manifesto fino por cliente, sem duplicação de conteúdo de
+  comportamento.
+- **FR-007**: O plugin DEVE empacotar: skills do produto, ao menos um
+  subagente de verificação ao trabalho principal (guardião de disciplina),
+  um hook de fim de sessão que **propõe** registro na memória do investidor e
+  um hook de início de sessão com a persona do assistente (papel de uso das
+  tools). O plugin NÃO DEVE registrar o servidor MCP — o registro é
+  responsabilidade exclusiva do assistente de instalação (FR-002…005).
 - **FR-008**: Nenhum hook ou subagente DEVE gravar na memória do investidor
   sem confirmação explícita do usuário na mesma interação (a memória é do
   usuário — ADR-0002).
@@ -142,10 +161,12 @@ funcionais — independentemente de como o MCP foi registrado antes.
   manifesto e ativos em pastas próprias ao lado do pacote — garantindo uma
   única fonte de verdade, versionamento alinhado e um único repositório que o
   marketplace do Claude Code e o instalador do Devin CLI apontam.
-- **FR-010**: O assistente de instalação DEVE, por padrão, registrar **apenas
-  o servidor MCP**; a instalação do plugin de comportamento DEVE ser opt-in
-  explícito (ex.: flag no assistente ou instalação pelo mecanismo de
-  marketplace do cliente), sem surpresa para quem só quer os dados.
+- **FR-010**: O assistente de instalação DEVE instalar o **bundle do produto
+  por padrão** — registro do servidor MCP + instalação do plugin de
+  comportamento nos clientes compatíveis — e oferecer `--mcp-only` como
+  escape explícito para quem quer apenas os dados no próprio harness. O
+  plugin permanece behavior-only (FR-007): a orquestração do bundle é do
+  assistente, nunca uma segunda fonte de registro do servidor.
 
 ### Key Entities *(include if feature involves data)*
 

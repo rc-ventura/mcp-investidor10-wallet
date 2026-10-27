@@ -19,8 +19,8 @@ da inicialização do servidor; todo o resto permanece servidor MCP.
 |---|---|---|
 | `--clients claude,devin,codex,gemini` | todos os detectados | restringe o alvo do registro; itens inválidos abortam com erro PT-BR |
 | `--wallet-id <id>` | interativo (pergunta) | uso não-interativo (scripts, CI) |
-| `--plugin` | ausente | ativa modo opt-in do plugin: imprime as instruções oficiais de instalação do plugin (Claude Code: `claude plugin marketplace add rc-ventura/mcp-investidor10-wallet` + `/plugin install investidor10-carteira`; Devin CLI: instalação do plugin pela mesma origem) |
-| `--dry-run` | ausente | percorre detecção + validação, reporta o que faria, não executa registro nenhum |
+| `--mcp-only` | ausente | **escape do bundle**: registra apenas o servidor MCP; nenhum comando de instalação de plugin é executado |
+| `--dry-run` | ausente | percorre detecção + validação, reporta o que faria ("registraria o servidor" + "instalaria o plugin"), não executa nada |
 | `--yes` | ausente | pula confirmações intermediárias de rotina (mantém a pergunta do ID se `--wallet-id` ausente); **NÃO afeta a pergunta de colisão de alias abaixo** |
 
 ## Pré-condições verificadas na ordem
@@ -40,6 +40,28 @@ da inicialização do servidor; todo o resto permanece servidor MCP.
 | Gemini CLI | `gemini mcp add -s user -e WALLET_ID=<id> carteira uvx mcp-investidor10-wallet` | `gemini mcp list` |
 
 Alias fixo `carteira` em todos (sem underscores — Gemini).
+
+## Bundle (padrão): instalação do plugin após o registro
+
+Sem `--mcp-only`, após o registro do servidor em cada cliente detectado
+(exceto os com status `failed`), o assistente executa os comandos nativos de
+instalação do plugin (fontes canônicas do repositório):
+
+| Cliente | Comandos executados (na ordem) |
+|---|---|
+| Claude Code | `claude plugin marketplace add rc-ventura/mcp-investidor10-wallet` → `claude plugin install investidor10-carteira@investidor10` |
+| Devin CLI | `devin plugins install rc-ventura/mcp-investidor10-wallet#plugin -y` |
+| Codex CLI | `codex plugin marketplace add rc-ventura/mcp-investidor10-wallet` → `codex plugin add investidor10-carteira@investidor10` |
+| Gemini CLI | `gemini extensions install https://github.com/rc-ventura/mcp-investidor10-wallet` |
+
+- Falha na instalação do plugin não altera o código de saída do registro do
+  servidor; vira linha `failed` no relatório com o erro resumido.
+- As fontes canônicas exigem o repositório público no GitHub (pendência até
+  o merge/push das branches da spec 003 — validação real do bundle gated
+  nisso; em dev, os comandos equivalentes locais já foram validados).
+- O Gemini instala a extensão pela raiz do repo; se a CLI não suportar a
+  extensão em subpasta, essa linha vira instrução manual — questão aberta
+  registrada no contrato do plugin (carga real pendente).
 
 ## Protocolo de colisão de alias
 

@@ -4,21 +4,14 @@ import shutil
 import sys
 
 from .. import wallet_client
-from . import ClientRegistration, InstallerSession
-from .clients import ADAPTERS
-
-PLUGIN_INSTRUCTIONS = (
-    "Para instalar o plugin de comportamento:\n"
-    "  Claude Code: claude plugin marketplace add rc-ventura/mcp-investidor10-wallet\n"
-    "               depois rode: /plugin install investidor10-carteira\n"
-    "  Devin CLI: instale o plugin do mesmo repositório com `devin plugins install`\n"
-)
+from . import ClientRegistration, InstallerSession, RegisterOutcome
+from .clients import ADAPTERS, _run
 
 
 def _parse(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="mcp-investidor10-wallet install",
-        description="Registra o servidor da carteira nos CLIs de agente da máquina.",
+        description="Instala o produto da carteira nos CLIs de agente da máquina: registra o servidor MCP e instala o plugin de comportamento.",
     )
     parser.add_argument(
         "--clients",
@@ -29,9 +22,9 @@ def _parse(argv: list[str]) -> argparse.Namespace:
         help="ID público da carteira (sem esta flag, o assistente pergunta)",
     )
     parser.add_argument(
-        "--plugin",
+        "--mcp-only",
         action="store_true",
-        help="ao final, imprime as instruções de instalação do plugin de comportamento",
+        help="registra apenas o servidor MCP, sem instalar o plugin de comportamento",
     )
     parser.add_argument(
         "--dry-run",
@@ -64,11 +57,6 @@ def _validate_wallet(wallet_id: str) -> bool:
         )
         return False
     return True
-
-
-def _maybe_print_plugin(args: argparse.Namespace) -> None:
-    if args.plugin:
-        print(PLUGIN_INSTRUCTIONS)
 
 
 def run(argv: list[str]) -> int:
@@ -105,16 +93,41 @@ def run(argv: list[str]) -> int:
         print("SIMULAÇÃO (nenhuma configuração foi alterada)")
         for adapter in detected:
             print(f"- {adapter.label}: registraria o servidor 'carteira'")
-        _maybe_print_plugin(args)
+            if not args.mcp_only:
+                print(f"- {adapter.label}: instalaria o plugin")
         return 0
     session = InstallerSession(
         wallet_id=wallet_id, requested={a.client_id for a in detected}
     )
     for adapter in detected:
         session.outcomes.append(adapter.register(reg))
+    if not args.mcp_only:
+        for adapter, outcome in zip(detected, session.outcomes):
+            if outcome.status == "failed":
+                continue
+            for command in adapter.plugin_install_commands():
+                proc = _run(command)
+                if proc.returncode == 0:
+                    session.plugin_outcomes.append(
+                        RegisterOutcome(
+                            adapter.client_id,
+                            "registered",
+                            f"{adapter.label}: plugin instalado (reinicie a sessão do cliente).",
+                        )
+                    )
+                else:
+                    detail = proc.stderr.strip() or f"código {proc.returncode}"
+                    session.plugin_outcomes.append(
+                        RegisterOutcome(
+                            adapter.client_id,
+                            "failed",
+                            f"{adapter.label}: falha ao instalar o plugin — {detail}",
+                        )
+                    )
     for outcome in session.outcomes:
         print(f"- {outcome.message}")
-    _maybe_print_plugin(args)
+    for outcome in session.plugin_outcomes:
+        print(f"- {outcome.message}")
     if session.outcomes and all(o.status == "failed" for o in session.outcomes):
         return 4
     return 0

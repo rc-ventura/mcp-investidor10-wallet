@@ -16,33 +16,43 @@ pytest` verde.
 
 (Concluído em 2026-10-24 — release 0.1.0 publicada com proveniência OIDC.)
 
-## V2 — Assistente detecta e registra nos 4 CLIs (US1, FR-002…005)
+## V2 — Assistente detecta e instala o bundle nos 4 CLIs (US1, FR-002…005, FR-010)
 
 1. `uv run mcp-investidor10-wallet install --dry-run`
-   → relatório SIMULAÇÃO lista os clientes presentes na máquina; nenhum
-   registro executado.
+   → relatório SIMULAÇÃO lista os clientes presentes; "registraria o
+   servidor" + "instalaria o plugin" por cliente; nada executado.
 2. `uv run mcp-investidor10-wallet install`
-   → pergunta o ID; valida; registra em cada CLI presente; relatório final
-   pede reinício dos clientes.
-3. Executar o mesmo comando de novo → todos os status são "já registrado"
+   → pergunta o ID; valida; registra o servidor E instala o plugin em cada
+   CLI presente (bundle = produto completo); relatório final pede reinício
+   dos clientes.
+3. `uv run mcp-investidor10-wallet install --mcp-only`
+   → registra apenas o servidor, zero comando de plugin (modo técnico).
+4. Executar o mesmo comando de novo → todos os status são "já registrado"
    (ou o protocolo de colisão pergunta pular/atualizar); nenhuma entrada
    duplicada (SC-003).
-4. **Esperado**: `claude mcp list`, `devin mcp list`, `codex mcp list` e
+5. **Esperado**: `claude mcp list`, `devin mcp list`, `codex mcp list` e
    `gemini mcp list` mostram `carteira`; cada cliente reiniciado expõe as 19
-   tools.
+   tools e o plugin carregado (skills, guardião, persona, hook).
 
-## V3 — Plugin nos dois clientes (US2, FR-006…009)
+## V3 — Plugin nos quatro clientes (US2, FR-006…009)
 
-1. Claude Code: `claude plugin marketplace add
-   rc-ventura/mcp-investidor10-wallet` seguido de `/plugin install
-   investidor10-carteira` (canal canônico via `marketplace.json` do repo);
-   durante o desenvolvimento, instalar do diretório local.
-2. Devin CLI: `devin plugins install <repo-ou-pasta>` com o mesmo conteúdo.
-3. **Esperado em ambos**: os 3 prompts aparecem como comandos; o subagente
-   guardião lista-se e executa read-only; o hook `Stop` emite o lembrete de
-   registro apenas propondo (nunca gravando) quando aplicável; o servidor
-   `carteira` do plugin resolve `${WALLET_ID}` quando a variável existe no
-   ambiente e falha visivelmente quando não existe.
+Pré-requisito: o servidor `carteira` já registrado via assistente (V2) — o
+plugin não registra MCP.
+
+1. Claude Code: `claude plugin marketplace add <repo>` (local durante dev:
+   apontar para a pasta do repo) seguido de `/plugin install
+   investidor10-carteira`.
+2. Devin CLI: `devin plugins install ./plugin -y --local`.
+3. Codex CLI: `codex plugin marketplace add <repo>` + instalar pela TUI
+   `/plugins`.
+4. Gemini CLI: `gemini extensions install <repo-url|path>`.
+
+**Esperado**: as 3 skills (`analise-da-carteira`, `check-de-tese`,
+`resumo-de-dividendos`), o subagente `guardiao-de-disciplina` (read-only), a
+persona injetada no início da sessão (hook SessionStart) e o hook `Stop`
+emitindo o lembrete de registro apenas propondo (nunca gravando) quando
+aplicável. No Gemini, as 3 skills + os custom commands `/analise-da-carteira`,
+`/check-de-tese`, `/resumo-de-dividendos`.
 
 ## V4 — Degradações (edge cases)
 

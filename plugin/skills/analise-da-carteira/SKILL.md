@@ -1,0 +1,10 @@
+---
+name: analise-da-carteira
+description: Análise completa da carteira do investidor usando as tools do servidor carteira
+---
+
+1. Chame `get_session_context` para carregar o contexto do investidor (teses, regras, decisões e alertas ativos).
+2. Obtenha `get_wallet_summary`, `get_wallet_allocation` e `get_wallet_positions`.
+3. Apresente patrimônio total, valor aplicado, rentabilidade, alocação por classe e a lista de posições com preço médio, cotação e rentabilidade.
+4. Mencione que as cotações têm atraso de aproximadamente 15 minutos (B3) e sinalize dados servidos de cache quando a tool indicar.
+5. Conclua comparando a carteira atual com as teses e regras salvas na memória do investidor; aponte divergências sem recomendar ordens.

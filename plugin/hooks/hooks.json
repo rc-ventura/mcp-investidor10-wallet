@@ -1,0 +1,27 @@
+{
+  "description": "Persona do assistente no início da sessão e lembrete de memória ao fim",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-persona.sh\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-memory-reminder.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
