@@ -59,6 +59,14 @@ description: Stage and commit changes in semantic groups. Use when the user want
 - **Skills são o denominador comum real**: mesmo formato `SKILL.md`
   (frontmatter `name`/`description`) nos três clientes — nosso `plugin/skills/`
   já é portável ao Codex sem edição.
+
+## Commands: não existe primitivo separado (verificado 2026-10-26)
+
+O Codex não tem custom commands à parte (como os `.toml` do Gemini): a
+invocação explícita do usuário é por `@plugin`/`@skill` e as skills são
+auto-descobertas pelo agente a partir da pasta `skills/` — o mesmo padrão
+"a skill é o command" do Claude Code pós-merge (v2.1.3). O
+`commands/*.toml` do nosso plugin (Gemini-only) não se aplica ao Codex.
 - Manifestos divergem (`.codex-plugin/plugin.json` próprio), mas o `$schema`
   Agent Plugins sinaliza convergência com o formato que o Devin já aceita.
 - MCP universal: `codex mcp add` já registra o mesmo servidor `carteira`

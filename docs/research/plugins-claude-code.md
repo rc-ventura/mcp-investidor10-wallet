@@ -8,7 +8,8 @@ para as divergências entre o publicado e o comportamento real).
 
 ## Conceito
 
-Um plugin empacota **comportamento** (skills, agents, commands, hooks) e
+Um plugin empacota **comportamento** (skills, agents, hooks — commands
+foram fundidos nas skills, ver seção própria) e
 **integrações** (MCP servers, LSP) numa unidade instalável. A instalação é
 via marketplace: `claude plugin marketplace add <owner/repo|url|path>` e
 `claude plugin install <plugin>[@marketplace]` (ou `/plugin install` dentro
@@ -20,7 +21,7 @@ da sessão).
 plugin-name/
 ├── .claude-plugin/
 │   └── plugin.json       # manifesto (obrigatório)
-├── commands/             # slash commands (.md) — só Claude Code
+├── commands/             # legacy — fundido nas skills (v2.1.3+)
 ├── agents/               # subagentes (.md) — auto-descobertos
 ├── skills/               # skills (skill-name/SKILL.md) — auto-descobertos
 ├── hooks/
