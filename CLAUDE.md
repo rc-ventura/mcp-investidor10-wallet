@@ -26,3 +26,4 @@
 - [API upstream tem detalhe de proventos por ativo — o MCP só expõe o total agregado](./docs/learning-lessons/earnings_list_detalhe_proventos_por_ativo.md) — 2026-10-17
 - [Efeito bola de neve: usar rendimento recorrente atual, nunca DY médio](./docs/learning-lessons/efeito_bola_de_neve_calculo.md) — 2026-10-17
 - [Endpoints paginados podem ignorar `start`: proteja o merge com dedupe e guarda de progresso](./docs/learning-lessons/paginacao_merge_guardar_dedupe_e_progresso.md) — 2026-10-17
+- [Endpoint de lançamentos existe: `/entries/{id}/{seção}` retorna compras/vendas ordem a ordem](./docs/learning-lessons/entries_endpoint_log_lancamentos.md) — 2026-10-26

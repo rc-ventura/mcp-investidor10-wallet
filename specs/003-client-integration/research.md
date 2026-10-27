@@ -56,36 +56,36 @@ cada atualização de cliente).
 
 ## D2 — Um artefato de plugin, dois manifestos finos, no mesmo repositório
 
-**Decision**: mesmo repositório (decisão do mantenedor, FR-009). Os assets de
-comportamento vivem em `plugin/` (commands, agents, hooks, skills); dois
-manifestos finos na raiz apontam para eles:
+**Decision (revisada 2026-10-24 — decisões do mantenedor)**: mesmo
+repositório (FR-009). O plugin vive em `plugin/` com layout canônico de raiz
+de plugin: `skills/`, `agents/`, `hooks/hooks.json` + **um manifesto fino por
+cliente** dentro dele — `.claude-plugin/plugin.json`, `.devin-plugin/plugin.json`,
+`.codex-plugin/plugin.json`, `gemini-extension.json` — além de
+`commands/*.toml` (custom commands do Gemini espelhando as skills). O
+marketplace fica na raiz do repo com `"source": "./plugin"`. **O plugin não
+registra servidor MCP** (Item 7): o registro é exclusivo do assistente de
+instalação; nenhum manifesto declara `mcpServers` e não há `.mcp.json` no
+plugin.
 
-- `.claude-plugin/plugin.json` (Claude Code; o manifesto suporta caminhos
-  explícitos de componentes, ex.: `"hooks": "./plugin/hooks/hooks.json"`)
-- `.devin-plugin/plugin.json` (Devin CLI, que tem precedência quando presente
-  e cai para o manifesto Claude caso contrário)
-
-Um `.mcp.json` compartilhado define o servidor `carteira` com o ID da
-carteira referenciado do ambiente em vez de valor embutido:
-
-```json
-{ "mcpServers": { "carteira": {
-    "command": "uvx", "args": ["mcp-investidor10-wallet"],
-    "env": { "WALLET_ID": "${WALLET_ID}" } } } }
-```
+**Carga real verificada (T021, pré-revisão)**: Claude Code — Skills (3),
+Agents (1), Hooks (Stop), MCP (1); Devin CLI — Skills (3 como slash
+commands), Agents (1), Hook on stop, MCP. Pós-revisão (sem MCP, com
+SessionStart persona), a re-verificação é executada no mesmo lote; formatos
+Codex/Gemini validados por teste de contrato (carga real pendente — Gemini
+não instalado na máquina; Codex via TUI).
 
 **Canal de instalação no Claude Code (revisado 2026-10-24, aprovado pelo
 mantenedor)**: um `.claude-plugin/marketplace.json` vai no mesmo repo
 apontando para o plugin; a instalação canônica vira
 `claude plugin marketplace add rc-ventura/mcp-investidor10-wallet` +
 `/plugin install investidor10-carteira`. Instalação por path local permanece
-documentada para desenvolvimento.
+documentada para desenvolvimento. Devin: `devin plugins install ./plugin`;
+Codex: `codex plugin marketplace add <repo>` + TUI `/plugins`; Gemini:
+`gemini extensions install <repo-url|path>`.
 
-**Rationale**: os dois CLIs leem `mcpServers` dos manifestos e referências
-`${VAR}` das configs de servidor de plugin (docs do Devin: configs MCP de
-plugin devem referenciar segredos como `${NAME}`; o `.mcp.json` do Claude
-Code suporta expansão `${VAR}`). Manifestos são adaptadores finos; os assets
-são a fonte única de verdade.
+**Rationale**: manifestos são adaptadores finos; os assets (skills, agent,
+hooks) são a fonte única de verdade — sem `mcpServers` em manifesto nenhum
+(conexão exclusiva do assistente de instalação, Item 7).
 
 **Fontes verificadas**:
 - Layout e campos do manifesto do Claude Code: repo oficial
@@ -101,11 +101,11 @@ são a fonte única de verdade.
   (`~/.config/devin/plugins/ralph-loop/`) — `hooks.json` na raiz +
   `.devin-plugin/plugin.json`.
 
-**Risco**: o Devin CLI honrar caminhos *custom* de componentes dentro de um
-manifesto em formato Claude não está documentado. Mitigação: dois manifestos
-explícitos (planejado) em vez de depender do fallback de caminho; verificado
-pelo teste de contrato e por um teste manual de carga nos dois clientes
-(quickstart V3).
+**Risco (resolvido em 2026-10-24)**: o Devin CLI honrar caminhos *custom*
+de componentes dentro de um manifesto em formato Claude não está
+documentado. Mitigação aplicada: layout canônico de raiz de plugin com
+auto-discovery nos dois loaders + dois manifestos finos — verificado por
+carga real nos dois clientes (T021) e registrado em learning lesson.
 
 ## D3 — Desktop adiado para spec futura dedicada
 
@@ -130,18 +130,21 @@ de desktop).
 
 ## D4 — Assets de comportamento do plugin (conjunto v1)
 
-**Decision**: entregar exatamente:
+**Decision (revisada 2026-10-24)**: entregar exatamente:
 
-1. `commands/` — três prompts: `analise-da-carteira`, `check-de-tese`,
-   `resumo-de-dividendos`.
+1. `skills/` — três skills (formato compartilhado pelos quatro clientes):
+   `analise-da-carteira`, `check-de-tese`, `resumo-de-dividendos` (SKILL.md
+   com frontmatter `name`/`description`).
 2. `agents/guardiao-de-disciplina.md` — confronta uma decisão de investimento
    com as regras salvas na memória (`get_rules`, `get_theses`) e reporta
    violações; nunca escreve.
-3. `hooks/` — hook `Stop`: inspeciona o transcript da sessão e, quando
-   decisões foram discutidas sem registro, injeta um lembrete para o agente
-   **propor** `log_decision`/`log_insight` e aguardar confirmação do usuário
-   (FR-010 — hook nunca grava sozinho; hooks são fail-open conforme docs do
-   Devin, então a ausência degrada para "sem lembrete").
+3. `hooks/` — dois eventos: **SessionStart** (persona do assistente via
+   `additionalContext` — mecanismo oficial equivalente a CLAUDE.md
+   distribuível, aprovado pelo mantenedor) e **Stop** (lembrete que propõe
+   `log_decision`/`log_insight` com confirmação — FR-008, fail-open).
+4. `commands/*.toml` — custom commands do Gemini espelhando as 3 skills
+   (o Gemini não lê `commands/` markdown nem hooks em formato Claude nesta
+   versão; skills são o denominador comum).
 
 **Rationale**: mínimo, com valor e testabilidade independentes; a proteção de
 escrita na memória segue o ADR-0002 (a memória é do usuário).

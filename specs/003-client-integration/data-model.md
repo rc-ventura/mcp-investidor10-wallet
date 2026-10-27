@@ -37,7 +37,8 @@ interno entre `cli.py` e `clients.py`.
 | Campo | Tipo | Regras |
 |---|---|---|
 | `wallet_id` | str | validado antes de qualquer registro (FR-004); nunca logado além do relatório ao usuário |
-| `outcomes` | list[RegisterOutcome] | um por cliente detectado ou explicitado em `--clients` |
+| `outcomes` | list[RegisterOutcome] | um por cliente detectado ou explicitado em `--clients` (registro do servidor) |
+| `plugin_outcomes` | list[RegisterOutcome] | um por comando de instalação de plugin executado no bundle (default); vazio com `--mcp-only` |
 | `requested` | set[str] | normalizado de `--clients` (padrão: todos os detectados) |
 
 ## Validações cruzadas
