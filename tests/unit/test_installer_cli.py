@@ -96,3 +96,46 @@ def test_exit_4_when_all_registrations_fail(fake_bin_dir):
     (fake_bin_dir / "exit-code").write_text("1")
     respx.get(PROBE).mock(return_value=httpx.Response(200))
     assert cli.run(["--wallet-id", "2061045", "--mcp-only"]) == 4
+
+
+@respx.mock
+def test_invalid_clients_flag_aborts_pt_br(fake_bin_dir, capsys):
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert cli.run(["--wallet-id", "2061045", "--clients", "claude,foo"]) == 2
+    assert "Clientes inválidos" in capsys.readouterr().err
+
+
+@respx.mock
+def test_wallet_id_must_be_digits(fake_bin_dir, capsys):
+    assert cli.run(["--wallet-id", "2061045/../../../other", "--mcp-only"]) == 3
+    assert "apenas números" in capsys.readouterr().err
+
+
+@respx.mock
+def test_absent_client_reported_when_explicitly_requested(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("PATH", str(_uv_only_dir(tmp_path)))
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert cli.run(["--wallet-id", "2061045", "--clients", "gemini", "--mcp-only"]) == 1
+    assert "não encontrado" in capsys.readouterr().err
+
+
+@respx.mock
+def test_plugin_failure_does_not_change_exit_code(fake_bin_dir, capsys):
+    (fake_bin_dir / "fail-plugin").write_text("")
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert cli.run(["--wallet-id", "2061045"]) == 0
+    assert "falha ao instalar o plugin" in capsys.readouterr().out
+
+
+@respx.mock
+def test_wallet_prompt_eof_returns_pt_br_guidance(fake_bin_dir, monkeypatch, capsys):
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+
+    def boom(prompt):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", boom)
+    assert cli.run(["--mcp-only"]) == 3
+    assert "não-interativa" in capsys.readouterr().err

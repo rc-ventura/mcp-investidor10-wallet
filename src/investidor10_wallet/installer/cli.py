@@ -1,11 +1,14 @@
 import argparse
 import asyncio
+import re
 import shutil
 import sys
 
 from .. import wallet_client
 from . import ClientRegistration, InstallerSession, RegisterOutcome
 from .clients import ADAPTERS, _run
+
+VALID_CLIENTS = {"claude", "devin", "codex", "gemini"}
 
 
 def _parse(argv: list[str]) -> argparse.Namespace:
@@ -39,15 +42,30 @@ def _parse(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _wallet_id(args: argparse.Namespace) -> str:
+def _wallet_id(args: argparse.Namespace) -> str | None:
     if args.wallet_id:
-        return args.wallet_id
-    return input(
-        "Informe o ID da carteira (o número na URL investidor10.com.br/carteira/SEU_ID): "
-    ).strip()
+        return args.wallet_id.strip()
+    try:
+        return input(
+            "Informe o ID da carteira (o número na URL investidor10.com.br/carteira/SEU_ID): "
+        ).strip()
+    except EOFError:
+        print(
+            "Não foi possível ler o ID da carteira (entrada não-interativa). "
+            "Use --wallet-id SEU_ID.",
+            file=sys.stderr,
+        )
+        return None
 
 
 def _validate_wallet(wallet_id: str) -> bool:
+    if not re.fullmatch(r"[0-9]+", wallet_id):
+        print(
+            "O ID da carteira deve conter apenas números "
+            "(o número na URL investidor10.com.br/carteira/SEU_ID).",
+            file=sys.stderr,
+        )
+        return False
     try:
         asyncio.run(wallet_client.validate_wallet(wallet_id))
     except SystemExit as exc:
@@ -70,14 +88,26 @@ def run(argv: list[str]) -> int:
         )
         return 2
     wallet_id = _wallet_id(args)
-    if not _validate_wallet(wallet_id):
+    if wallet_id is None or not _validate_wallet(wallet_id):
         return 3
     requested = (
         {item.strip() for item in args.clients.split(",")} if args.clients else None
     )
+    if requested is not None:
+        invalid = requested - VALID_CLIENTS
+        if invalid:
+            print(
+                f"Clientes inválidos em --clients: {', '.join(sorted(invalid))}. "
+                f"Válidos: {', '.join(sorted(VALID_CLIENTS))}.",
+                file=sys.stderr,
+            )
+            return 2
     adapters = [a for a in ADAPTERS if requested is None or a.client_id in requested]
     detected = [a for a in adapters if a.detect()]
+    absent = [a for a in adapters if not a.detect()] if requested is not None else []
     if not detected:
+        for adapter in absent:
+            print(f"- {adapter.label}: não encontrado na máquina", file=sys.stderr)
         print(
             "Nenhum cliente de agente detectado. Instale Claude Code, Devin CLI, "
             "Codex ou Gemini CLI e rode o assistente novamente.",
@@ -95,10 +125,20 @@ def run(argv: list[str]) -> int:
             print(f"- {adapter.label}: registraria o servidor 'carteira'")
             if not args.mcp_only:
                 print(f"- {adapter.label}: instalaria o plugin")
+        for adapter in absent:
+            print(f"- {adapter.label}: não encontrado na máquina")
         return 0
     session = InstallerSession(
         wallet_id=wallet_id, requested={a.client_id for a in detected}
     )
+    for adapter in absent:
+        session.outcomes.append(
+            RegisterOutcome(
+                adapter.client_id,
+                "skipped_absent",
+                f"{adapter.label}: não encontrado na máquina — pulado.",
+            )
+        )
     for adapter in detected:
         session.outcomes.append(adapter.register(reg))
     if not args.mcp_only:
@@ -128,6 +168,8 @@ def run(argv: list[str]) -> int:
         print(f"- {outcome.message}")
     for outcome in session.plugin_outcomes:
         print(f"- {outcome.message}")
-    if session.outcomes and all(o.status == "failed" for o in session.outcomes):
+    if session.outcomes and all(
+        o.status in ("failed", "skipped_absent") for o in session.outcomes
+    ):
         return 4
     return 0

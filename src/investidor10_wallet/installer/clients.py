@@ -8,7 +8,9 @@ RUNNER_ARGS = ["mcp-investidor10-wallet"]
 
 
 def _run(command: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(command, check=False, capture_output=True, text=True)
+    return subprocess.run(
+        command, check=False, capture_output=True, text=True, timeout=120
+    )
 
 
 class ClientAdapter:
@@ -21,7 +23,7 @@ class ClientAdapter:
 
     def list_existing(self) -> bool:
         proc = _run([self.binary, "mcp", "list"])
-        return SERVER_ALIAS in proc.stdout
+        return any(SERVER_ALIAS in line for line in proc.stdout.splitlines())
 
     def add_command(self, reg: ClientRegistration) -> list[str]:
         raise NotImplementedError

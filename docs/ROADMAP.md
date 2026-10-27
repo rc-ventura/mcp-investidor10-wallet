@@ -227,6 +227,19 @@ Princípios que orientam este roadmap (decisões já tomadas, não reabrir):
   o snapshot detecta também drift de PM e posições criadas por eventos
   (bonificação, desdobramento) que não viram lançamento. Cuidado com
   tamanho do memory.json — snapshot é leve (~20 posições).
+- [ ] **Coleção `trades` na memória (tracking de trades táticos)** —
+  motivação real de 26-27/10/2026: o usuário opera tranches de marcação
+  a mercado em títulos longos (IPCA+), e hoje o melhor encaixe é
+  `decisions` — que registra intenção, não ciclo de vida do trade
+  (abertura, tranches parciais, alvo de saída, fechamento, P&L).
+  Nova coleção `trades` no schema do memory.json (bump de versão +
+  migração vazia, padrão do `memory_store`): campos propostos
+  `{ticker_ou_titulo, thesis_ref, opened_at, tranches: [{date, qty,
+  price}], status: open|closed, close_price, close_at, outcome_note}`.
+  Tools: `open_trade`, `add_tranche`, `close_trade`, `list_trades`.
+  Sinergia direta com a regra de monitor de juro longo (baseline DI) e
+  com `get_entries` para conferir se o lançamento registrado no
+  Investidor10 bate com o tranche declarado.
 - [ ] **Tool de reconciliação corretora↔carteira** — responde à maior
   fricção do fluxo real (compra na corretora → Investidor10 fica stale → MCP
   lê carteira desatualizada). Read-only: usuário cola posições da corretora
