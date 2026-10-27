@@ -91,3 +91,20 @@ def test_no_emoji_and_no_wallet_id_literals_in_assets():
         assert not re.search(r"[\U0001F300-\U0001FAFF]", content)
         if path.suffix in (".md", ".json", ".toml"):
             assert not re.search(r"WALLET_ID\s*[:=]\s*\d+", content)
+
+
+def test_hooks_scripts_fail_open_on_empty_input():
+    import subprocess
+
+    for script in ("session-start-persona.sh", "stop-memory-reminder.sh"):
+        path = PLUGIN / "hooks" / script
+        proc = subprocess.run(
+            ["bash", str(path)], check=False, input="{}", capture_output=True, text=True
+        )
+        assert proc.returncode == 0, (
+            f"{script} saiu com {proc.returncode}: {proc.stderr}"
+        )
+        if script == "session-start-persona.sh":
+            assert "additionalContext" in proc.stdout
+        else:
+            assert proc.stdout == ""
