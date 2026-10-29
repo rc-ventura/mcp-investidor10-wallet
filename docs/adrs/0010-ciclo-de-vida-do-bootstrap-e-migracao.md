@@ -92,6 +92,21 @@ qualquer URL, e mantém o fail-open do probe (5xx/transporte → avisa e
 prossegue) — mesma postura do servidor, agora explícita também para o
 caminho do instalador. Falhas definitivas (404/401/403) abortam com exit 3.
 
+### Emenda 2026-10-27 (spec 004)
+
+A condição de invalidação nº 1 foi **antecipada**: a migração automática de
+`./memory.json` para `~/.investidor10/memory.json` foi removida na `0.3.0`,
+sem esperar a `1.0.0`. O único usuário conhecido migrou em 18/10/2026 e o
+arquivo está no `.gitignore`, então a máquina de transição virou código
+morto. `resolve_memory_path` agora é: `WALLET_MEMORY_PATH` verbatim, ou o
+diretório canônico (0700, regular, não-symlink) e o arquivo canônico (não
+symlink). O bootstrap **não inspeciona mais o diretório corrente**: um
+`memory.json` solto no cwd é ignorado, não absorvido. Ficam encerrados o
+hardening de TOCTOU/symlink da migração (§3-4 das aceitações residuais) e
+as mensagens de migração e de conflito. Quem ainda tem memória no diretório
+do repositório move o arquivo (`mv ./memory.json ~/.investidor10/memory.json`)
+ou define `WALLET_MEMORY_PATH`; a nota está no `CHANGELOG.md` da `0.3.0`.
+
 ## References
 
 - ADR-0002 (fronteira de persistência da memória e escrita atômica)

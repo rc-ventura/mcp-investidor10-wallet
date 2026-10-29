@@ -10,6 +10,11 @@ from .clients import ADAPTERS, _run
 
 VALID_CLIENTS = {"claude", "devin", "codex", "gemini"}
 
+PRIVACY_NOTICE = (
+    "Privacidade: veja https://github.com/rc-ventura/mcp-investidor10-wallet"
+    "/blob/main/docs/PRIVACY.md"
+)
+
 
 def _parse(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -179,6 +184,7 @@ def run(argv: list[str]) -> int:
         print(f"- {outcome.message}")
     for outcome in session.plugin_outcomes:
         print(f"- {outcome.message}")
+    print(PRIVACY_NOTICE)
     if session.outcomes and all(
         o.status in ("failed", "skipped_absent") for o in session.outcomes
     ):

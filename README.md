@@ -15,6 +15,11 @@ Sem frontend — a interface é o cliente do agente. O servidor roda sobre stdio
 > desligada sem aviso. Falhas aparecem como erros estruturados explícitos —
 > nunca como valores inventados.
 
+> **Privacidade**: leia [docs/PRIVACY.md](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/docs/PRIVACY.md) antes de instalar. Ele
+> explica o que vai para onde, por que o ID da carteira deve ser tratado como
+> senha e como o modo privacidade (`WALLET_MASK_VALUES`) evita que valores em
+> reais cheguem ao modelo.
+
 ## Status
 
 Roadmap: [docs/ROADMAP.md](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/docs/ROADMAP.md).
@@ -37,6 +42,11 @@ uvx mcp-investidor10-wallet install
 
 O assistente pergunta apenas o ID da carteira (ver abaixo), valida que ela é
 pública e cuida do resto, com relatório em PT-BR.
+
+O servidor fica registrado na versão exata do assistente
+(`uvx mcp-investidor10-wallet@<versão>`), e não na mais recente do PyPI a cada
+abertura. Para atualizar, rode `uvx mcp-investidor10-wallet@latest install` de
+novo.
 
 Opções:
 
@@ -149,14 +159,20 @@ reinicie a sessão para carregar tools novas.
 | `WALLET_ID não configurado` + saída | `WALLET_ID` ausente na config do cliente | Adicione `WALLET_ID` no bloco `env` do servidor |
 | `Carteira ... não encontrada ou não é pública` | ID errado ou carteira privada | Confira o ID na URL pública e deixe a carteira pública nas configurações do site |
 | `Não foi possível validar a carteira ... (fonte indisponível)` | API fora do ar ou sem rede | Aviso não-bloqueante: o servidor sobe e as tools de dados informarão o erro |
-| `Não foi possível migrar a memória ...` | Permissões de `~/.investidor10/` | Corrija as permissões do diretório indicado e reinicie |
+| `Não foi possível preparar o diretório de memória ...` | Permissões de `~/.investidor10/` | Corrija as permissões do diretório indicado e reinicie |
 
 ## Onde ficam os dados
 
 - **Memória**: `~/.investidor10/memory.json` — arquivo local versionado com
-  escrita atômica, compartilhado por todos os clientes da máquina. A
-  instalação anterior (memória no diretório de trabalho) é migrada
-  automaticamente na primeira execução, com aviso no stderr.
+  escrita atômica, compartilhado por todos os clientes da máquina. Vários
+  clientes abertos ao mesmo tempo não perdem gravações: o servidor controla o
+  acesso ao arquivo (`memory.json.lock`) e mantém um histórico de cada mudança
+  (`memory.json.log`). Para quem tinha a memória no diretório do repositório:
+  mova o arquivo com `mv ./memory.json ~/.investidor10/memory.json` ou defina
+  `WALLET_MEMORY_PATH`.
+- **Pasta sincronizada (Dropbox, iCloud, OneDrive)**: segura na mesma máquina;
+  usar a mesma memória em duas máquinas ao mesmo tempo não é protegido (a
+  sincronização pode gerar uma cópia em conflito). Use uma máquina por vez.
 - **Cache de API**: apenas em memória de processo (TTL configurável).
 - **Nada é enviado a outro lugar pelo servidor** — os resultados das tools
   entram no contexto do seu provedor de LLM (o agente), como qualquer tool.
@@ -166,7 +182,8 @@ reinicie a sessão para carregar tools novas.
 | Variável | Obrigatória | Default | Uso |
 |---|---|---|---|
 | `WALLET_ID` | Sim | — | ID público da carteira (o servidor aborta sem ela) |
-| `WALLET_MEMORY_PATH` | Não | `~/.investidor10/memory.json` | Caminho da memória (override sem migração) |
+| `WALLET_MEMORY_PATH` | Não | `~/.investidor10/memory.json` | Caminho da memória (use um disco local) |
+| `WALLET_MASK_VALUES` | Não | desligado | `1`/`true`/`yes`/`on` ligam o modo privacidade: valores em R$ e quantidades não chegam ao modelo (ver [PRIVACY.md](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/docs/PRIVACY.md)) |
 | `WALLET_CACHE_TTL_SECONDS` | Não | `600` | TTL do cache em memória |
 | `WALLET_CACHE_MAX_STALE_SECONDS` | Não | `86400` | Idade máxima de cache expirado servido em queda da fonte (24h); mais antigo vira erro explícito |
 

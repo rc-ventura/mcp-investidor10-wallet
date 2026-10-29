@@ -6,6 +6,96 @@ e o projeto adota [versionamento semântico](https://semver.org/lang/pt-BR/).
 Enquanto a versão for 0.x: mudanças de comportamento (features) incrementam o
 minor; correções incrementam o patch.
 
+## [0.3.0] - 2026-10-28
+
+Hardening antes da distribuição Desktop: memória segura com vários clientes,
+modo privacidade e erros sinalizados como erro.
+
+### Adicionado
+
+- **Trava da memória entre processos** (macOS, Linux e Windows): vários clientes
+  abertos ao mesmo tempo não perdem gravações. Cada operação relê o arquivo sob
+  uma trava (`memory.json.lock`); identificadores são únicos e um alerta é
+  disparado uma única vez. Se o sistema de arquivos não suporta trava (ex.:
+  algumas pastas de rede), as leituras continuam e as gravações são recusadas
+  com orientação em PT-BR. Nova dependência de runtime: `filelock`.
+- **Histórico de mudanças da memória** (`memory.json.log`, JSONL append-only):
+  uma linha por mudança, com estado anterior e novo, para auditar e recuperar
+  gravações erradas.
+- **Modo privacidade** (`WALLET_MASK_VALUES=1`): valores em R$ e quantidades não
+  chegam ao modelo; só campos reconhecidamente não monetários passam, e a
+  resposta traz `privacy.omitted`. `get_patrimony_history` e `get_earnings` ficam
+  indisponíveis nesse modo.
+- **`docs/PRIVACY.md`**: o que vai para onde, o ID da carteira como credencial e
+  os limites do modo privacidade. O assistente de instalação aponta para ele.
+- **Descrição do servidor** (`instructions`) com propósito e índice de uso.
+- Quatro novos códigos de erro: `memory_busy`, `memory_read_only`,
+  `privacy_mode_unavailable` e `state_conflict` (12 no total).
+- **`truncated` em `get_wallet_positions`**: quando a fonte para de devolver
+  linhas novas antes do total declarado, a resposta traz `truncated: true`, e o
+  modelo avisa que a lista está incompleta.
+- **Job `audit` no CI**: `pip-audit` sobre o lock em todo push e PR.
+
+### Alterado
+
+- **Erros previstos agora chegam com `isError`**, além do envelope
+  `{error: {code, message}}`, que continua no conteúdo da resposta. Clientes que
+  tratavam erro como sucesso passam a enxergar a falha. Mensagens revisadas com
+  a próxima ação.
+- Após uma falha de gravação, a memória não fica mais "presa" como indisponível
+  no processo: a próxima operação relê o arquivo e se recupera.
+- Backup de arquivo corrompido ganha o hash do conteúdo no nome e não é duplicado.
+- Skill `resumo-de-dividendos` (plugin 0.1.1) trata o modo privacidade.
+- **Cancelar um alerta já disparado ou cancelado** devolve `state_conflict`, e
+  não mais `invalid_params`. A mensagem de `invalid_params` passa a nomear o
+  argumento inválido.
+- **O assistente de instalação registra a versão exata**
+  (`uvx mcp-investidor10-wallet@<versão>`), em vez da mais recente do PyPI a cada
+  abertura. Para atualizar, rode o assistente da versão nova.
+- Dependências: `fastmcp` 4.0.11 → 4.1.2; no lock, `authlib` 1.9.1, `certifi`
+  2026.10.19 e `virtualenv` 21.14.13. Isso fecha 2 GHSAs do FastMCP, 7 CVEs do
+  `authlib` e o certificado emSign comprometido do `certifi`. As actions do CI
+  estão fixadas por SHA.
+
+### Corrigido
+
+- As regras de uso de 5 ferramentas (`get_wallet_positions`, `get_asset_quote`
+  com o aviso do atraso de ~15 minutos das cotações, `get_earnings`,
+  `get_patrimony_history`, `create_price_alert`) estavam depois do bloco `Args:`
+  da docstring e nunca chegavam ao modelo; passaram a ser servidas.
+
+- Exceções inesperadas (bugs) deixam de expor o texto interno ao cliente: ele
+  recebe apenas `Error calling tool '<nome>'`, e o detalhe fica no stderr do
+  servidor.
+- Os arquivos auxiliares `memory.json.lock` e `memory.json.log` ficam com modo
+  0600 (um arquivo preexistente com permissão mais aberta é apertado), e o
+  arquivo temporário `.memory-*` entra no `.gitignore`.
+- **Alertas não disparam com cotação velha.** Durante uma queda da fonte, a
+  cotação em cache vencido não dispara mais um alerta, porque o disparo é
+  definitivo. O alerta fica em `pending_check` com o motivo `stale_quote` e é
+  avaliado na próxima sessão (ADR-0017).
+- **Memória apagada com o servidor rodando** não é mais recriada vazia em
+  silêncio. Ela fica indisponível, o operador recebe um aviso apontando o
+  histórico `memory.json.log`, e restaurar o arquivo traz a memória de volta.
+- **Robustez da memória**: `fsync` antes de substituir o arquivo. Um erro de
+  leitura passageiro, como antivírus ou sincronização, não é mais tratado como
+  corrupção nem gera backup. O modo somente-leitura não grava backup. O
+  changelog não segue symlink e é restrito a 0600 pelo descritor, e uma falha
+  ao restringir a permissão gera aviso.
+- **Modo privacidade**: um campo permitido que chegue com valor aninhado
+  (objeto ou lista) é omitido, em vez de passar inteiro.
+- **Disponibilidade**: o cache em memória tem limite de 256 entradas e descarta
+  as que já passaram da idade máxima, e respostas acima de 10 MB são
+  recusadas sem serem lidas inteiras.
+
+### Removido
+
+- **Migração automática de `./memory.json`** para `~/.investidor10/memory.json`.
+  O servidor deixa de inspecionar o diretório corrente: um `memory.json` solto
+  é ignorado. Quem ainda tem a memória no diretório do repositório deve mover o
+  arquivo: `mv ./memory.json ~/.investidor10/memory.json`, ou definir
+  `WALLET_MEMORY_PATH`.
+
 ## [0.2.0] - 2026-10-26
 
 Assistente de instalação e plugin de comportamento — o produto passa a ser o

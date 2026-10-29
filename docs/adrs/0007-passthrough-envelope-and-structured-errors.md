@@ -64,3 +64,20 @@ at.
 - Related: ADR-0003 (validation), ADR-0005 (source risk), ADR-0006 (memory
   tools follow the same envelope-free structured-error convention for local
   operations).
+
+## Emenda 2026-10-28 (spec 004)
+
+O conjunto fechado de códigos do item 3 passou a ter **11** códigos: além dos
+oito listados, `memory_busy` (trava da memória ocupada), `memory_read_only`
+(sistema de arquivos sem suporte a trava) e `privacy_mode_unavailable` (tool
+monetária com o modo privacidade ligado). Todo erro previsto agora sai também
+com `isError=true` no protocolo, mantendo o envelope e o código no texto da
+resposta. Decisão e alternativas no ADR-0014. Depois disso, o 12º código
+`state_conflict` (alerta inativo em `cancel_price_alert`) entrou pela emenda de
+28/10/2026 do ADR-0014.
+
+Nota de 2026-10-28 (spec 004) sobre o item 4: o FastMCP serve ao modelo só o
+texto da docstring **anterior** ao bloco `Args:`; o que vem depois é descartado.
+As regras de uso das tools precisam, portanto, ficar antes do `Args:`, e um teste
+de contrato garante isso. Ver a learning lesson
+`fastmcp_docstring_descarta_texto_apos_args.md`.

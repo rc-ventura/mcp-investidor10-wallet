@@ -2,11 +2,21 @@ from typing import ClassVar
 
 import pytest
 import respx
-from fastmcp import Client
+from fastmcp import Client as _Client
 
 from investidor10_wallet import server, wallet_client
 from investidor10_wallet.memory_store import MemoryStore
 from investidor10_wallet.server import mcp
+
+
+class Client(_Client):
+    async def call_tool(self, name, arguments=None, **kwargs):
+        kwargs.setdefault("raise_on_error", False)
+        result = await super().call_tool(name, arguments, **kwargs)
+        if result.is_error and result.data is None:
+            result.data = result.structured_content
+        return result
+
 
 PROXY = wallet_client.WALLET_PROXY_BASE_URL
 
@@ -327,6 +337,41 @@ class TestPriceAlerts:
         # The alert remains active for a future check.
         assert len(fresh_memory.list_price_alerts("active")) == 1
 
+    async def test_stale_quote_during_outage_never_triggers_an_alert(
+        self, fresh_memory, monkeypatch
+    ):
+        fresh_memory.create_price_alert("PETR4", "below", 999.0)
+        url = f"{wallet_client.REST_BASE_URL}/assets/tickers/PETR4"
+        wallet_client.rest_client._cache.clear()
+        with respx.mock:
+            respx.get(url).respond(json=TestGetAssetQuote.QUOTE_PAYLOAD)
+            async with Client(mcp) as client:
+                await client.call_tool("get_asset_quote", {"ticker": "PETR4"})
+        # The TTL expires and the source goes down: request() serves the old
+        # price as stale cache, which must not fire the terminal trigger.
+        monkeypatch.setattr(wallet_client.rest_client, "ttl_seconds", 0)
+        with respx.mock:
+            respx.get(url).respond(status_code=503)
+            async with Client(mcp) as client:
+                result = await client.call_tool("get_session_context", {})
+        assert result.data["triggered_alerts"] == []
+        assert result.data["pending_check"] == [
+            {"ticker": "PETR4", "reason": "stale_quote"}
+        ]
+        assert len(fresh_memory.list_price_alerts("active")) == 1
+
+    async def test_quote_cached_within_the_ttl_still_triggers(self, fresh_memory):
+        fresh_memory.create_price_alert("PETR4", "below", 999.0)
+        url = f"{wallet_client.REST_BASE_URL}/assets/tickers/PETR4"
+        wallet_client.rest_client._cache.clear()
+        with respx.mock:
+            route = respx.get(url).respond(json=TestGetAssetQuote.QUOTE_PAYLOAD)
+            async with Client(mcp) as client:
+                await client.call_tool("get_asset_quote", {"ticker": "PETR4"})
+                result = await client.call_tool("get_session_context", {})
+        assert route.call_count == 1
+        assert len(result.data["triggered_alerts"]) == 1
+
     @pytest.mark.parametrize(
         "status,body,reason",
         [
@@ -523,9 +568,12 @@ async def test_save_failure_is_mapped_to_memory_unavailable(tmp_path, monkeypatc
     )
     async with Client(mcp) as client:
         result = await client.call_tool("save_rule", {"text": "do not sell"})
+        retry = await client.call_tool("save_rule", {"text": "do not sell"})
         context = await client.call_tool("get_session_context", {})
     assert result.data["error"]["code"] == "memory_unavailable"
-    assert context.data["memory_status"] == "unavailable"
+    assert retry.data["error"]["code"] == "memory_unavailable"
+    assert context.data["memory_status"] == "ok"
+    assert context.data["memory"]["rules"] == []
 
 
 @pytest.mark.parametrize(

@@ -2,7 +2,7 @@
 
 Catálogo de endpoints validados em **17/10/2026**, obtido por engenharia
 reversa dos chunks JS do app Next.js `/wallet/` + probes HTTP diretos na
-carteira pública `1234567`. Complementado pelas learning lessons.
+carteira pública `<id>`. Complementado pelas learning lessons.
 
 **Modelo de auth:** carteira pública = **o ID é a credencial** (quem tem o
 link lê tudo — o botão "mascarar" do site é cosmético). Rotas de

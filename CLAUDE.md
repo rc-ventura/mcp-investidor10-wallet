@@ -18,6 +18,11 @@
 | [0010](./docs/adrs/0010-ciclo-de-vida-do-bootstrap-e-migracao.md) | Semântica do ciclo de vida do bootstrap e endurecimento da migração | Accepted | 2026-10-18 |
 | [0011](./docs/adrs/0011-estrategia-de-distribuicao-e-release.md) | Estratégia de distribuição e release — PyPI via `uvx`, src layout, versionamento 0.x e pipeline OIDC | Accepted | 2026-10-18 |
 | [0012](./docs/adrs/0012-integracao-automatica-de-clientes.md) | Integração automática de clientes — assistente de instalação e plugin de comportamento (bundle em 4 CLIs) | Accepted | 2026-10-26 |
+| [0013](./docs/adrs/0013-concorrencia-da-memoria-multiprocesso.md) | Concorrência da memória multiprocesso — trava `filelock` fail-closed, reload sob trava e modo somente-leitura | Accepted | 2026-10-28 |
+| [0014](./docs/adrs/0014-sinal-duplo-de-erro.md) | Sinal duplo de erro — `isError` do protocolo mais o envelope estruturado (12 códigos) | Accepted | 2026-10-28 |
+| [0015](./docs/adrs/0015-modo-privacidade-wallet-mask-values.md) | Modo privacidade `WALLET_MASK_VALUES` — allowlist fail-closed, tools monetárias indisponíveis | Accepted | 2026-10-28 |
+| [0016](./docs/adrs/0016-validacao-de-payloads-em-tools-novas.md) | Regra de validação de payloads para tools novas — pydantic validate-then-passthrough | Accepted | 2026-10-28 |
+| [0017](./docs/adrs/0017-cotacao-em-cache-vencido-nao-dispara-alerta.md) | Cotação em cache vencido não dispara alerta — `stale_quote` em `pending_check` | Accepted | 2026-10-28 |
 
 ## Learning Lessons
 
@@ -30,3 +35,6 @@
 - [Endpoint de lançamentos existe: `/entries/{id}/{seção}` retorna compras/vendas ordem a ordem](./docs/learning-lessons/entries_endpoint_log_lancamentos.md) — 2026-10-26
 - [Devin CLI `mcp add` tem flags de user scope e env — baseline do README estava incompleto](./docs/learning-lessons/devin_mcp_add_user_scope.md) — 2026-10-24
 - [Formato real de plugin do Claude Code (versão instalada) diverge do publicado](./docs/learning-lessons/claude_plugin_formato_verificado.md) — 2026-10-24
+- [filelock troca para soft lock em silêncio e cria o diretório pai — usar fallback_to_soft=False e guardar o diretório](./docs/learning-lessons/filelock_fallback_soft_silencioso.md) — 2026-10-28
+- [FastMCP descarta o texto da docstring que vem depois do bloco `Args:` — regras de uso das tools não chegavam ao modelo](./docs/learning-lessons/fastmcp_docstring_descarta_texto_apos_args.md) — 2026-10-28
+- [FastMCP: `mask_error_details` vem desligado e a exceção inesperada chega crua ao cliente — ligar a opção](./docs/learning-lessons/fastmcp_mask_error_details_padrao_falso.md) — 2026-10-28

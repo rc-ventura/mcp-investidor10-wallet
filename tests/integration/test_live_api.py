@@ -1,18 +1,37 @@
 """Live integration tests against the real Investidor10 API (opt-in).
 
 These hit investidor10.com.br and are excluded from the default pytest run
-(see addopts in pyproject.toml). Run explicitly with:
+(see addopts in pyproject.toml). They need a real public wallet, passed
+explicitly (the suite default is a placeholder):
 
-    uv run pytest -m live
+    WALLET_ID=<id> uv run pytest -m live
 """
 
+import os
+
 import pytest
-from fastmcp import Client
+from fastmcp import Client as _Client
 
 from investidor10_wallet import bootstrap, wallet_client
 from investidor10_wallet.server import mcp
 
-pytestmark = pytest.mark.live
+
+class Client(_Client):
+    async def call_tool(self, name, arguments=None, **kwargs):
+        kwargs.setdefault("raise_on_error", False)
+        result = await super().call_tool(name, arguments, **kwargs)
+        if result.is_error and result.data is None:
+            result.data = result.structured_content
+        return result
+
+
+pytestmark = [
+    pytest.mark.live,
+    pytest.mark.skipif(
+        os.environ.get("WALLET_ID") == "1234567",
+        reason="live tests need a real public wallet: WALLET_ID=<id> uv run pytest -m live",
+    ),
+]
 
 
 async def test_live_wallet_summary_returns_data():

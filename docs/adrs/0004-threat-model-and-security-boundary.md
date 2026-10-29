@@ -1,6 +1,6 @@
 # ADR-0004: Threat model and security boundary of the single-user stdio server
 
-- **Status**: Accepted
+- **Status**: Accepted (amended 2026-10-28 — see "Emenda 2026-10-28" at the end)
 - **Date**: 2026-10-17
 - **Deciders**: Tech Leader + user (SDD final review cycle 4, spec 001)
 
@@ -24,7 +24,8 @@ operator error.
 2. **Authentication is delegated**: the local MCP client config owns `WALLET_ID`
    (a public wallet identifier, not a secret). The server authenticates nothing
    and trusts the local operator — whoever can edit the client config or the
-   local files is already in the trust boundary.
+   local files is already in the trust boundary. *Amended 2026-10-28: the ID
+   works as a read credential — see "Emenda 2026-10-28".*
 
 3. **Fixed outbound surface**: the only network egress is
    `https://investidor10.com.br` (wallet proxy + REST assets). There are no
@@ -33,7 +34,9 @@ operator error.
    the URL/path-injection path.
 
 4. **No secrets**: no API keys, tokens or credentials exist anywhere in the
-   system; nothing is written to logs.
+   system; nothing is written to logs. *Amended 2026-10-28: the memory
+   changelog `memory.json.log` is local personal data at rest — see "Emenda
+   2026-10-28".*
 
 5. **Local memory is trusted data**: `memory.json` is user-authored local data,
    treated like any other local config. Corrupted files degrade the store
@@ -58,6 +61,10 @@ operator error.
    `fastmcp==4.0.11` executado no ciclo spec 003 (patch que corrige o GHSA
    crítico do client — superfície que este servidor não instancia), com suíte
    completa verde; a meta >=4.1.0 permanece como hardening agendado.
+   Atualizado 2026-10-28: upgrade para `fastmcp==4.1.2` executado (corrige
+   GHSA-7xgj-8392-5q4r e GHSA-vqqp-x5qm-5qp4), com `authlib` 1.9.1 e
+   `certifi` 2026.10.19 no lock; suíte completa verde e `pip-audit` sem
+   achados. A política de atualização ficou no ADR-0001 (emenda 2026-10-28).
 
 ## Consequences
 
@@ -72,3 +79,22 @@ operator error.
   (e.g. an international quotes source per the learning lesson
   `get_asset_quote_apenas_acoes_b3`); secrets are introduced; or web-fetched
   content starts being executed or written to disk by this process.
+
+## Emenda 2026-10-28 (spec 004)
+
+Duas decisões acima ficaram desatualizadas e foram reconciliadas com a spec 004
+e o ADR-0015:
+
+- **Item 2 (ID da carteira)**: o ID continua não sendo um segredo no sentido de
+  chave de API (o servidor não autentica nada), mas **funciona como credencial de
+  leitura**: quem o possui lê todos os valores da carteira pela API, e o botão de
+  mascarar do site é só visual. Deve ser tratado como senha na divulgação (ver
+  `docs/PRIVACY.md`). O modo privacidade protege o que vai ao modelo, não quem
+  tem o link.
+- **Item 4 (logs)**: o servidor continua sem registrar segredos nem payloads da
+  fonte, mas passou a gravar o **histórico de mudanças da memória**
+  (`memory.json.log`), com cópias do estado anterior e novo de teses, regras,
+  decisões e alertas. É dado pessoal em repouso, local, com modo 0600 (também o
+  arquivo de trava `memory.json.lock`), fora do controle de versão
+  (`.gitignore`) e sob a mesma fronteira de confiança do `memory.json`. Não há
+  rotação nesta versão.

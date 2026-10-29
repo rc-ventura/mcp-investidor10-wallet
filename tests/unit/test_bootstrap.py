@@ -1,9 +1,7 @@
 import json
 import os
-import re
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -58,6 +56,31 @@ def test_valid_config_returns_parsed_values():
     assert config["max_stale_seconds"] == 3600
 
 
+@pytest.mark.parametrize("value", ["1", "true", "TRUE", "Yes", " on ", "oN"])
+def test_mask_values_accepts_truthy_spellings(value):
+    config = bootstrap.load_config({"WALLET_ID": "1", "WALLET_MASK_VALUES": value})
+    assert config["mask_values"] is True
+
+
+@pytest.mark.parametrize("value", ["0", "false", "False", "NO", " off "])
+def test_mask_values_accepts_falsy_spellings(value):
+    config = bootstrap.load_config({"WALLET_ID": "1", "WALLET_MASK_VALUES": value})
+    assert config["mask_values"] is False
+
+
+def test_mask_values_defaults_to_off_when_absent():
+    assert bootstrap.load_config({"WALLET_ID": "1"})["mask_values"] is False
+
+
+@pytest.mark.parametrize("value", ["talvez", "", "  ", "2", "sim"])
+def test_mask_values_rejects_unknown_values_with_pt_br_message(value):
+    with pytest.raises(SystemExit) as exc:
+        bootstrap.load_config({"WALLET_ID": "1", "WALLET_MASK_VALUES": value})
+    assert str(exc.value) == bootstrap.INVALID_MASK_MESSAGE.format(value=value)
+    assert "1/true/yes/on" in str(exc.value)
+    assert "0/false/no/off" in str(exc.value)
+
+
 def test_config_failure_makes_no_network_calls():
     with respx.mock(assert_all_called=False) as router:
         router.get(url__regex=r".*").mock(
@@ -67,233 +90,98 @@ def test_config_failure_makes_no_network_calls():
             bootstrap.load_config({"WALLET_ID": "nope"})
 
 
-def test_override_returns_custom_path_without_migration(tmp_path):
-    cwd = tmp_path / "cwd"
+def test_override_returns_custom_path_verbatim_and_inspects_nothing(tmp_path):
     home = tmp_path / "home"
-    cwd.mkdir()
-    legacy = cwd / "memory.json"
-    legacy.write_text('{"version": 1}', encoding="utf-8")
     custom = tmp_path / "custom" / "mem.json"
 
     resolved = bootstrap.resolve_memory_path(
-        cwd=cwd,
-        home=home,
-        environ={"WALLET_MEMORY_PATH": str(custom)},
+        home=home, environ={"WALLET_MEMORY_PATH": str(custom)}
     )
 
     assert resolved == str(custom)
-    assert legacy.exists()
     assert not (home / ".investidor10").exists()
+    assert not custom.parent.exists()
 
 
-def test_novo_canonico_creates_canonical_dir_0700_and_first_save_persists(tmp_path):
-    cwd = tmp_path / "cwd"
+def test_without_override_returns_canonical_path_and_first_save_persists(tmp_path):
     home = tmp_path / "home"
-    cwd.mkdir()
     home.mkdir()
 
-    resolved = bootstrap.resolve_memory_path(cwd=cwd, home=home, environ={})
+    resolved = bootstrap.resolve_memory_path(home=home, environ={})
 
-    canonical_dir = home / ".investidor10"
-    canonical_file = canonical_dir / "memory.json"
+    canonical_file = home / ".investidor10" / "memory.json"
     assert resolved == str(canonical_file)
-    assert canonical_dir.is_dir()
-    assert (canonical_dir.stat().st_mode & 0o777) == 0o700
-
+    assert canonical_file.parent.is_dir()
     store = MemoryStore(resolved)
     assert store.available is True
     store.save_rule("comprar apenas ativos com lucro consistente")
-    assert canonical_file.is_file()
+    assert len(MemoryStore(resolved).get_rules()) == 1
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: file mode bits")
+def test_canonical_dir_is_0700_and_memory_file_is_0600(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+
+    resolved = bootstrap.resolve_memory_path(home=home, environ={})
+
+    canonical_file = Path(resolved)
+    MemoryStore(resolved).save_rule("regra")
+    assert (canonical_file.parent.stat().st_mode & 0o777) == 0o700
     assert (canonical_file.stat().st_mode & 0o777) == 0o600
-    reloaded = MemoryStore(resolved)
-    assert len(reloaded.get_rules()) == 1
 
 
-def test_migrado_copies_legacy_sets_0700_0600_removes_legacy_and_warns(
-    tmp_path, capsys
+def test_stray_memory_file_in_cwd_is_ignored_and_untouched(
+    tmp_path, monkeypatch, capsys
 ):
     cwd = tmp_path / "cwd"
     home = tmp_path / "home"
     cwd.mkdir()
     home.mkdir()
-    legacy = cwd / "memory.json"
-    seed = MemoryStore(str(legacy))
-    seed.save_thesis("PETR4", "geração de caixa")
-    seed.save_rule("máximo 10% por ativo")
-    original_bytes = legacy.read_bytes()
+    stray = cwd / "memory.json"
+    stray.write_text('{"version": 1, "source": "stray"}', encoding="utf-8")
+    before = (stray.read_bytes(), stray.stat().st_ino, stray.stat().st_mtime_ns)
+    monkeypatch.chdir(cwd)
 
-    resolved = bootstrap.resolve_memory_path(cwd=cwd, home=home, environ={})
+    resolved = bootstrap.resolve_memory_path(home=home, environ={})
 
-    canonical = home / ".investidor10" / "memory.json"
-    assert resolved == str(canonical)
-    assert not legacy.exists()
-    assert canonical.read_bytes() == original_bytes
-    assert (canonical.parent.stat().st_mode & 0o777) == 0o700
-    assert (canonical.stat().st_mode & 0o777) == 0o600
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert str(legacy) in captured.err
-    assert str(canonical) in captured.err
-
-
-def test_canonico_wins_keeps_canonical_renames_legacy_with_microseconds_and_warns(
-    tmp_path, capsys
-):
-    cwd = tmp_path / "cwd"
-    home = tmp_path / "home"
-    canonical_dir = home / ".investidor10"
-    cwd.mkdir()
-    canonical_dir.mkdir(parents=True, mode=0o700)
-    canonical = canonical_dir / "memory.json"
-    legacy = cwd / "memory.json"
-    canonical.write_text('{"version": 1, "source": "canonical"}', encoding="utf-8")
-    legacy.write_text('{"version": 1, "source": "legacy"}', encoding="utf-8")
-    fixed_now = datetime(2026, 10, 18, 14, 5, 6, 789012)
-
-    resolved = bootstrap.resolve_memory_path(
-        cwd=cwd, home=home, environ={}, now=fixed_now
-    )
-
-    assert resolved == str(canonical)
-    assert (
-        canonical.read_text(encoding="utf-8") == '{"version": 1, "source": "canonical"}'
-    )
-    assert not legacy.exists()
-    backups = list(cwd.glob("memory.json.legacy-*"))
-    assert len(backups) == 1
-    assert re.fullmatch(
-        r"memory\.json\.legacy-[0-9]{8}-[0-9]{6}-[0-9]{6}", backups[0].name
-    )
-    assert (
-        backups[0].read_text(encoding="utf-8") == '{"version": 1, "source": "legacy"}'
-    )
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert str(canonical) in captured.err
-    assert str(backups[0]) in captured.err
-
-
-def test_cwd_equal_to_canonical_dir_does_not_conflict_with_itself(tmp_path, capsys):
-    home = tmp_path / "home"
-    canonical_dir = home / ".investidor10"
-    canonical_dir.mkdir(parents=True, mode=0o700)
-    canonical = canonical_dir / "memory.json"
-    canonical.write_text('{"version": 1, "source": "same"}', encoding="utf-8")
-
-    resolved = bootstrap.resolve_memory_path(cwd=canonical_dir, home=home, environ={})
-
-    assert resolved == str(canonical)
-    assert canonical.exists()
-    assert canonical.read_text(encoding="utf-8") == '{"version": 1, "source": "same"}'
-    assert list(canonical_dir.glob("memory.json.legacy-*")) == []
+    assert resolved == str(home / ".investidor10" / "memory.json")
+    assert not Path(resolved).exists()
+    assert (stray.read_bytes(), stray.stat().st_ino, stray.stat().st_mtime_ns) == before
+    assert [entry.name for entry in cwd.iterdir()] == ["memory.json"]
     assert capsys.readouterr().err == ""
 
 
-def test_migration_failure_aborts_with_pt_br_and_keeps_legacy_intact(
-    tmp_path, monkeypatch
-):
-    cwd = tmp_path / "cwd"
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: symlink creation")
+def test_symlinked_canonical_file_aborts_with_pt_br(tmp_path):
     home = tmp_path / "home"
-    cwd.mkdir()
-    home.mkdir()
-    legacy = cwd / "memory.json"
-    legacy.write_text('{"version": 1}', encoding="utf-8")
-    monkeypatch.setattr(
-        "investidor10_wallet.bootstrap.os.replace",
-        lambda *_args: (_ for _ in ()).throw(OSError("permissão negada")),
-    )
+    canonical_dir = home / ".investidor10"
+    canonical_dir.mkdir(parents=True, mode=0o700)
+    target = tmp_path / "elsewhere.json"
+    target.write_text('{"version": 1}', encoding="utf-8")
+    (canonical_dir / "memory.json").symlink_to(target)
 
     with pytest.raises(SystemExit) as exc:
-        bootstrap.resolve_memory_path(cwd=cwd, home=home, environ={})
+        bootstrap.resolve_memory_path(home=home, environ={})
 
-    msg = str(exc.value)
-    assert str(legacy) in msg
-    assert str(home / ".investidor10" / "memory.json") in msg
-    assert legacy.read_text(encoding="utf-8") == '{"version": 1}'
+    assert str(canonical_dir) in str(exc.value)
+    assert target.read_text(encoding="utf-8") == '{"version": 1}'
 
 
-def test_migration_unlink_failure_aborts_with_pt_br_and_keeps_legacy(
-    tmp_path, monkeypatch
-):
-    cwd = tmp_path / "cwd"
-    home = tmp_path / "home"
-    cwd.mkdir()
-    home.mkdir()
-    legacy = cwd / "memory.json"
-    legacy.write_text('{"version": 1}', encoding="utf-8")
-    orig_unlink = Path.unlink
-
-    def fail_legacy_unlink(self, *args, **kwargs):
-        if self == legacy:
-            raise PermissionError("diretório somente leitura")
-        return orig_unlink(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "unlink", fail_legacy_unlink)
-
-    with pytest.raises(SystemExit) as exc:
-        bootstrap.resolve_memory_path(cwd=cwd, home=home, environ={})
-
-    assert str(legacy) in str(exc.value)
-    assert legacy.exists()
-    assert not (home / ".investidor10" / "memory.json").exists()
-
-
-def test_migration_rejects_symlinked_legacy_file(tmp_path):
-    cwd = tmp_path / "cwd"
-    home = tmp_path / "home"
-    cwd.mkdir()
-    home.mkdir()
-    secret = tmp_path / "secret.json"
-    secret.write_text('{"secret": true}', encoding="utf-8")
-    legacy = cwd / "memory.json"
-    legacy.symlink_to(secret)
-
-    with pytest.raises(SystemExit):
-        bootstrap.resolve_memory_path(cwd=cwd, home=home, environ={})
-
-    assert secret.exists()
-    assert not (home / ".investidor10" / "memory.json").exists()
-
-
-def test_migration_rejects_symlinked_canonical_dir(tmp_path):
-    cwd = tmp_path / "cwd"
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: symlink creation")
+def test_symlinked_canonical_dir_aborts_with_pt_br_and_leaves_target_alone(tmp_path):
     home = tmp_path / "home"
     other = tmp_path / "other"
-    cwd.mkdir()
     home.mkdir()
     other.mkdir(mode=0o755)
     os.chmod(other, 0o755)
     (home / ".investidor10").symlink_to(other)
 
-    with pytest.raises(SystemExit):
-        bootstrap.resolve_memory_path(cwd=cwd, home=home, environ={})
+    with pytest.raises(SystemExit) as exc:
+        bootstrap.resolve_memory_path(home=home, environ={})
 
+    assert str(home / ".investidor10") in str(exc.value)
     assert (other.stat().st_mode & 0o777) == 0o755
-
-
-def test_migration_aborts_if_legacy_inode_changes_before_unlink(tmp_path, monkeypatch):
-    cwd = tmp_path / "cwd"
-    home = tmp_path / "home"
-    cwd.mkdir()
-    home.mkdir()
-    legacy = cwd / "memory.json"
-    legacy.write_text('{"version": 1, "step": "initial"}', encoding="utf-8")
-    real_atomic_copy = bootstrap._atomic_copy
-
-    def copy_then_swap_legacy(source: Path, destination: Path):
-        result = real_atomic_copy(source, destination)
-        replacement = cwd / "replacement.json"
-        replacement.write_text('{"version": 1, "step": "swapped"}', encoding="utf-8")
-        os.replace(replacement, source)
-        return result
-
-    monkeypatch.setattr(bootstrap, "_atomic_copy", copy_then_swap_legacy)
-
-    with pytest.raises(SystemExit):
-        bootstrap.resolve_memory_path(cwd=cwd, home=home, environ={})
-
-    assert legacy.exists()
-    assert legacy.read_text(encoding="utf-8") == '{"version": 1, "step": "swapped"}'
 
 
 @respx.mock

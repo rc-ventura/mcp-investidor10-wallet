@@ -1,7 +1,14 @@
+import sys
+
 import httpx
+import pytest
 import respx
 
 from investidor10_wallet.installer import cli
+
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32", reason="POSIX-only: fake clients are /bin/sh scripts"
+)
 
 PROBE = (
     "https://investidor10.com.br/wallet/api/proxy/wallet-app/summary/metrics/1234567"
@@ -56,6 +63,22 @@ def test_success_registers_all_detected_and_installs_plugin_by_default(
     out = capsys.readouterr().out
     assert "carteira" in out
     assert "plugin" in out
+
+
+@respx.mock
+def test_every_client_runs_the_installer_release_pinned(fake_bin_dir):
+    from investidor10_wallet import __version__
+
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert cli.run(["--wallet-id", "1234567", "--mcp-only"]) == 0
+    registrations = [
+        line
+        for line in (fake_bin_dir / "calls.log").read_text().splitlines()
+        if "mcp add" in line
+    ]
+    assert len(registrations) == 4
+    for line in registrations:
+        assert line.endswith(f"uvx mcp-investidor10-wallet@{__version__}")
 
 
 @respx.mock
@@ -139,3 +162,13 @@ def test_wallet_prompt_eof_returns_pt_br_guidance(fake_bin_dir, monkeypatch, cap
     monkeypatch.setattr("builtins.input", boom)
     assert cli.run(["--mcp-only"]) == 3
     assert "não-interativa" in capsys.readouterr().err
+
+
+@respx.mock
+def test_final_report_points_to_the_privacy_doc(fake_bin_dir, capsys):
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert cli.run(["--wallet-id", "1234567"]) == 0
+    assert (
+        "Privacidade: veja https://github.com/rc-ventura/mcp-investidor10-wallet"
+        "/blob/main/docs/PRIVACY.md" in capsys.readouterr().out
+    )

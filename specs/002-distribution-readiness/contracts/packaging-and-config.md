@@ -55,6 +55,12 @@ escrevem no stdout; avisos sempre no stderr.
 
 ## 4. Contrato da resolução/migração da memória
 
+> **Superado pela spec 004 (0.3.0):** as linhas Conflito, Migração e Falha
+> de migração abaixo, e as mensagens correspondentes do §6, deixaram de
+> valer. A resolução agora é override verbatim ou local canônico, sem
+> inspecionar o diretório corrente. Contrato vigente em
+> `specs/004-hardening/contracts/memory-concurrency.md`.
+
 | Caso | Condição | Resultado |
 |---|---|---|
 | Override | `WALLET_MEMORY_PATH` definido | usa o override; migração **não** ocorre |

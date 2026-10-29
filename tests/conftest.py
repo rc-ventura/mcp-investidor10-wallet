@@ -4,7 +4,10 @@ import tempfile
 
 import pytest
 
-os.environ.setdefault("WALLET_ID", "1234567")
+# Placeholder ID for offline tests; never a real wallet. Live tests (-m live)
+# need a real public wallet passed explicitly: WALLET_ID=<id> uv run pytest -m live
+PLACEHOLDER_WALLET_ID = "1234567"
+os.environ.setdefault("WALLET_ID", PLACEHOLDER_WALLET_ID)
 _test_dir = tempfile.mkdtemp(prefix="mcp-investidor10-tests-")
 os.environ["WALLET_MEMORY_PATH"] = os.path.join(_test_dir, "memory.json")
 

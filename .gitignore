@@ -14,6 +14,10 @@ build/
 memory.json
 memory.json.tmp
 memory.json.broken-*
+memory.json.log
+memory.json.lock
+*.broken-*
+.memory-*
 
 # Tooling session state
 .specify/feature.json

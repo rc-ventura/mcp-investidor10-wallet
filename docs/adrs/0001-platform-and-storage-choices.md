@@ -1,6 +1,6 @@
 # ADR-0001: Platform and storage choices — FastMCP, httpx + TTL cache, single JSON store, pinned deps
 
-- **Status**: Accepted
+- **Status**: Accepted (amended 2026-10-28)
 - **Date**: 2026-10-17
 - **Deciders**: Tech Leader + user (SDD final review cycle 4, spec 001)
 
@@ -74,3 +74,35 @@ rejections were reversed by later cycles.
   transport (ADR-0004 revisit conditions).
 - Related: ADR-0002 (persistence boundary), ADR-0003 (cache/stale semantics),
   ADR-0004 (threat model), ADR-0007 (tool interface), research D1/D2/D5/D9.
+
+### Emenda 2026-10-28 (spec 004)
+
+A política de dependências do §4 ("httpx + fastmcp, pinados") ganha uma
+exceção autorizada pela emenda 1.2.0 da Constituição (V.1): `filelock==4.2.4`
+como dependência direta de runtime, usada só para exclusão mútua entre
+processos sobre o arquivo de memória. Qualquer outra dependência de runtime
+continua exigindo nova emenda. Decisão e alternativas no ADR-0013.
+
+### Emenda 2026-10-28 (revisão final da spec 004, ciclo 2) — atualização de dependências
+
+O §4 diz como as versões ficam fixas, mas não quando mudam. A revisão final da
+spec 004 achou CVEs no lock (`fastmcp` 4.0.11, `authlib` transitivo e
+`certifi` transitivo). Fica decidido:
+
+- **Dependências diretas** (`fastmcp`, `httpx`, `filelock`) continuam com `==`
+  e só mudam por bump deliberado, com a suíte completa verde antes do merge.
+  Aplicado agora: `fastmcp==4.1.2` (publicado há 8 dias), que corrige as duas
+  GHSAs da 4.0.11.
+- **Transitivas** não têm pin no `pyproject.toml`. Elas mudam por renovação
+  do `uv.lock` (`uv lock --upgrade-package <pacote>`) sempre que houver aviso
+  de segurança, e a cada release. Isso não fere o §4, porque o lock continua
+  determinístico. Usa-se a versão corrigida mais antiga que respeite a regra
+  dos 7 dias. Aplicado agora: `authlib` 1.9.1 (14 dias) e `certifi`
+  2026.10.19 (8 dias). Exceção registrada: `virtualenv` 21.14.13, dependência
+  só de desenvolvimento via `pre-commit` e fora do pacote publicado, tinha 6
+  dias. É a versão corrigida mais antiga do CVE-2026-115586, e esperar um dia
+  manteria o job `audit` vermelho.
+- **Auditoria contínua**: o job `audit` do CI roda `pip-audit` (versão fixa)
+  sobre o lock exportado em todo push e PR. Um achado novo falha o CI e entra
+  na renovação acima. Achados não alcançáveis só podem ser ignorados com
+  justificativa registrada no ADR-0004 §8.

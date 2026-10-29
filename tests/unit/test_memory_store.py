@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
+from investidor10_wallet import memory_store
 from investidor10_wallet.memory_store import MemoryStore, MemoryUnavailableError
 
 
@@ -219,6 +220,89 @@ def test_unreadable_file_degrades_without_crashing(tmp_path):
     assert path.read_text() == "private"
 
 
+def test_memory_deleted_while_running_is_not_recreated_empty(tmp_path, capsys):
+    path = tmp_path / "memory.json"
+    store = MemoryStore(str(path))
+    store.save_rule("máximo 10% por ativo")
+    path.unlink()
+
+    with pytest.raises(MemoryUnavailableError):
+        store.get_rules()
+    with pytest.raises(MemoryUnavailableError):
+        store.save_rule("outra regra")
+    assert not path.exists()
+    assert capsys.readouterr().err.count("sumiu com o servidor rodando") == 1
+
+
+def test_restored_memory_file_is_available_again(tmp_path):
+    path = tmp_path / "memory.json"
+    store = MemoryStore(str(path))
+    store.save_rule("r")
+    content = path.read_text()
+    path.unlink()
+    with pytest.raises(MemoryUnavailableError):
+        store.get_rules()
+
+    path.write_text(content)
+
+    assert [rule["text"] for rule in store.get_rules()] == ["r"]
+
+
+def test_a_restarted_server_starts_an_empty_memory_when_the_file_is_gone(tmp_path):
+    path = tmp_path / "memory.json"
+    MemoryStore(str(path)).save_rule("r")
+    path.unlink()
+    assert MemoryStore(str(path)).get_rules() == []
+
+
+def test_transient_read_error_degrades_without_a_corruption_backup(
+    tmp_path, monkeypatch
+):
+    path = tmp_path / "memory.json"
+    store = MemoryStore(str(path))
+    store.save_rule("r")
+
+    def denied(*args, **kwargs):
+        raise PermissionError("locked by antivirus")
+
+    monkeypatch.setattr(memory_store, "open", denied, raising=False)
+    with pytest.raises(MemoryUnavailableError):
+        store.get_rules()
+    assert glob.glob(str(path) + ".broken-*") == []
+
+    monkeypatch.undo()
+    assert [rule["text"] for rule in store.get_rules()] == ["r"]
+
+
+def test_read_only_store_never_writes_a_corruption_backup(tmp_path):
+    path = tmp_path / "memory.json"
+    store = MemoryStore(str(path))
+    store.read_only = True
+    path.write_text("{broken")
+
+    with pytest.raises(MemoryUnavailableError):
+        store.get_rules()
+    assert glob.glob(str(path) + ".broken-*") == []
+
+
+def test_write_is_fsynced_before_the_atomic_rename(store, monkeypatch):
+    calls = []
+    real_fsync, real_replace = os.fsync, os.replace
+
+    def fsync(fd):
+        calls.append("fsync")
+        real_fsync(fd)
+
+    def replace(source, destination):
+        calls.append("replace")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    monkeypatch.setattr(os, "replace", replace)
+    store.save_rule("r")
+    assert calls == ["fsync", "replace"]
+
+
 def test_first_run_save_failure_degrades(tmp_path):
     store = MemoryStore(str(tmp_path / "missing" / "memory.json"))
     assert not store.available
@@ -241,6 +325,7 @@ def test_save_failure_returns_memory_unavailable_without_overwriting_original(
     assert list(tmp_path.glob(".memory-*")) == []
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: symlink creation")
 def test_save_does_not_follow_preexisting_tmp_symlink(store, tmp_path):
     victim = tmp_path / "victim"
     victim.write_text("untouched")
@@ -249,6 +334,7 @@ def test_save_does_not_follow_preexisting_tmp_symlink(store, tmp_path):
     assert victim.read_text() == "untouched"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: file mode bits")
 def test_corrupt_backup_is_created_with_private_permissions(tmp_path):
     path = tmp_path / "memory.json"
     path.write_text("{broken")

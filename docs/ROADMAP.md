@@ -41,7 +41,7 @@ externo; reavaliar depois.
 | **Must** | Listagem em MCP registries (Smithery, PulseMCP, diretório Anthropic) | 3 | É distribuição; **antes de submeter, decidir o risco do ToS** da API não-documentada (ADR-0005) |
 | **Should** | Spec 006 — verificação determinística de cálculos | 4 | Maior lacuna de confiança; fica depois da distribuição por ordem de decisão, não por importância |
 | **Should** | Modo privacidade `WALLET_MASK_VALUES` | 1 | Passa a fazer sentido ao distribuir; env var, nunca parâmetro de tool |
-| **Should** | Action semanal de live tests | 1 | A API upstream é não-documentada; risco #1 de produção, cresce com mais usuários |
+| **Should** | Action semanal de live tests | 1 | Aviso antecipado de drift para o mantenedor; o usuário já é protegido pela validação em tempo de execução. Fora da spec 004 — entra quando houver usuários além do mantenedor (após a 005) |
 | **Should** | Changelog append-only da memória (`memory.json.log`) | 1 | Escrita válida porém errada do modelo hoje é invisível; ~25 linhas |
 | **Should** | Sinal duplo de erro (`is_error` + envelope) | 1 | No protocolo, o erro aparece como sucesso |
 | **Should** | `get_entries` — log de lançamentos | 2 | Endpoint já validado; responde "o que comprei e quando" |
@@ -55,9 +55,11 @@ externo; reavaliar depois.
 | **Could** | Alertas compostos e gatilhos por indicador | 2 | Depende de baseline real e de fonte de cotação |
 | **Could** | Snapshot de posições para diff entre sessões | 2 | `get_entries` cobre parte do caso |
 | **Could** | Coleção `trades` na memória | 2 | Caso de uso do mantenedor; `decisions` serve de contorno |
+| **Could** | Métricas locais + subcomando `doctor` | 3 | Diagnóstico de suporte sem telemetria: o usuário cola o resumo sanitizado numa issue |
 | **Won't (agora)** | Avaliação Ollama local + nota na doc | 1/3 | Depende do mask e de privacidade total como requisito |
 | **Won't (agora)** | Reconciliação corretora↔carteira | 2 | Grande; reavaliar após `get_entries` |
 | **Won't (agora)** | Spike multi-carteira | 2 | Contornado por regra de memória |
+| **Won't (agora)** | Telemetria remota opt-in | 3 | Pouco valor com poucos usuários; contradiz o posicionamento local e exige endpoint hospedado |
 
 Nota: o item "CHANGELOG" da Fase 1 já foi atendido (`CHANGELOG.md` existe
 desde a 0.1.0) e pode ser marcado `[x]`. Os itens "Fora de escopo" ao final
@@ -66,8 +68,9 @@ do documento seguem valendo e não entram na matriz.
 **Numeração e sequência (decisão do mantenedor, 27/10/2026):**
 1. **Spec 004 — Hardening** (Fase 1 inteira, exceto Ollama): file lock, doc de
    privacidade, `WALLET_MASK_VALUES`, changelog append-only da memória, sinal
-   duplo de erro, action semanal de live tests e os itens menores
-   (`instructions=`, pydantic, remoção da migração legada). Vem primeiro
+   duplo de erro e os itens menores (`instructions=`, pydantic, remoção da
+   migração legada). A action semanal de live tests saiu da 004 em
+   27/10/2026 (ver item na Fase 1). Vem primeiro
    porque o Desktop da 005 aumenta o número de processos sobre o mesmo
    `memory.json`.
 2. **Spec 005 — Distribuição Desktop**: `.mcpb` do Claude Desktop, teste do
@@ -107,13 +110,14 @@ do documento seguem valendo e não entram na matriz.
 
 ## Fase 1 — Robustez e confiança
 
-> Escopo da **spec 004 (Hardening)**, decisão de 27/10/2026.
+> Escopo da **spec 004 (Hardening)**, decisão de 27/10/2026 — exceto a
+> avaliação Ollama e a action semanal de live tests.
 
-- [ ] **File lock no memory.json** — dois clientes (ex.: Claude Desktop +
+- [x] **File lock no memory.json** — dois clientes (ex.: Claude Desktop +
   Devin) spawnam dois processos sobre o mesmo arquivo; `os.replace` atômico
   evita corrupção, mas escritas concorrentes se perdem (last-write-wins).
   Lock barato (fcntl/portalocker) resolve.
-- [ ] **Changelog append-only da memória (`memory.json.log`)** — hoje toda
+- [x] **Changelog append-only da memória (`memory.json.log`)** — hoje toda
   mutação escrita pelo modelo é invisível: o backup `.broken-*` só cobre
   arquivo corrompido, não "escrita válida porém errada" (tese ruim, regra
   sobrescrita, outcome errado). Implementar `_append_changelog(op,
@@ -126,7 +130,7 @@ do documento seguem valendo e não entram na matriz.
   `memory.json.log` ao `.gitignore` (mesmos dados financeiros pessoais).
   Rotação deferida — single-user, escrita humana-escala. ~25 linhas em
   `memory_store.py`, zero mudança de schema nem de contrato das tools.
-- [ ] **Sinal duplo de erro (`is_error` + envelope)** — ver
+- [x] **Sinal duplo de erro (`is_error` + envelope)** — ver
   [`docs/research/tool-error-channels.md`](research/tool-error-channels.md).
   Hoje todos os erros chegam só pelo payload `{error: {code, message}}` —
   no metadata do protocolo a chamada consta como sucesso (o mesmo
@@ -137,13 +141,13 @@ do documento seguem valendo e não entram na matriz.
   da spec — SEP-1303/2145). Aproveitar para: revisar `message`s no estilo
   trigger-phrase (recurso + causa + próxima ação nomeando tool do
   servidor) e avaliar campo `retryable`/`category` no envelope.
-- [ ] **Doc de privacidade** — tabela "o que vai para onde": Investidor10
+- [x] **Doc de privacidade** — tabela "o que vai para onde": Investidor10
   (API pública), provedor do LLM (contexto das tools), arquivo local
   (memory.json). Incluir o modelo de ameaça real: **o ID/link da carteira é
   a credencial** — quem o tem vê todos os valores via API, e o botão de
   mascarar do site é cosmético (verificado em 17/10/2026, ver item abaixo).
   Nota explícita de que o modo 100% local exige LLM local (Ollama).
-- [ ] **Modo privacidade `WALLET_MASK_VALUES`** — mascaramento **do lado do
+- [x] **Modo privacidade `WALLET_MASK_VALUES`** — mascaramento **do lado do
   MCP**, o único que funciona de verdade: o botão de mascarar do site só
   altera a renderização, a API segue retornando tudo. Verificado
   empiricamente em 17/10/2026 — com a carteira mascarada,
@@ -171,14 +175,32 @@ do documento seguem valendo e não entram na matriz.
 - [ ] **Action semanal de live tests** — a API upstream é não-documentada; o
   risco #1 de produção é ela mudar sem aviso. Rodar `pytest -m live` em
   schedule (GitHub Actions) para detectar drift antes dos usuários.
-- [ ] **`instructions=` no FastMCP** — preencher com **propósito + índice**
+  **Retirada da spec 004 em 27/10/2026**: a validação em tempo de execução
+  do `wallet_client` (campos e tipos obrigatórios → `unexpected_format`) já
+  impede que drift vire dado errado; o job só antecipa o aviso ao
+  mantenedor, que hoje usa o produto quase todo dia e é o primeiro a ver o
+  erro. Reavaliar quando a spec 005 trouxer usuários do Desktop. Decisões
+  já tomadas (clarificação da 004):
+  - **carteira pública dedicada com posições fictícias** (ação B3, FII,
+    ETF internacional, tesouro, cripto), nunca a carteira real — logs do
+    Actions são públicos e um assert que falha imprime o payload;
+  - ID em segredo do repositório (`LIVE_WALLET_ID`);
+    `on: schedule` semanal + `workflow_dispatch`, nunca em PR; não bloqueia
+    CI nem release; notificação padrão de falha do GitHub basta;
+  - ~~`tests/conftest.py`: trocar o default `WALLET_ID` (carteira real) por ID
+    fictício e exigir `WALLET_ID` explícito nos testes `live`~~ (feito em
+    28/10/2026);
+  - asserts dos testes `live` imprimem só `error.code`, nunca o payload;
+  - fatos de plataforma a revalidar na doc oficial: schedule só roda no
+    branch default e é desativado após 60 dias sem atividade no repo.
+- [x] **`instructions=` no FastMCP** — preencher com **propósito + índice**
   (o que o servidor é, por onde começar, envelope de dados, delay das
   cotações), **não** com comportamento do agente — ver
   [`docs/research/agent-behavior.md`](research/agent-behavior.md).
   Uma linha no `server.py`; já ajuda no Claude Code hoje e a spec 2026-07-28
   formaliza o campo em `server/discover`.
-- [ ] **CHANGELOG** — acompanha o empacotamento da Fase 0.
-- [ ] **Validação de payloads via pydantic (decisão de design)** — pydantic
+- [x] **CHANGELOG** — acompanha o empacotamento da Fase 0.
+- [x] **Validação de payloads via pydantic (decisão de design)** — pydantic
   já está no dependency tree (transitivo do FastMCP). Regra proposta para
   as **tools novas da Fase 2**: um `BaseModel` leve por endpoint em modo
   **validate-then-passthrough** (`model_validate` só para validar; o
@@ -189,7 +211,7 @@ do documento seguem valendo e não entram na matriz.
   motivo para tocar nelas (já passaram 4 ciclos verdes) nem schema de
   memory.json via pydantic — shape é a parte fácil, a semântica de degrade
   (backup `.broken-*`, modo indisponível) continua custom.
-- [ ] **Remover a migração legada `./memory.json` → canônico** — a
+- [x] **Remover a migração legada `./memory.json` → canônico** — a
   máquina inteira (ramos `MIGRADO`/`CANONICO_WINS`, `_atomic_copy`,
   verificação de inode, backup `legacy-<timestamp>`, guarda
   `cwd == canonical`) é código de transição da Fase 0 e virou dead code:
@@ -207,6 +229,46 @@ do documento seguem valendo e não entram na matriz.
   decidir se antecipa agora (single-user já migrado) ou gateia no 1.0.0
   conforme o texto original. Se adiada, o hardening da ADR-0010 §3–4
   segue válido até lá.
+
+### Pendências da revisão final da spec 004 (28/10/2026)
+
+> Achados dos ciclos 1 e 2 de `reports/sdd-final-review/004/` que já existiam
+> antes da 004 ou eram de baixo risco. Os bloqueantes do ciclo 1 (modo 0600 da
+> trava e do log, `mask_error_details`, `.memory-*` no `.gitignore`, emendas dos
+> ADRs) foram corrigidos no próprio ciclo. Os itens abaixo foram fechados em
+> 28/10/2026, ainda dentro da 0.3.0, com teste para cada um.
+
+- [x] **Frescor das cotações nos alertas** — uma cotação em cache vencido,
+  servida durante queda da fonte, não dispara mais o alerta. Ele vai para
+  `pending_check` com `reason: "stale_quote"` e segue ativo. ADR-0017.
+- [x] **Memória apagada com o servidor rodando** — o arquivo não é recriado
+  vazio. A memória fica indisponível, o operador recebe um aviso apontando
+  `memory.json.log`, e restaurar o arquivo traz a memória de volta. ADR-0013,
+  emenda.
+- [x] **Posições truncadas** — `truncated: true` quando a coleta para antes do
+  total declarado. O campo atravessa o modo privacidade.
+- [x] **Privacidade** — um campo permitido com valor aninhado é omitido (fecha
+  a condição 1 do ADR-0015).
+- [x] **Cadeia de suprimentos e disponibilidade** — cache limitado a 256
+  entradas, com descarte do que passou da idade máxima; resposta acima de
+  10 MB é recusada; `uvx` do instalador com versão fixa (ADR-0012, emenda);
+  actions do CI fixadas por SHA; job `audit` com `pip-audit` no CI (ADR-0001,
+  emenda).
+- [x] **Higiene de testes** — os testes usam o ID fictício `1234567`, e os
+  testes `live` exigem `WALLET_ID` explícito. O smoke test de `release.yml` usa
+  o ID fictício.
+- [x] **Polimento do contrato de erro** — `state_conflict` (12º código) para
+  cancelar um alerta inativo; `invalid_params` nomeia o argumento; o texto do
+  contrato de retry foi corrigido para "até 5 novas tentativas (6 no total)".
+  ADR-0014, emenda.
+- [x] **Robustez da memória** — `fsync` antes do `os.replace`; `OSError` de
+  leitura não é tratada como corrupção; nenhum backup em modo somente-leitura.
+- [x] **Ciclo 2: changelog sem seguir symlink** — `O_NOFOLLOW` mais `fchmod`
+  pelo descritor, com aviso se a restrição a 0600 falhar.
+- [x] **Ciclo 2: dependências com CVE** — `fastmcp` 4.1.2, `authlib` 1.9.1,
+  `certifi` 2026.10.19 e `virtualenv` 21.14.13; `pip-audit` sem achados.
+- [x] **Ciclo 2: ADR-0004** — status "Accepted (amended)", com ponteiros nos
+  itens 2 e 4 para a emenda.
 
 ## Fase 2 — Valor de produto (oriundo das learning lessons)
 
@@ -354,6 +416,30 @@ do documento seguem valendo e não entram na matriz.
   se o modelo local passar nos critérios, documentar o "modo privacidade
   total" (mask + Ollama); se não passar, documentar honestamente as
   limitações de tool-calling observadas.
+- [ ] **Métricas locais + subcomando `doctor`** — observabilidade sem dado
+  saindo da máquina. Um evento JSONL por chamada de tool em arquivo irmão
+  da memória (`{ts, tool, duration_ms, error_code, cached, version}`,
+  nunca argumentos, payload, ticker, valor nem ID da carteira; mesmas
+  permissões e `.gitignore` do `memory.json`). `doctor` resume o período
+  (chamadas por tool, erros por código, latência p50/p95, taxa de cache,
+  versão, SO, cliente) e checa a instalação (runner, `WALLET_ID`
+  válido, caminho da memória, trava disponível). A saída é sanitizada
+  para o usuário colar numa issue: **relato iniciado pelo usuário** é o
+  canal de diagnóstico de máquinas de terceiros. Os hooks do plugin podem
+  registrar no mesmo arquivo se o bootstrap `get_session_context` rodou
+  (mede se o bundle funciona). Sinais passivos que já existem e
+  dispensam telemetria: downloads no PyPI (pypistats.org/BigQuery, por
+  versão e SO) e tráfego/issues do GitHub; drift da API é coberto pela
+  action semanal de live tests (spec 004).
+- [ ] **Telemetria remota opt-in — Won't (agora)** — tecnicamente simples
+  (`httpx` já é dependência), mas é decisão de produto/privacidade:
+  vira uma quarta linha na tabela "o que vai para onde" do doc de
+  privacidade. Só reavaliar com base de usuários que justifique, e então
+  com regras fixas: **desligada por padrão** (opt-in por env var), só
+  contadores anônimos (versão, SO, cliente, tool, código de erro,
+  latência) — nunca ticker, valor, payload, ID da carteira ou conteúdo da
+  memória —, documentada no doc de privacidade, com ADR próprio e custo
+  de operar o endpoint assumido explicitamente.
 
 ---
 

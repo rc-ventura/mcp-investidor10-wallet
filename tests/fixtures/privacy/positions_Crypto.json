@@ -1,0 +1,40 @@
+{
+  "total": 1,
+  "weighted": 9988.77,
+  "draw": 1,
+  "data": [
+    {
+      "currency": "BRL",
+      "user_avg_price": null,
+      "id": 11,
+      "target_price": null,
+      "target_price_amount": 9988.77,
+      "quantity": "9988.77",
+      "url": "https://example.test/x",
+      "ticker_name": "Empresa Fictícia",
+      "ticker": "XPCR",
+      "avg_price": 20.5,
+      "current_price": 25.25,
+      "image": "https://example.test/x.png",
+      "equity_brl": "9988.77",
+      "appreciation": 8.5,
+      "weighted_return": 4.2,
+      "is_calculating_rentability": false,
+      "ticker_type": "Crypto",
+      "rating": "A",
+      "raw_rating": "A",
+      "percent_wallet": 15.2,
+      "percent_ideal": 8.0,
+      "equity_total": 9988.77,
+      "buy": "comprar",
+      "avg_rating": "B",
+      "raw_avg_rating": 3.5,
+      "tickerable_id": 77,
+      "capitalization": "1000000",
+      "profit_1": "1.5",
+      "profit_7": 2.5,
+      "profit_30": 3.5,
+      "profit_365": 4.5
+    }
+  ]
+}

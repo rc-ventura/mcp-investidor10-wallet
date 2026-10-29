@@ -1,7 +1,10 @@
 import json
 import re
 import stat
+import sys
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 PLUGIN = REPO / "plugin"
@@ -75,6 +78,10 @@ def test_hooks_cover_persona_and_memory_reminder():
     assert "assistente de investimentos" in persona
     reminder = (PLUGIN / "hooks" / "stop-memory-reminder.sh").read_text()
     assert "confirmação" in reminder
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: executable bit")
+def test_hook_scripts_are_executable():
     for script in ("session-start-persona.sh", "stop-memory-reminder.sh"):
         path = PLUGIN / "hooks" / script
         assert path.stat().st_mode & stat.S_IXUSR
@@ -108,3 +115,12 @@ def test_hooks_scripts_fail_open_on_empty_input():
             assert "additionalContext" in proc.stdout
         else:
             assert proc.stdout == ""
+
+
+def test_dividends_skill_and_its_mirror_handle_privacy_mode():
+    skill = (PLUGIN / "skills" / "resumo-de-dividendos" / "SKILL.md").read_text()
+    command = (PLUGIN / "commands" / "resumo-de-dividendos.toml").read_text()
+    for content in (skill, command):
+        assert "privacy_mode_unavailable" in content
+        assert "get_wallet_positions" in content
+        assert "não estime" in content

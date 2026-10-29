@@ -405,6 +405,7 @@ async def test_positions_paginates_until_source_total():
     envelope = await make_client().get_positions("Ticker")
     assert envelope["data"]["total"] == 60
     assert len(envelope["data"]["data"]) == 60
+    assert envelope["data"]["truncated"] is False
 
 
 @respx.mock
@@ -420,8 +421,10 @@ async def test_positions_dedupe_when_source_ignores_start():
     )
     envelope = await make_client().get_positions("Ticker")
     assert len(envelope["data"]["data"]) == 50
-    # The merged total never claims more rows than `data` contains.
+    # The merged total never claims more rows than `data` contains, and the
+    # shortfall against the declared total is flagged.
     assert envelope["data"]["total"] == 50
+    assert envelope["data"]["truncated"] is True
 
 
 @respx.mock
@@ -483,6 +486,7 @@ async def test_positions_stops_on_short_page_when_total_missing():
     envelope = await make_client().get_positions("Ticker")
     assert len(envelope["data"]["data"]) == 57
     assert envelope["data"]["total"] == 57
+    assert envelope["data"]["truncated"] is False  # no declared total to miss
 
 
 @pytest.mark.parametrize(
@@ -510,3 +514,65 @@ async def test_default_earnings_uses_calendar_year(monkeypatch, today, start):
         await make_client().get_earnings()
     assert route.calls[0].request.url.params["start_date"] == start
     assert route.calls[0].request.url.params["end_date"] == today.isoformat()
+
+
+@pytest.mark.parametrize(
+    "envelope,stale",
+    [
+        ({"cached": False, "fetched_at": "2000-01-01T00:00:00+00:00"}, False),
+        ({"cached": True, "fetched_at": wallet_client._now_iso()}, False),
+        ({"cached": True, "fetched_at": "2000-01-01T00:00:00+00:00"}, True),
+        ({"cached": True}, True),
+        ({"cached": True, "fetched_at": "not a date"}, True),
+    ],
+)
+def test_is_stale_only_flags_cache_older_than_the_ttl(envelope, stale):
+    assert make_client(ttl_seconds=600).is_stale(envelope) is stale
+
+
+@respx.mock
+async def test_response_larger_than_the_cap_is_refused_before_caching(monkeypatch):
+    monkeypatch.setattr(wallet_client, "MAX_RESPONSE_BYTES", 64)
+    respx.get(f"{BASE}{PATH}").respond(json={"applied": 1.0, "equity": "x" * 200})
+    client = make_client()
+    with pytest.raises(SourceError) as excinfo:
+        await client.request(PATH)
+    assert excinfo.value.code == "unexpected_format"
+    assert "larger than 64 bytes" in str(excinfo.value)
+    assert client._cache == {}
+
+
+@respx.mock
+async def test_declared_oversized_body_is_refused_without_reading_it(monkeypatch):
+    monkeypatch.setattr(wallet_client, "MAX_RESPONSE_BYTES", 64)
+    respx.get(f"{BASE}{PATH}").respond(
+        content=b"{}", headers={"content-length": "999999999"}
+    )
+    with pytest.raises(SourceError) as excinfo:
+        await make_client().request(PATH)
+    assert excinfo.value.code == "unexpected_format"
+
+
+@respx.mock
+async def test_cache_is_bounded_and_evicts_the_oldest_entries(monkeypatch):
+    monkeypatch.setattr(wallet_client, "MAX_CACHE_ENTRIES", 3)
+    respx.get(url__regex=rf"{BASE}/q/\d+").respond(json=PAYLOAD)
+    client = make_client()
+    for i in range(5):
+        await client.request(f"/q/{i}")
+    paths = [key[1] for key in client._cache]
+    assert paths == ["/q/2", "/q/3", "/q/4"]
+
+
+@respx.mock
+async def test_entries_too_old_even_for_stale_use_are_purged():
+    respx.get(url__regex=rf"{BASE}/q/\w+").respond(json=PAYLOAD)
+    client = make_client(max_stale_seconds=60)
+    await client.request("/q/old")
+    key = next(iter(client._cache))
+    _, fetched_at, data = client._cache[key]
+    client._cache[key] = (time.monotonic() - 3600, fetched_at, data)
+
+    await client.request("/q/1")
+
+    assert [key[1] for key in client._cache] == ["/q/1"]

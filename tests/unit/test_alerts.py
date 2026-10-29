@@ -11,7 +11,11 @@ from pathlib import Path
 import pytest
 
 from investidor10_wallet import memory_store
-from investidor10_wallet.memory_store import MemoryStore, MemoryUnavailableError
+from investidor10_wallet.memory_store import (
+    MemoryStore,
+    MemoryUnavailableError,
+    StateConflictError,
+)
 
 
 @pytest.fixture
@@ -63,7 +67,8 @@ def test_cancel_is_terminal_and_validates(store):
     alert = store.create_price_alert("PETR4", "below", 30.0)
     cancelled = store.cancel_price_alert(alert["id"])
     assert cancelled["state"] == "cancelled"
-    with pytest.raises(ValueError):
+    # A terminal alert is a state conflict, not an argument error.
+    with pytest.raises(StateConflictError, match="only active alerts"):
         store.cancel_price_alert(alert["id"])  # already cancelled
     assert store.cancel_price_alert(999) is None  # not found
 
@@ -177,3 +182,17 @@ def test_persisted_lowercase_ticker_still_valid(tmp_path):
     store.save()
     reloaded = MemoryStore(str(path))
     assert memory_store.alert_is_valid(reloaded.list_price_alerts()[0]) is True
+
+
+def test_second_store_does_not_trigger_an_alert_the_first_already_triggered(tmp_path):
+    path = str(tmp_path / "memory.json")
+    first = MemoryStore(path)
+    first.create_price_alert("PETR4", "below", 30.0)
+    second = MemoryStore(path)
+
+    triggered = first.evaluate_alerts({"PETR4": 25.0})
+
+    assert [a["ticker"] for a in triggered] == ["PETR4"]
+    assert second.evaluate_alerts({"PETR4": 25.0}) == []
+    states = [a["state"] for a in MemoryStore(path).list_price_alerts()]
+    assert states == ["triggered"]

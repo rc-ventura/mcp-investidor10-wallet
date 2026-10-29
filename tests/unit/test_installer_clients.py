@@ -1,4 +1,12 @@
+import sys
+
+import pytest
+
 from investidor10_wallet.installer import ClientRegistration, clients
+
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32", reason="POSIX-only: fake clients are /bin/sh scripts"
+)
 
 
 def _registration():

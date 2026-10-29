@@ -89,8 +89,12 @@ MCP é stateless no protocolo. Regras:
 
 ### V. Dependências pinadas, upgrades conscientes de protocolo
 
-1. Runtime: `fastmcp` + `httpx` + stdlib, pinados a versões publicadas há
-   ≥7 dias (ADR-0001 §4). Tooling pode adicionar deps pinadas; runtime, não.
+1. Runtime: `fastmcp` + `httpx` + uma biblioteca de trava de arquivo
+   multiplataforma + stdlib, pinados a versões publicadas há ≥7 dias
+   (ADR-0001 §4). A biblioteca de trava é escolhida e pinada por ADR e só
+   serve à exclusão mútua entre processos sobre o arquivo de memória — a
+   stdlib não oferece trava portátil entre POSIX e Windows. Tooling pode
+   adicionar deps pinadas; qualquer outra dep de runtime exige nova emenda.
 2. Upgrade de FastMCP não é bump cego: exige leitura do changelog/release
    notes oficiais, conferência contra os SEPs/revisões de spec absorvidos
    (postura de advisory escopado, ADR-0004 §8) e suíte completa verde
@@ -188,4 +192,4 @@ trecho já estiver sendo tocado por outra tarefa).
   de quem implementa **e** de quem revisa: citação ausente em decisão de
   protocolo é motivo suficiente para bloquear merge.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
+**Version**: 1.2.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-27
