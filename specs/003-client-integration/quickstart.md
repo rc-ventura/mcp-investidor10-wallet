@@ -63,3 +63,21 @@ aplicável. No Gemini, as 3 skills + os custom commands `/analise-da-carteira`,
   exibida — pular (default, `skipped_present`) ou atualizar (`updated`) —
   mesmo com `--yes` (protocolo de colisão do contract install-cli.md).
 - Runner `uv` ausente: sai 2 com instrução PT-BR de instalação.
+## Evidências (preenchidas em 2026-10-27, `main` após o merge do PR #6)
+
+| Cenário | Resultado | Evidência |
+|---|---|---|
+| V1 | ✅ | Release 0.1.0 (2026-10-24) e 0.2.0 (2026-10-27, tag `v0.2.0`, run 40599673366) publicadas no PyPI com proveniência OIDC |
+| V2.1 `install --dry-run` | ✅ | `uvx --refresh mcp-investidor10-wallet@0.2.0 install --dry-run`, fora do repo, baixando do PyPI: SIMULAÇÃO lista Claude Code, Devin CLI e Codex (registraria o servidor + instalaria o plugin); Gemini ausente da máquina; nada alterado |
+| V2.3 `--dry-run --mcp-only` | ✅ | Só "registraria o servidor", zero linha de plugin |
+| V2.2/V2.4 `install` real e reexecução | ⏳ pendente | Não executado na máquina do mantenedor (servidor `carteira` já registrado em Claude Code e Codex); será testado em outra máquina. Idempotência coberta por testes (SC-003) |
+| V3 Claude Code | ✅ | `claude plugin list`: `investidor10-carteira@investidor10` enabled, escopo user |
+| V3 Devin CLI | ✅ | `devin plugins list`: `investidor10-carteira` instalado |
+| V3 Codex | ⏳ pendente | Instalação via TUI `/plugins` ainda não registrada |
+| V3 Gemini | ⏳ pendente | CLI não instalado; formato validado só por contrato |
+| V4 ID inválido | ✅ | `--wallet-id abc` → mensagem PT-BR, exit 3, nada registrado |
+| V4 `--clients` inválido | ✅ | `--clients foo` → "Clientes inválidos…", exit 2 |
+| V4 sem cliente / `uv` ausente / colisão | ✅ (testes) | Suíte `-k "install or plugin or hook or collision or degrad"`: 56 passed |
+
+Pendências aceitas para o fechamento da spec: V2 real em máquina limpa,
+Codex via TUI e Gemini. Não bloqueiam a 0.2.0.
