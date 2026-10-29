@@ -3,6 +3,7 @@ import glob
 import json
 import os
 import sys
+import threading
 
 import filelock
 import pytest
@@ -224,3 +225,71 @@ def test_preexisting_wide_lock_file_is_tightened(path, umask_022):
     MemoryStore(path)
 
     assert os.stat(lock_path).st_mode & 0o777 == 0o600
+
+
+def test_full_kernel_lock_table_fails_one_operation_and_then_recovers(
+    path, monkeypatch
+):
+    store = MemoryStore(path)
+    real_acquire = filelock.FileLock.acquire
+    failures = iter([True])
+
+    def flaky(self, *args, **kwargs):
+        if next(failures, False):
+            raise OSError(errno.ENOLCK, "No locks available")
+        return real_acquire(self, *args, **kwargs)
+
+    monkeypatch.setattr(filelock.FileLock, "acquire", flaky)
+
+    with pytest.raises(MemoryUnavailableError) as exc:
+        store.save_rule("first try")
+    assert exc.value.code == "memory_unavailable"
+    assert store.read_only is False  # transient: never latched
+    store.save_rule("second try")
+    assert [r["text"] for r in store.get_rules()] == ["second try"]
+
+
+def test_a_second_thread_never_slips_past_the_lock(path):
+    store = MemoryStore(path, lock_timeout=0.2)
+    entered = threading.Event()
+    release = threading.Event()
+
+    def holder():
+        with store._locked():
+            entered.set()
+            release.wait(5)
+
+    thread = threading.Thread(target=holder)
+    thread.start()
+    assert entered.wait(5)
+    try:
+        with pytest.raises(MemoryBusyError):
+            store.save_rule("from another thread")
+    finally:
+        release.set()
+        thread.join(5)
+
+    store.save_rule("after release")
+    assert [r["text"] for r in store.get_rules()] == ["after release"]
+
+
+def test_nested_calls_in_one_thread_stay_reentrant(path):
+    store = MemoryStore(path, lock_timeout=0.2)
+    with store._locked():
+        store.save_rule("nested")
+    assert [r["text"] for r in store.get_rules()] == ["nested"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: symlinks")
+def test_lock_tighten_never_follows_a_symlink(path, capsys):
+    victim = os.path.join(os.path.dirname(path), "victim")
+    with open(victim, "w", encoding="utf-8") as f:
+        f.write("x")
+    os.chmod(victim, 0o644)
+    link = f"{path}.lock-link"
+    os.symlink(victim, link)
+
+    MemoryStore(path)._tighten_by_path(link)
+
+    assert os.stat(victim).st_mode & 0o777 == 0o644
+    assert "não foi possível restringir" in capsys.readouterr().err

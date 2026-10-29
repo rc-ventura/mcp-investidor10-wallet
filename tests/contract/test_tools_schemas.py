@@ -4,7 +4,7 @@ import pytest
 import respx
 from fastmcp import Client as _Client
 
-from investidor10_wallet import server, wallet_client
+from investidor10_wallet import memory_store, server, wallet_client
 from investidor10_wallet.memory_store import MemoryStore
 from investidor10_wallet.server import mcp
 
@@ -359,6 +359,27 @@ class TestPriceAlerts:
             {"ticker": "PETR4", "reason": "stale_quote"}
         ]
         assert len(fresh_memory.list_price_alerts("active")) == 1
+
+    async def test_pending_checks_survive_a_memory_failure_during_evaluation(
+        self, fresh_memory, monkeypatch
+    ):
+        fresh_memory.create_price_alert("MXRF11", "below", 999.0)
+
+        def unavailable(quotes):
+            raise memory_store.MemoryUnavailableError("gone")
+
+        monkeypatch.setattr(fresh_memory, "evaluate_alerts", unavailable)
+        with respx.mock:
+            respx.get(f"{wallet_client.REST_BASE_URL}/assets/tickers/MXRF11").respond(
+                status_code=410
+            )
+            wallet_client.rest_client._cache.clear()
+            async with Client(mcp) as client:
+                result = await client.call_tool("get_session_context", {})
+        assert result.data["memory_status"] == "unavailable"
+        assert result.data["pending_check"] == [
+            {"ticker": "MXRF11", "reason": "asset_type_not_supported"}
+        ]
 
     async def test_quote_cached_within_the_ttl_still_triggers(self, fresh_memory):
         fresh_memory.create_price_alert("PETR4", "below", 999.0)

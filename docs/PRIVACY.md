@@ -59,6 +59,9 @@ cotações de mercado, memória e alertas.
 
 - O modo **não é anonimização**. Preços unitários e percentuais permitem
   estimar proporções, não montantes.
+- Entre os preços unitários está o **seu preço médio de compra** por ativo
+  (`avg_price`). Diferente da cotação, ele é seu: mostra quanto você pagou por
+  cota ou ação, mas não quantas você tem nem quanto investiu.
 - O **texto livre** que você escreve (teses, regras, objetivo, notas de decisão)
   e o que você digita na conversa **não são mascarados**. Se você escrever
   "quero chegar a R$ 1 milhão", isso vai ao modelo.

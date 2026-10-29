@@ -56,8 +56,8 @@
 
 ### Implementation for User Story 2
 
-- [x] T010 [US2] Remover o default `"1234567"` de `src/investidor10_wallet/wallet_client.py` e mover a validação de `WALLET_ID` (ausente/vazio/não-numérico) para `bootstrap.py` usando os esqueletos C6; validação executada antes da criação do app FastMCP (research D3, contrato C2)
-- [x] T011 [US2] Varrer o repositório e substituir `1234567` hardcoded fora dos testes por placeholder (`<id>`) em `README.md` e demais docs citados; nos testes, manter apenas onde o ID é parte do cenário (não é default)
+- [x] T010 [US2] Remover o default `"<id>"` de `src/investidor10_wallet/wallet_client.py` e mover a validação de `WALLET_ID` (ausente/vazio/não-numérico) para `bootstrap.py` usando os esqueletos C6; validação executada antes da criação do app FastMCP (research D3, contrato C2)
+- [x] T011 [US2] Varrer o repositório e substituir `<id>` hardcoded fora dos testes por placeholder (`<id>`) em `README.md` e demais docs citados; nos testes, manter apenas onde o ID é parte do cenário (não é default)
 
 **Checkpoint**: US2 validada por S3 — servidor aborta sem carteira configurada em < 1s, sem rede
 

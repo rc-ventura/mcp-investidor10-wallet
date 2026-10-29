@@ -60,3 +60,27 @@ def test_concurrent_writers_leave_one_intact_changelog_line_per_mutation(tmp_pat
     assert {line["after"]["text"] for line in lines} == {
         f"{label}-{index}" for label in "ab" for index in range(20)
     }
+
+
+def test_racing_bootstraps_trigger_one_alert_exactly_once(tmp_path):
+    path = str(tmp_path / "memory.json")
+    alert = MemoryStore(path).create_price_alert("PETR4", "below", 999.0)
+
+    context = multiprocessing.get_context("spawn")
+    processes = [
+        context.Process(target=memory_worker.evaluate, args=(path, {"PETR4": 30.0}))
+        for _ in range(4)
+    ]
+    for process in processes:
+        process.start()
+    _finish(*processes)
+
+    with open(f"{path}.log", encoding="utf-8") as f:
+        triggers = [
+            line
+            for line in map(json.loads, filter(str.strip, f))
+            if line["op"] == "trigger"
+        ]
+    assert [line["id"] for line in triggers] == [alert["id"]]
+    [stored] = MemoryStore(path).list_price_alerts()
+    assert stored["state"] == "triggered"

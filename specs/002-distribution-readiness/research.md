@@ -25,7 +25,7 @@ Context foram resolvidos aqui; a sondagem da API ao vivo foi feita em
 
 ## D3 — `WALLET_ID` obrigatório, sem default
 
-**Decision**: remover `os.getenv("WALLET_ID", "1234567")`. Env ausente/vazio → `SystemExit(1)` com mensagem PT-BR nomeando a variável e ensinando a obter o ID na URL pública da carteira (`investidor10.com.br/carteira/<id>` — confirmado na prática de uso). Valor não numérico mantém o comportamento ADR-0003 §3 (mensagem ajustada para PT-BR). Checks de config executam antes da criação do app FastMCP, para que nenhuma tool responda sem carteira configurada.
+**Decision**: remover `os.getenv("WALLET_ID", "<id>")`. Env ausente/vazio → `SystemExit(1)` com mensagem PT-BR nomeando a variável e ensinando a obter o ID na URL pública da carteira (`investidor10.com.br/carteira/<id>` — confirmado na prática de uso). Valor não numérico mantém o comportamento ADR-0003 §3 (mensagem ajustada para PT-BR). Checks de config executam antes da criação do app FastMCP, para que nenhuma tool responda sem carteira configurada.
 
 **Rationale**: FR-002/SC-002 — produto não pode nascer com a carteira do autor como default; falha imediata e acionável é o padrão já estabelecido para env inválida.
 
@@ -39,7 +39,7 @@ Context foram resolvidos aqui; a sondagem da API ao vivo foi feita em
 - **401/403** → `SystemExit(1)` PT-BR: carteira privada.
 - **5xx/timeout/transporte** → warning no stderr e **startup continua** (servidor não fica refém de indisponibilidade transitória; as tools já retornam `source_unavailable` estruturado — ADR-0007).
 
-**Evidência live (18/10/2026)**: `summary/metrics/99999999999` → **404**; `summary/metrics/1234567` → **200**. Não há como testar carteira privada sem um ID real privado — o caso fica coberto pela mensagem "não encontrada ou privada" (RFC: assumir indistinguível) e um teste `live` documenta a regressão se a fonte passar a diferenciar.
+**Evidência live (18/10/2026)**: `summary/metrics/99999999999` → **404**; `summary/metrics/<id>` → **200**. Não há como testar carteira privada sem um ID real privado — o caso fica coberto pela mensagem "não encontrada ou privada" (RFC: assumir indistinguível) e um teste `live` documenta a regressão se a fonte passar a diferenciar.
 
 **Rationale**: ROADMAP Fase 0 pede "validar o WALLET_ID (fetch + erro amigável)". Fazer no startup (e não na 1ª tool) dá feedback no momento da configuração, quando o usuário está olhando; proteger o startup contra indisponibilidade transitória preserva a filosofia de degrade do projeto.
 

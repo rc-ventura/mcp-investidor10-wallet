@@ -5,7 +5,7 @@ Guia de validação ponta a ponta. Detalhes de contratos em [contracts/mcp-tools
 ## Pré-requisitos
 
 - Python 3.11+ e [`uv`](https://docs.astral.sh/uv/) instalados
-- Carteira pública no Investidor10 (ID default `1234567`, configurável via env)
+- Carteira pública no Investidor10 (ID default `<id>`, configurável via env)
 - Um cliente MCP: Claude Desktop, Claude Code ou Devin CLI
 
 ## Setup
@@ -15,7 +15,7 @@ cd ~/CascadeProjects/mcp-investidor10-wallet
 uv sync                    # instala fastmcp + httpx (pinados)
 
 # Smoke test sem cliente MCP:
-WALLET_ID=1234567 uv run server.py   # sobe em stdio; Ctrl+C para sair
+WALLET_ID=<id> uv run server.py   # sobe em stdio; Ctrl+C para sair
 ```
 
 Testes:
@@ -35,7 +35,7 @@ uv run pytest -m live          # opt-in: integração contra a API real do Inves
     "carteira": {
       "command": "uv",
       "args": ["--directory", "/Users/rafaelventura/CascadeProjects/mcp-investidor10-wallet", "run", "server.py"],
-      "env": { "WALLET_ID": "1234567" }
+      "env": { "WALLET_ID": "<id>" }
     }
   }
 }

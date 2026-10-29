@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 import pytest
 
-from investidor10_wallet import memory_store
 from investidor10_wallet.memory_store import MemoryStore, MemoryUnavailableError
 
 
@@ -214,10 +213,11 @@ def test_invalid_schema_degrades_and_preserves_file(tmp_path, data):
 def test_unreadable_file_degrades_without_crashing(tmp_path):
     path = tmp_path / "memory.json"
     path.write_text("private")
-    with patch("builtins.open", side_effect=PermissionError("denied")):
+    with patch.object(MemoryStore, "_read_file", side_effect=PermissionError("denied")):
         store = MemoryStore(str(path))
     assert not store.available
     assert path.read_text() == "private"
+    assert glob.glob(str(path) + ".broken-*") == []
 
 
 def test_memory_deleted_while_running_is_not_recreated_empty(tmp_path, capsys):
@@ -265,7 +265,7 @@ def test_transient_read_error_degrades_without_a_corruption_backup(
     def denied(*args, **kwargs):
         raise PermissionError("locked by antivirus")
 
-    monkeypatch.setattr(memory_store, "open", denied, raising=False)
+    monkeypatch.setattr(MemoryStore, "_read_file", denied)
     with pytest.raises(MemoryUnavailableError):
         store.get_rules()
     assert glob.glob(str(path) + ".broken-*") == []
@@ -301,6 +301,40 @@ def test_write_is_fsynced_before_the_atomic_rename(store, monkeypatch):
     monkeypatch.setattr(os, "replace", replace)
     store.save_rule("r")
     assert calls == ["fsync", "replace"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: symlinks")
+def test_memory_file_swapped_for_a_symlink_is_never_followed(tmp_path, capsys):
+    path = tmp_path / "memory.json"
+    store = MemoryStore(str(path))
+    store.save_rule("r")
+    secret = tmp_path / "secret.txt"
+    secret.write_text('{"version": 1}')
+    path.unlink()
+    path.symlink_to(secret)
+
+    with pytest.raises(MemoryUnavailableError):
+        store.get_rules()
+    with pytest.raises(MemoryUnavailableError):
+        store.save_rule("outra")
+
+    assert path.is_symlink()  # never replaced or detached
+    assert secret.read_text() == '{"version": 1}'
+    assert glob.glob(str(path) + ".broken-*") == []
+    assert capsys.readouterr().err.count("link simbólico") == 1
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: symlinks")
+def test_symlinked_memory_path_is_unavailable_from_the_start(tmp_path):
+    real = tmp_path / "real.json"
+    MemoryStore(str(real)).save_rule("r")
+    link = tmp_path / "memory.json"
+    link.symlink_to(real)
+
+    store = MemoryStore(str(link))
+
+    assert not store.available
+    assert link.is_symlink()
 
 
 def test_first_run_save_failure_degrades(tmp_path):

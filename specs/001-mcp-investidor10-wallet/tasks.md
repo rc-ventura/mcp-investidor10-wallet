@@ -23,7 +23,7 @@ description: "Task list for feature implementation"
 
 - [X] T001 Criar `pyproject.toml` com `fastmcp` e `httpx` pinados a versões publicadas há ≥7 dias (pesquisar versão atual no PyPI, sem ranges flutuantes), requires-python `>=3.11`, e dev-dependencies `pytest`, `pytest-asyncio`, `respx`; registrar `live` como marker do pytest
 - [X] T002 Criar `.gitignore` com `.venv/`, `__pycache__/`, `memory.json`, `memory.json.tmp`, `memory.json.broken-*`, `.specify/feature.json`
-- [X] T003 [P] Criar `README.md` com descrição do projeto, instalação via `uv sync`, execução `WALLET_ID=1234567 uv run server.py` e tabela das 19 tools (link para specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md)
+- [X] T003 [P] Criar `README.md` com descrição do projeto, instalação via `uv sync`, execução `WALLET_ID=<id> uv run server.py` e tabela das 19 tools (link para specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md)
 
 ---
 
@@ -33,7 +33,7 @@ description: "Task list for feature implementation"
 
 **⚠️ CRITICAL**: Nenhuma story começa antes desta fase completar.
 
-- [X] T004 Implementar base de `wallet_client.py`: `httpx.AsyncClient` com `User-Agent: "Mozilla/5.0"` e timeout 20s; base URLs `https://investidor10.com.br/wallet/api/proxy/wallet-app` e `https://investidor10.com.br/api/rest`; `WALLET_ID` via env (default `1234567`)
+- [X] T004 Implementar base de `wallet_client.py`: `httpx.AsyncClient` com `User-Agent: "Mozilla/5.0"` e timeout 20s; base URLs `https://investidor10.com.br/wallet/api/proxy/wallet-app` e `https://investidor10.com.br/api/rest`; `WALLET_ID` via env (default `<id>`)
 - [X] T005 Adicionar cache TTL em memória a `wallet_client.py`: dict `chave=path+params → (timestamp, resposta)`, TTL via `WALLET_CACHE_TTL_SECONDS` (default 600); envelope de saída SEMPRE `{ "cached": bool, "fetched_at": ISO-8601, "data": ... }`; em falha da fonte com cache válido, retornar cache com `cached=true`, senão erro `source_unavailable`
 - [X] T006 Adicionar normalização de erros a `wallet_client.py`: HTTP não-2xx/timeout → `source_unavailable`; JSON com schema inesperado (chaves-chave ausentes) → `unexpected_format`; nunca fabricar valores (FR-016); formato de erro único `{ "error": { "code": str, "message": str } }`
 - [X] T007 Implementar base de `memory_store.py`: schema v1 de `memory.json` exatamente como data-model.md (chaves `version`, `wallet_goal`, `theses`, `rules`, `decisions`, `insights_log`, `alerts`); cria arquivo vazio na 1ª execução; path via `WALLET_MEMORY_PATH` (default `./memory.json`); IDs inteiros monotônicos por coleção (`max(id)+1`); timestamps ISO-8601 com timezone local
@@ -64,7 +64,7 @@ description: "Task list for feature implementation"
 - [X] T014 [P] [US1] Adicionar `get_allocation(wallet_id)` a `wallet_client.py`: `GET /summary/donutchart/{WALLET_ID}/all?groupBy=ticker` (alocação por ativo/classe)
 - [X] T015 [P] [US1] Adicionar `get_positions(wallet_id, asset_type)` a `wallet_client.py`: validar `asset_type ∈ {Ticker, Fii, EtfInternational, Treasure, Crypto}` (case-sensitive da API; normalizar input do usuário para esses valores, senão `invalid_asset_type`); `GET /summary/actives/{WALLET_ID}/{asset_type}?raw=1&api_version=v2&start=0&length=50&order_column=equity_total&order_dir=desc`
 - [X] T016 [US1] Registrar em `server.py` tools `get_wallet_summary()`, `get_wallet_allocation()`, `get_wallet_positions(asset_type)` com docstrings em inglês explicando quando usar, parâmetros e campos de retorno (research D8: docstring é o contrato com o modelo); indicadores não aplicáveis por classe são omitidos, nunca inventados; docstring de posições deve instruir o modelo a sinalizar que equity de `EtfInternational` envolve conversão cambial (US1 cenário 3)
-- [X] T017 [US1] Teste de integração live opt-in em `tests/integration/test_live_api.py` (marker `live`): as 3 tools contra a carteira real `1234567` — resumo retorna equity > 0; posições das 5 classes retornam sem erro (algumas podem ser `[]`)
+- [X] T017 [US1] Teste de integração live opt-in em `tests/integration/test_live_api.py` (marker `live`): as 3 tools contra a carteira real `<id>` — resumo retorna equity > 0; posições das 5 classes retornam sem erro (algumas podem ser `[]`)
 
 **Checkpoint**: SC-001 (<30s por pergunta) e SC-002 (100% dos valores conferem com a fonte) validáveis no cliente. MVP pronto.
 

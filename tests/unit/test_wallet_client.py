@@ -516,18 +516,31 @@ async def test_default_earnings_uses_calendar_year(monkeypatch, today, start):
     assert route.calls[0].request.url.params["end_date"] == today.isoformat()
 
 
-@pytest.mark.parametrize(
-    "envelope,stale",
-    [
-        ({"cached": False, "fetched_at": "2000-01-01T00:00:00+00:00"}, False),
-        ({"cached": True, "fetched_at": wallet_client._now_iso()}, False),
-        ({"cached": True, "fetched_at": "2000-01-01T00:00:00+00:00"}, True),
-        ({"cached": True}, True),
-        ({"cached": True, "fetched_at": "not a date"}, True),
-    ],
-)
-def test_is_stale_only_flags_cache_older_than_the_ttl(envelope, stale):
-    assert make_client(ttl_seconds=600).is_stale(envelope) is stale
+@respx.mock
+async def test_is_stale_follows_the_cache_monotonic_age_not_the_wall_clock(
+    monkeypatch,
+):
+    respx.get(f"{BASE}{PATH}").respond(json=PAYLOAD)
+    client = make_client(ttl_seconds=600)
+    fresh = await client.request(PATH)
+    assert client.is_stale(fresh) is False  # straight from the source
+
+    hit = await client.request(PATH)
+    assert hit["cached"] is True
+    assert client.is_stale(hit) is False  # regular hit inside the TTL
+
+    # A wall clock stepped backwards (fetched_at in the future) changes nothing:
+    # only the monotonic age of the cache entry decides.
+    key = next(iter(client._cache))
+    cached_at, _, data = client._cache[key]
+    client._cache[key] = (cached_at - 601, "2999-01-01T00:00:00+00:00", data)
+    aged = {"cached": True, "fetched_at": "2999-01-01T00:00:00+00:00", "data": data}
+    assert client.is_stale(aged) is True
+
+
+def test_cached_envelope_of_unknown_provenance_counts_as_stale():
+    envelope = {"cached": True, "fetched_at": wallet_client._now_iso(), "data": {}}
+    assert make_client().is_stale(envelope) is True
 
 
 @respx.mock
@@ -576,3 +589,21 @@ async def test_entries_too_old_even_for_stale_use_are_purged():
     await client.request("/q/1")
 
     assert [key[1] for key in client._cache] == ["/q/1"]
+
+
+@respx.mock
+async def test_positions_stop_at_the_page_cap_on_endless_new_rows(monkeypatch):
+    monkeypatch.setattr(wallet_client, "MAX_POSITION_PAGES", 3)
+    route = respx.get(f"{BASE}/summary/actives/1234567/Ticker")
+
+    def endless(request):
+        start = int(request.url.params["start"])
+        rows = [{"ticker": f"T{i}"} for i in range(start, start + 50)]
+        return httpx.Response(200, json={"data": rows, "weighted": {}, "draw": 0})
+
+    route.side_effect = endless
+    envelope = await make_client().get_positions("Ticker")
+
+    assert route.call_count == 3
+    assert envelope["data"]["total"] == len(envelope["data"]["data"]) == 150
+    assert envelope["data"]["truncated"] is True

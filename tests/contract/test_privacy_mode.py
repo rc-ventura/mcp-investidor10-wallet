@@ -179,3 +179,9 @@ async def test_no_tool_exposes_a_privacy_parameter_and_schemas_do_not_change():
     for schema in after.values():
         for name in schema.get("properties", {}):
             assert "privacy" not in name.lower() and "mask" not in name.lower()
+
+
+async def test_bad_horizon_is_invalid_params_even_in_privacy_mode(masked):
+    result = await _call("get_patrimony_history", {"months": 0})
+    assert result.is_error is True
+    assert result.structured_content["error"]["code"] == "invalid_params"

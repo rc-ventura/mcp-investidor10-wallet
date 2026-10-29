@@ -11,7 +11,7 @@ configuração/estado do bootstrap, efêmeros por processo.
 
 | Campo | Tipo | Obrigatório | Validação | Falha |
 |---|---|---|---|---|
-| `WALLET_ID` | string de dígitos | **Sim** (novo — era default `1234567`) | ausente/vazio → aborta; `re.fullmatch(r"\d+")` → aborta | `SystemExit(1)` PT-BR com instrução (URL pública da carteira) |
+| `WALLET_ID` | string de dígitos | **Sim** (novo — era default `<id>`) | ausente/vazio → aborta; `re.fullmatch(r"\d+")` → aborta | `SystemExit(1)` PT-BR com instrução (URL pública da carteira) |
 | `WALLET_MEMORY_PATH` | path | Não (override) | usado como está quando definido | comportamento do store (degrade) |
 | `WALLET_CACHE_TTL_SECONDS` | número ≥ 0 | Não (default 600) | finito ≥ 0 | `SystemExit(1)` — ADR-0003 §3 |
 | `WALLET_CACHE_MAX_STALE_SECONDS` | número ≥ 0 | Não (default 86400) | finito ≥ 0 | `SystemExit(1)` — ADR-0003 §3 |
