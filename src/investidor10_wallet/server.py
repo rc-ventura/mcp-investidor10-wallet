@@ -427,7 +427,7 @@ async def get_session_context() -> dict:
         try:
             envelope = await wallet_client.rest_client.get_quote(ticker)
             if wallet_client.rest_client.is_stale(envelope):
-                # Never fire a terminal alert on an old price (ADR-0017).
+                # Never fire a terminal alert on an old price.
                 pending_check.append({"ticker": ticker, "reason": "stale_quote"})
                 continue
             price = _parse_quote_price(envelope.get("data"))
