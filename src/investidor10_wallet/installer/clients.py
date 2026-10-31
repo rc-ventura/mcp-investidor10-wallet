@@ -1,10 +1,11 @@
 import shutil
 import subprocess
 
+from .. import __version__
 from . import SERVER_ALIAS, ClientRegistration, RegisterOutcome
 
 RUNNER_COMMAND = "uvx"
-RUNNER_ARGS = ["mcp-investidor10-wallet"]
+RUNNER_ARGS = [f"mcp-investidor10-wallet@{__version__}"]
 
 
 def _run(command: list[str]) -> subprocess.CompletedProcess:

@@ -24,6 +24,10 @@ WALLET_ID = os.getenv("WALLET_ID", "").strip()
 CACHE_TTL_SECONDS = 600.0
 MAX_STALE_SECONDS = 86400.0
 REQUEST_TIMEOUT_SECONDS = 20.0
+MAX_CACHE_ENTRIES = 256
+MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+MAX_POSITION_PAGES = 400
+MAX_HISTORY_MONTHS = 600
 
 
 def _now_iso() -> str:
@@ -37,9 +41,7 @@ def _matches(value, typ) -> bool:
     return isinstance(value, typ)
 
 
-# Marker for request(required_types=...): int/float, or a string that parses
-# as a finite number. The live summary endpoint returns numeric strings
-# (e.g. "96801.5575437"), so strict (int, float) would break production.
+# The live summary endpoint returns numeric strings (e.g. "96801.5575437"):
 NUMERIC = "numeric"
 
 
@@ -72,6 +74,26 @@ class SourceError(Exception):
 
     def to_payload(self) -> dict:
         return {"error": {"code": self.code, "message": self.message}}
+
+
+async def _read_capped(response: httpx.Response, path: str) -> bytes:
+    """Read a streamed body, refusing one larger than MAX_RESPONSE_BYTES."""
+    too_large = SourceError(
+        "unexpected_format",
+        f"Investidor10 API response for {path} is larger than "
+        f"{MAX_RESPONSE_BYTES} bytes — refusing to read it",
+    )
+    declared = response.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_RESPONSE_BYTES:
+        raise too_large
+    chunks = []
+    size = 0
+    async for chunk in response.aiter_bytes():
+        size += len(chunk)
+        if size > MAX_RESPONSE_BYTES:
+            raise too_large
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 VALID_ASSET_TYPES = ("Ticker", "Fii", "EtfInternational", "Treasure", "Crypto")
@@ -136,6 +158,27 @@ class WalletClient:
     def _envelope(data, cached: bool, fetched_at: str) -> dict:
         return {"cached": cached, "fetched_at": fetched_at, "data": data}
 
+    def is_stale(self, envelope: dict) -> bool:
+        """True for an expired cache entry served during a source outage.
+
+        The age comes from this client's own cache entry, on the same
+        monotonic clock that request() uses to decide TTL and stale serving,
+        so a wall-clock step can never make old data look fresh. A regular
+        cache hit (younger than the TTL) is fresh. A cached envelope whose
+        entry is no longer in this cache has unknown age and counts as stale.
+        The entry is matched by `data` identity, so pass the envelope exactly as
+        request() returned it: a copied or masked `data` also counts as stale.
+        Callers that make terminal decisions (alert triggers) must skip it.
+        """
+        if not envelope.get("cached"):
+            return False
+        for cached_at, fetched_at, data in self._cache.values():
+            if data is envelope.get("data") and fetched_at == envelope.get(
+                "fetched_at"
+            ):
+                return time.monotonic() - cached_at >= self.ttl_seconds
+        return True
+
     def _stale_envelope(self, hit, path: str) -> dict:
         """Serve an expired cache entry on outage only while it is still recent.
 
@@ -175,41 +218,39 @@ class WalletClient:
             return self._envelope(hit[2], cached=True, fetched_at=hit[1])
 
         try:
-            async with httpx.AsyncClient(
-                headers=self.headers,
-                timeout=self.timeout,
-                follow_redirects=False,
-            ) as client:
-                response = await client.get(f"{self.base_url}{path}", params=params)
+            async with (
+                httpx.AsyncClient(
+                    headers=self.headers,
+                    timeout=self.timeout,
+                    follow_redirects=False,
+                ) as client,
+                client.stream(
+                    "GET", f"{self.base_url}{path}", params=params
+                ) as response,
+            ):
+                status = response.status_code
+                body = await _read_capped(response, path) if status < 400 else b""
         except (httpx.HTTPError, httpx.InvalidURL) as exc:
-            # Source failure: serve the stale cache (with its explicit age)
-            # while it is recent enough; otherwise fail explicitly.
             if hit:
                 return self._stale_envelope(hit, path)
             raise SourceError(
                 "source_unavailable", f"Investidor10 API request failed: {exc}"
             ) from exc
 
-        if response.status_code >= 500 and hit:
-            # Temporary outage: serve the stale cache while within max stale.
+        if status >= 500 and hit:
             return self._stale_envelope(hit, path)
-        if response.status_code >= 400:
-            message = (
-                f"Investidor10 API returned HTTP {response.status_code} for {path}"
-            )
-            if (
-                400 <= response.status_code < 500
-                and self.base_url == WALLET_PROXY_BASE_URL
-            ):
+        if status >= 400:
+            message = f"Investidor10 API returned HTTP {status} for {path}"
+            if 400 <= status < 500 and self.base_url == WALLET_PROXY_BASE_URL:
                 message += " — check WALLET_ID"
             raise SourceError(
                 "source_unavailable",
                 message,
-                status_code=response.status_code,
+                status_code=status,
             )
 
         try:
-            data = response.json()
+            data = json.loads(body)
         except ValueError as exc:
             raise SourceError(
                 "unexpected_format",
@@ -243,10 +284,26 @@ class WalletClient:
                     )
 
         fetched_at = _now_iso()
-        self._cache[cache_key] = (time.monotonic(), fetched_at, data)
+        self._remember(cache_key, fetched_at, data)
         return self._envelope(data, cached=False, fetched_at=fetched_at)
 
-    # ------------------------------------------------------------- wallet endpoints
+    def _remember(self, cache_key: tuple, fetched_at: str, data) -> None:
+        """Cache a payload, keeping the cache bounded.
+
+        Entries too old to be served even as stale are dropped, then the
+        oldest ones beyond MAX_CACHE_ENTRIES (dicts keep insertion order).
+        """
+        now = time.monotonic()
+        for key in [
+            key
+            for key, (cached_at, _, _) in self._cache.items()
+            if now - cached_at > self.max_stale_seconds
+        ]:
+            del self._cache[key]
+        self._cache.pop(cache_key, None)
+        self._cache[cache_key] = (now, fetched_at, data)
+        while len(self._cache) > MAX_CACHE_ENTRIES:
+            del self._cache[next(iter(self._cache))]
 
     async def get_summary(self) -> dict:
         """Wallet summary: applied amount, equity, variations, total/12M returns.
@@ -280,7 +337,10 @@ class WalletClient:
         (full-row identity as fallback), the loop stops on a page that adds no
         new rows, and `total` in the merged payload reflects the unique rows
         actually collected — never more than `data` contains. The merged
-        payload keeps the source shape: {total, data, weighted, draw}.
+        payload keeps the source shape {total, data, weighted, draw} plus
+        `truncated`, true when collection stopped below the declared total or
+        hit the MAX_POSITION_PAGES hard stop. A declared total that is not a
+        positive int, or that the collected rows exceed, is treated as absent.
         """
         canonical = normalize_asset_type(asset_type)
         page_size = 50
@@ -289,7 +349,13 @@ class WalletClient:
         envelope = None
         page = None
         total = None
+        pages = 0
+        capped = False
         while True:
+            if pages >= MAX_POSITION_PAGES:
+                capped = True
+                break
+            pages += 1
             start = len(rows)
             envelope = await self.request(
                 f"/summary/actives/{self.wallet_id}/{canonical}",
@@ -305,8 +371,9 @@ class WalletClient:
                 required_types={"data": list},
             )
             page = envelope["data"]
-            if total is None and type(page.get("total")) is int:
-                total = page["total"]
+            declared = page.get("total")
+            if type(declared) is int and declared > 0:
+                total = declared if total is None else max(total, declared)
             added = 0
             for row in page["data"]:
                 ticker = row.get("ticker") if isinstance(row, dict) else None
@@ -319,6 +386,8 @@ class WalletClient:
                     seen.add(identity)
                     rows.append(row)
                     added += 1
+            if total is not None and len(rows) > total:
+                total = None
             if (
                 added == 0
                 or len(page["data"]) < page_size
@@ -328,6 +397,7 @@ class WalletClient:
         merged = dict(page)
         merged["data"] = rows
         merged["total"] = len(rows)
+        merged["truncated"] = capped or (total is not None and len(rows) < total)
         return {**envelope, "data": merged}
 
     async def get_quote(self, ticker: str) -> dict:
@@ -363,14 +433,11 @@ class WalletClient:
             raise
         data = envelope["data"]
         if isinstance(data, dict) and not data:
-            # An empty successful payload means the ticker does not exist.
             raise SourceError(
                 "ticker_not_found",
                 f"Ticker '{normalized}' was not found — check the spelling",
             )
         if not isinstance(data, dict):
-            # Only a genuinely empty payload means ticker_not_found; any
-            # non-empty wrong shape (e.g. a JSON array) is a schema drift.
             raise SourceError(
                 "unexpected_format",
                 f"Investidor10 API payload for /assets/tickers/{normalized} has an unexpected type",
@@ -394,10 +461,11 @@ class WalletClient:
             ) from None
         return envelope
 
-    async def get_earnings(
-        self, start_date: str | None = None, end_date: str | None = None
-    ) -> dict:
-        """Earnings received in a period; defaults to the last 12 months."""
+    @staticmethod
+    def resolve_earnings_period(
+        start_date: str | None = None, end_date: str | None = None
+    ) -> tuple[str, str]:
+        """Resolve and validate the earnings window; defaults to the last 12 months."""
         if start_date is None and end_date is None:
             today = datetime.date.today()
             try:
@@ -406,13 +474,20 @@ class WalletClient:
                 start_date = today.replace(year=today.year - 1, day=28).isoformat()
             end_date = today.isoformat()
         else:
-            start_date = self._validate_date(start_date, "start_date")
-            end_date = self._validate_date(end_date, "end_date")
+            start_date = WalletClient._validate_date(start_date, "start_date")
+            end_date = WalletClient._validate_date(end_date, "end_date")
         if start_date > end_date:
             raise SourceError(
                 "invalid_params",
                 f"start_date ({start_date}) must not be after end_date ({end_date}) — check the dates",
             )
+        return start_date, end_date
+
+    async def get_earnings(
+        self, start_date: str | None = None, end_date: str | None = None
+    ) -> dict:
+        """Earnings received in a period; defaults to the last 12 months."""
+        start_date, end_date = self.resolve_earnings_period(start_date, end_date)
         return await self.request(
             f"/earnings/total-period/{self.wallet_id}",
             params={"start_date": start_date, "end_date": end_date},
@@ -441,13 +516,19 @@ class WalletClient:
 
     async def get_patrimony_history(self, months: int) -> dict:
         """Monthly patrimony evolution (contributions vs capital gains)."""
-        if type(months) is not int or months <= 0:
-            raise SourceError(
-                "invalid_params",
-                f"months must be a positive integer (e.g. 12, 24, 60), got {months!r}",
-            )
+        check_months(months)
         return await self.request(
             f"/summary/barchart/{self.wallet_id}/{months}/all", expected_type=list
+        )
+
+
+def check_months(months) -> None:
+    """Validate the patrimony-history horizon (a positive integer, capped)."""
+    if type(months) is not int or not 0 < months <= MAX_HISTORY_MONTHS:
+        raise SourceError(
+            "invalid_params",
+            f"months must be an integer from 1 to {MAX_HISTORY_MONTHS} "
+            f"(e.g. 12, 24, 60), got {months!r}",
         )
 
 
@@ -477,19 +558,22 @@ async def validate_wallet(
     never blocks local operation.
     """
     try:
-        async with httpx.AsyncClient(
-            headers=BROWSER_HEADERS,
-            timeout=timeout,
-            follow_redirects=False,
-        ) as client:
-            response = await client.get(f"{base_url}/summary/metrics/{wallet_id}")
+        async with (
+            httpx.AsyncClient(
+                headers=BROWSER_HEADERS,
+                timeout=timeout,
+                follow_redirects=False,
+            ) as client,
+            client.stream("GET", f"{base_url}/summary/metrics/{wallet_id}") as response,
+        ):
+            status = response.status_code
     except (httpx.HTTPError, httpx.InvalidURL):
         bootstrap.warn(bootstrap.PROBE_UNAVAILABLE_MESSAGE.format(wallet_id=wallet_id))
         return
-    if response.status_code == 200:
+    if status == 200:
         return
-    if response.status_code == 404:
+    if status == 404:
         bootstrap.fail(bootstrap.WALLET_NOT_FOUND_MESSAGE.format(wallet_id=wallet_id))
-    if response.status_code in (401, 403):
+    if status in (401, 403):
         bootstrap.fail(bootstrap.WALLET_PRIVATE_MESSAGE.format(wallet_id=wallet_id))
     bootstrap.warn(bootstrap.PROBE_UNAVAILABLE_MESSAGE.format(wallet_id=wallet_id))

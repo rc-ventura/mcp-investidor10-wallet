@@ -7,28 +7,73 @@ from fastmcp.exceptions import ValidationError
 from fastmcp.server.middleware import Middleware
 from fastmcp.tools import ToolResult
 
-from . import bootstrap, memory_store, wallet_client
-from .memory_store import MemoryStore, MemoryUnavailableError
+from . import bootstrap, memory_store, privacy, wallet_client
+from .memory_store import (
+    MemoryBusyError,
+    MemoryReadOnlyError,
+    MemoryStore,
+    MemoryUnavailableError,
+    StateConflictError,
+)
 
-mcp = FastMCP("investidor10-wallet")
+INSTRUCTIONS = (
+    "Read-only access to one public Investidor10 wallet plus a persistent investor "
+    "memory (theses, rules, decisions, price alerts). Start every session with "
+    "get_session_context. Wallet tools return a data envelope "
+    "{cached, fetched_at, data}; errors return {error: {code, message}} with isError "
+    "set. B3 quotes carry ~15 minutes of delay. When privacy.masked is true, the "
+    "operator withheld monetary amounts."
+)
+
+mcp = FastMCP("investidor10-wallet", instructions=INSTRUCTIONS, mask_error_details=True)
 
 
-class ParameterErrorMiddleware(Middleware):
+def _invalid_argument_names(exc: ValidationError) -> list[str]:
+    """Names of the offending arguments, from the pydantic error locations.
+
+    Only identifier-shaped names are echoed back; input values never are.
+    """
+    errors = getattr(exc.__cause__ or exc.__context__, "errors", None)
+    if not callable(errors):
+        return []
+    names: list[str] = []
+    for error in errors():
+        name = next((p for p in error.get("loc", ()) if isinstance(p, str)), None)
+        if name and name.isidentifier() and len(name) <= 64 and name not in names:
+            names.append(name)
+    return names
+
+
+class ErrorSignalMiddleware(Middleware):
     async def on_call_tool(self, context, call_next) -> ToolResult:
         try:
-            return await call_next(context)
-        except ValidationError:
+            result = await call_next(context)
+        except ValidationError as exc:
+            names = _invalid_argument_names(exc)
+            which = f" ({', '.join(names)})" if names else ""
             return ToolResult(
                 structured_content={
                     "error": {
                         "code": "invalid_params",
-                        "message": f"Invalid parameters for {context.message.name}; check the tool schema",
+                        "message": (
+                            f"Invalid parameters for {context.message.name}{which}: an "
+                            "argument is missing, has the wrong type or is out of range. "
+                            "Check the tool input schema and call it again with corrected "
+                            "arguments."
+                        ),
                     }
-                }
+                },
+                is_error=True,
             )
+        content = result.structured_content
+        if isinstance(content, dict) and "error" in content:
+            return ToolResult(
+                content=result.content, structured_content=content, is_error=True
+            )
+        return result
 
 
-mcp.add_middleware(ParameterErrorMiddleware())
+mcp.add_middleware(ErrorSignalMiddleware())
 
 
 class _LazyMemory:
@@ -44,9 +89,25 @@ class _LazyMemory:
 memory: MemoryStore | _LazyMemory = _LazyMemory()
 
 
+NEXT_ACTIONS = {
+    "source_unavailable": (
+        "Retry this tool later; if it keeps failing, tell the user the source is "
+        "unavailable and do not invent values."
+    ),
+    "unexpected_format": (
+        "The source changed its format: tell the user and do not use numbers "
+        "from this response."
+    ),
+}
+
+
 def source_error_payload(exc: wallet_client.SourceError) -> dict:
     """Convert a data-source failure into the structured error envelope."""
-    return exc.to_payload()
+    payload = exc.to_payload()
+    hint = NEXT_ACTIONS.get(exc.code)
+    if hint:
+        payload["error"]["message"] = f"{exc.message} {hint}"
+    return payload
 
 
 def memory_error_payload(exc: MemoryUnavailableError) -> dict:
@@ -55,12 +116,14 @@ def memory_error_payload(exc: MemoryUnavailableError) -> dict:
     The agent should inform the user and keep operating without memory
     (corrupted memory must not disable the other tools).
     """
-    return {"error": {"code": "memory_unavailable", "message": str(exc)}}
+    return {"error": {"code": exc.code, "message": str(exc)}}
 
 
 def _memory_or_param_error(exc: Exception) -> dict:
     if isinstance(exc, MemoryUnavailableError):
         return memory_error_payload(exc)
+    if isinstance(exc, StateConflictError):
+        return {"error": {"code": exc.code, "message": str(exc)}}
     return {"error": {"code": "invalid_params", "message": str(exc)}}
 
 
@@ -68,10 +131,7 @@ def _not_found(what: str) -> dict:
     return {"error": {"code": "not_found", "message": what}}
 
 
-MEMORY_ERRORS = (MemoryUnavailableError, ValueError)
-
-
-# --------------------------------------------------------------------- wallet tools
+MEMORY_ERRORS = (MemoryUnavailableError, StateConflictError, ValueError)
 
 
 @mcp.tool
@@ -84,9 +144,14 @@ async def get_wallet_summary() -> dict:
     `fetched_at` and whether the answer came from the in-memory cache
     (`cached=true`). On failure this returns {"error": {"code", "message"}} —
     never invent values.
+
+    When the envelope has `privacy.masked` true, the operator withheld monetary
+    amounts and quantities: work with the percentages and ratios provided and
+    never estimate or reconstruct the withheld values.
     """
     try:
-        return await wallet_client.wallet_client.get_summary()
+        envelope = await wallet_client.wallet_client.get_summary()
+        return privacy.mask("summary", envelope)
     except wallet_client.SourceError as exc:
         return source_error_payload(exc)
 
@@ -104,9 +169,14 @@ async def get_wallet_allocation() -> dict:
     the ideal, say so instead of forcing suggestions. This is also a data
     envelope — always mention `fetched_at` and `cached` when presenting the
     numbers.
+
+    When the envelope has `privacy.masked` true, the operator withheld monetary
+    amounts and quantities: work with the percentages and ratios provided and
+    never estimate or reconstruct the withheld values.
     """
     try:
-        return await wallet_client.wallet_client.get_allocation()
+        envelope = await wallet_client.wallet_client.get_allocation()
+        return privacy.mask("allocation", envelope)
     except wallet_client.SourceError as exc:
         return source_error_payload(exc)
 
@@ -115,18 +185,18 @@ async def get_wallet_allocation() -> dict:
 async def get_wallet_positions(asset_type: str) -> dict:
     """Detailed positions of one asset class of the wallet.
 
-    Args:
-        asset_type: One of Ticker (Brazilian stocks), Fii (real estate funds),
-            EtfInternational (international ETFs), Treasure (Brazilian treasury
-            bonds), Crypto. Any case is accepted; other values return an
-            invalid_asset_type error listing the valid types.
+    When the envelope has `privacy.masked` true, the operator withheld monetary
+    amounts and quantities: work with the percentages and ratios provided and
+    never estimate or reconstruct the withheld values.
 
     Each position includes quantity, average price, current quote, equity,
     profitability, percent of wallet (percent_wallet), ideal percent
     (percent_ideal), fundamental indicators when the class provides them
     (P/E, P/B, dividend yield, ROE) and the source's buy flag. Positions are
     in data.data; a class with no positions has data.data=[] (not an error). Never invent
-    indicator values that the source did not provide.
+    indicator values that the source did not provide. When data.truncated is
+    true the source stopped returning new rows before its declared total: tell
+    the user the list is incomplete and do not present it as the whole class.
 
     Presentation rules: compare percent_wallet vs percent_ideal when discussing
     rebalancing; for EtfInternational positions, remind the user that equity
@@ -136,9 +206,16 @@ async def get_wallet_positions(asset_type: str) -> dict:
     add the current quote via get_asset_quote, then enrich with recent events
     from your own web search, citing every source; if no relevant recent news
     exists, say so explicitly instead of padding with generic content.
+
+    Args:
+        asset_type: One of Ticker (Brazilian stocks), Fii (real estate funds),
+            EtfInternational (international ETFs), Treasure (Brazilian treasury
+            bonds), Crypto. Any case is accepted; other values return an
+            invalid_asset_type error listing the valid types.
     """
     try:
-        return await wallet_client.wallet_client.get_positions(asset_type)
+        envelope = await wallet_client.wallet_client.get_positions(asset_type)
+        return privacy.mask("positions", envelope)
     except wallet_client.SourceError as exc:
         return source_error_payload(exc)
 
@@ -148,9 +225,6 @@ async def get_asset_quote(ticker: str) -> dict:
     """Current market quote and fundamentals of a ticker (any asset, in the
     wallet or not): price, day and 12-month variation, Graham and Bazin fair
     prices, P/E, P/BV, dividend yield and sector.
-
-    Args:
-        ticker: Asset ticker (e.g. PETR4, MXRF11, IVVB11). Any case accepted.
 
     IMPORTANT presentation rules: quotes from the B3 have an inherent delay of
     ~15 minutes — always state this when giving prices. Always mention
@@ -164,6 +238,9 @@ async def get_asset_quote(ticker: str) -> dict:
     position (when held) with recent events found through your own web search,
     citing every source; if no relevant recent news exists, say so explicitly
     instead of padding the report with generic content.
+
+    Args:
+        ticker: Asset ticker (e.g. PETR4, MXRF11, IVVB11). Any case accepted.
     """
     try:
         return await wallet_client.rest_client.get_quote(ticker)
@@ -177,17 +254,23 @@ async def get_earnings(
 ) -> dict:
     """Earnings (dividends, interest, income) received by the wallet in a period.
 
-    Args:
-        start_date: YYYY-MM-DD. Omit both dates to get the last 12 months.
-        end_date: YYYY-MM-DD. Must be after start_date — an inverted range
-            returns an invalid_params error (never a silent empty result).
+    When the operator enabled privacy mode this tool returns a
+    privacy_mode_unavailable error: say so and do not estimate earnings.
 
     Presentation rules: present the total (data.sum) for exactly the requested
     window; this endpoint does not include per-asset earnings. A period without
     earnings is not an error — state it plainly. Always mention
     `cached`/`fetched_at`.
+
+    Args:
+        start_date: YYYY-MM-DD. Omit both dates to get the last 12 months.
+        end_date: YYYY-MM-DD. Must be after start_date — an inverted range
+            returns an invalid_params error (never a silent empty result).
     """
     try:
+        if privacy.enabled():
+            wallet_client.wallet_client.resolve_earnings_period(start_date, end_date)
+            return privacy.unavailable_error("get_earnings")
         return await wallet_client.wallet_client.get_earnings(start_date, end_date)
     except wallet_client.SourceError as exc:
         return source_error_payload(exc)
@@ -198,15 +281,22 @@ async def get_patrimony_history(months: int) -> dict:
     """Monthly patrimony evolution over a horizon, separating contributions
     from capital gains.
 
-    Args:
-        months: Positive integer horizon (e.g. 12, 24, 60).
+    When the operator enabled privacy mode this tool returns a
+    privacy_mode_unavailable error: say so and do not estimate the series.
 
     Presentation rules: show the monthly series splitting what was contributed
     from what the market added; when the user asks "how did my patrimony
     evolve", propose a horizon if none was given. Always mention
     `cached`/`fetched_at`.
+
+    Args:
+        months: Integer horizon from 1 to 600 (e.g. 12, 24, 60).
     """
     try:
+        # Arguments first: a bad horizon is invalid_params even in privacy mode.
+        wallet_client.check_months(months)
+        if privacy.enabled():
+            return privacy.unavailable_error("get_patrimony_history")
         return await wallet_client.wallet_client.get_patrimony_history(months)
     except wallet_client.SourceError as exc:
         return source_error_payload(exc)
@@ -218,14 +308,14 @@ async def create_price_alert(ticker: str, direction: str, limit_price: float) ->
     of the NEXT session by get_session_context — there is no continuous
     monitoring outside sessions (scope of this product).
 
+    Note: quotes only exist for B3 stocks; alerts on other asset classes stay
+    active but are reported as pending check (asset_type_not_supported).
+
     Args:
         ticker: Asset ticker (uppercase-normalized).
         direction: 'above' (notify when price >= limit) or 'below'
             (notify when price <= limit). Boundaries are inclusive.
         limit_price: Price threshold, must be greater than zero.
-
-    Note: quotes only exist for B3 stocks; alerts on other asset classes stay
-    active but are reported as pending check (asset_type_not_supported).
     """
     try:
         return memory.create_price_alert(ticker, direction, limit_price)
@@ -260,11 +350,10 @@ async def cancel_price_alert(alert_id: int) -> dict:
     except MEMORY_ERRORS as exc:
         return _memory_or_param_error(exc)
     if cancelled is None:
-        return _not_found(f"Price alert {alert_id} not found")
+        return _not_found(
+            f"Price alert {alert_id} not found. Use list_price_alerts to see the valid ids."
+        )
     return cancelled
-
-
-# ---------------------------------------------------------------------- memory tools
 
 
 def _parse_quote_price(data) -> float | None:
@@ -294,61 +383,78 @@ async def get_session_context() -> dict:
     `triggered_alerts` so you can notify the user at the start of the session,
     with the alert's registration date and the current price. Alerts whose
     quote could not be fetched are returned in `pending_check` and remain
-    active. Use `pending_decisions` to follow up on earlier recommendations and
-    `recent_insights` to never repeat an alert as if it were new. If
-    memory_status is "unavailable", tell the user memory could not be loaded
-    and keep operating without it.
+    active; so are alerts whose only quote is stale cached data served during
+    a source outage (reason "stale_quote"), because a trigger is terminal and
+    must never fire on an old price. Use `pending_decisions` to follow up on earlier recommendations and
+    `recent_insights` to never repeat an alert as if it were new.
+
+    `memory_status` is "ok", "unavailable" or "read_only". If it is
+    "unavailable", tell the user memory could not be loaded and keep operating
+    without it. If it is "read_only", the memory is readable but cannot be
+    written (alerts are not evaluated): tell the user and do not attempt to
+    save anything. A memory_busy error means another client is writing: retry
+    this tool call.
     """
     try:
         digest = memory.session_digest()
+    except MemoryBusyError as exc:
+        return memory_error_payload(exc)
     except MemoryUnavailableError:
-        return {
-            "memory": None,
-            "triggered_alerts": [],
-            "pending_check": [],
-            "memory_status": "unavailable",
-        }
+        return _session_context(None, [], [], "unavailable")
+    try:
+        active_alerts = memory.list_price_alerts("active")
+    except MemoryBusyError as exc:
+        return memory_error_payload(exc)
+    except MemoryUnavailableError:
+        return _session_context(digest, [], [], "unavailable")
+
+    if memory.read_only:
+        return _session_context(digest, [], [], "read_only")
+
+    quotes: dict = {}
+    pending_check: list = []
+    attempted: set[str] = set()
+    for alert in active_alerts:
+        if not memory_store.alert_is_valid(alert):
+            pending_check.append(
+                {"alert_id": alert.get("id"), "reason": "invalid_alert"}
+            )
+            continue
+        ticker = alert["ticker"].strip().upper()
+        if ticker in attempted:
+            continue
+        attempted.add(ticker)
+        try:
+            envelope = await wallet_client.rest_client.get_quote(ticker)
+            if wallet_client.rest_client.is_stale(envelope):
+                # Never fire a terminal alert on an old price (ADR-0017).
+                pending_check.append({"ticker": ticker, "reason": "stale_quote"})
+                continue
+            price = _parse_quote_price(envelope.get("data"))
+            if price is None:
+                pending_check.append({"ticker": ticker, "reason": "unexpected_format"})
+            else:
+                quotes[ticker] = price
+        except wallet_client.SourceError as exc:
+            pending_check.append({"ticker": ticker, "reason": exc.code})
 
     try:
-        quotes: dict = {}
-        pending_check: list = []
-        attempted: set[str] = set()
-        for alert in memory.list_price_alerts("active"):
-            if not memory_store.alert_is_valid(alert):
-                pending_check.append(
-                    {"alert_id": alert.get("id"), "reason": "invalid_alert"}
-                )
-                continue
-            ticker = alert["ticker"].strip().upper()
-            if ticker in attempted:
-                continue  # one quote per ticker, reused across its alerts
-            attempted.add(ticker)
-            try:
-                envelope = await wallet_client.rest_client.get_quote(ticker)
-                price = _parse_quote_price(envelope.get("data"))
-                if price is None:
-                    pending_check.append(
-                        {"ticker": ticker, "reason": "unexpected_format"}
-                    )
-                else:
-                    quotes[ticker] = price
-            except wallet_client.SourceError as exc:
-                pending_check.append({"ticker": ticker, "reason": exc.code})
         triggered = memory.evaluate_alerts(quotes)
+    except MemoryBusyError as exc:
+        return memory_error_payload(exc)
+    except MemoryReadOnlyError:
+        return _session_context(digest, [], pending_check, "read_only")
     except MemoryUnavailableError:
-        # The store degraded mid-session (e.g. file corrupted after boot):
-        # degrade gracefully instead of leaking an exception.
-        return {
-            "memory": digest,
-            "triggered_alerts": [],
-            "pending_check": [],
-            "memory_status": "unavailable",
-        }
+        return _session_context(digest, [], pending_check, "unavailable")
+    return _session_context(digest, triggered, pending_check, "ok")
+
+
+def _session_context(digest, triggered: list, pending_check: list, status: str) -> dict:
     return {
         "memory": digest,
         "triggered_alerts": triggered,
         "pending_check": pending_check,
-        "memory_status": "ok",
+        "memory_status": status,
     }
 
 
@@ -470,7 +576,9 @@ async def record_decision_outcome(
     except MEMORY_ERRORS as exc:
         return _memory_or_param_error(exc)
     if updated is None:
-        return _not_found(f"Decision {decision_id} not found")
+        return _not_found(
+            f"Decision {decision_id} not found. Use get_session_context (pending_decisions) to see the valid ids."
+        )
     return updated
 
 
@@ -502,6 +610,9 @@ def main() -> None:
     global memory
     config = bootstrap.load_config()
     wallet_client.configure(config)
+    privacy.configure(config)
+    if privacy.enabled():
+        bootstrap.warn(bootstrap.MASK_ACTIVE_MESSAGE)
     memory = MemoryStore(bootstrap.resolve_memory_path())
     asyncio.run(wallet_client.validate_wallet(wallet_client.WALLET_ID))
     mcp.run()

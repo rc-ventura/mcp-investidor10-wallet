@@ -3,8 +3,6 @@ import os
 import re
 import stat
 import sys
-import tempfile
-from datetime import datetime
 from pathlib import Path
 
 MISSING_WALLET_ID_MESSAGE = (
@@ -38,25 +36,49 @@ PROBE_UNAVAILABLE_MESSAGE = (
     "iniciará mesmo assim; as ferramentas de dados informarão o erro quando falhar."
 )
 
-MIGRATION_FAILED_MESSAGE = (
-    "Não foi possível migrar a memória de {legacy} para {canonical} ({cause}). "
-    "Corrija as permissões do diretório {directory} e reinicie — seus dados em {legacy} "
-    "não foram alterados."
-)
-
 CANONICAL_DIR_FAILED_MESSAGE = (
     "Não foi possível preparar o diretório de memória {directory} ({cause}). "
     "Verifique as permissões de escrita (0700) e reinicie o servidor."
 )
 
-MIGRATED_MESSAGE = "Memória migrada de {legacy} para {canonical}."
-
-CONFLICT_RESOLVED_MESSAGE = (
-    "Memória: {canonical} em uso. O arquivo antigo {legacy} foi preservado como {backup} "
-    "e não é mais utilizado."
+LOCK_UNSUPPORTED_MESSAGE = (
+    "A memória em {path} está em um sistema de arquivos sem suporte a trava (ex.: pasta de "
+    "rede). Leituras seguem funcionando, mas gravações serão recusadas para não perder dados. "
+    "Aponte WALLET_MEMORY_PATH para um disco local (ex.: ~/.investidor10/memory.json) e "
+    "reinicie."
 )
 
-CANONICAL_DIR = Path.home() / ".investidor10"
+CHANGELOG_FAILED_MESSAGE = (
+    "Aviso: não foi possível registrar a mudança em {path} ({cause}); a gravação na "
+    "memória seguiu normalmente."
+)
+
+TIGHTEN_FAILED_MESSAGE = (
+    "Aviso: não foi possível restringir {path} a 0600 ({cause}); confira as permissões "
+    "do arquivo, que pode estar legível por outros usuários."
+)
+
+MEMORY_SYMLINK_MESSAGE = (
+    "A memória em {path} é um link simbólico e não será lida nem gravada: um link "
+    "pode apontar a leitura para qualquer arquivo. Aponte WALLET_MEMORY_PATH para o "
+    "arquivo real (não para o link) e reinicie o servidor."
+)
+
+MEMORY_FILE_VANISHED_MESSAGE = (
+    "A memória em {path} sumiu com o servidor rodando. Ela não será recriada vazia para "
+    "não apagar teses e regras em silêncio. Restaure o arquivo (o histórico está em "
+    "{path}.log) ou reinicie o servidor para começar uma memória vazia."
+)
+
+INVALID_MASK_MESSAGE = (
+    "WALLET_MASK_VALUES={value!r} inválido: use 1/true/yes/on para ligar ou "
+    "0/false/no/off para desligar. Corrija o ambiente e reinicie o servidor."
+)
+
+MASK_ACTIVE_MESSAGE = "Modo privacidade ativo: montantes em reais e quantidades não serão enviados ao modelo."
+
+MASK_ON = frozenset({"1", "true", "yes", "on"})
+MASK_OFF = frozenset({"0", "false", "no", "off"})
 
 
 def warn(message: str) -> None:
@@ -78,6 +100,18 @@ def _parse_float(name: str, raw: str, default: str, environ) -> float:
     return number
 
 
+def _parse_mask(environ) -> bool:
+    raw = environ.get("WALLET_MASK_VALUES")
+    if raw is None:
+        return False
+    value = str(raw).strip().lower()
+    if value in MASK_ON:
+        return True
+    if value in MASK_OFF:
+        return False
+    fail(INVALID_MASK_MESSAGE.format(value=raw))
+
+
 def load_config(environ=None) -> dict:
     """Parse the operator environment; abort with PT-BR guidance on bad config."""
     environ = os.environ if environ is None else environ
@@ -92,6 +126,7 @@ def load_config(environ=None) -> dict:
         "max_stale_seconds": _parse_float(
             "WALLET_CACHE_MAX_STALE_SECONDS", "", "86400", environ
         ),
+        "mask_values": _parse_mask(environ),
     }
 
 
@@ -113,112 +148,14 @@ def _ensure_not_symlink(path: Path) -> None:
         raise OSError(f"{path} não pode ser um link simbólico")
 
 
-def _atomic_copy(source: Path, destination: Path) -> os.stat_result:
-    _ensure_canonical_dir(destination.parent)
-    _ensure_not_symlink(destination)
-    _ensure_not_symlink(source)
-    nofollow = getattr(os, "O_NOFOLLOW", 0)
-    src_fd = os.open(source, os.O_RDONLY | nofollow)
-    with os.fdopen(src_fd, "rb") as src_file:
-        src_stat = os.fstat(src_file.fileno())
-        if not stat.S_ISREG(src_stat.st_mode):
-            raise OSError(f"{source} não é um arquivo regular")
-        content = src_file.read()
-    fd, tmp_name = tempfile.mkstemp(dir=destination.parent, prefix=".memory-")
-    try:
-        with os.fdopen(fd, "wb") as tmp:
-            tmp.write(content)
-        os.chmod(tmp_name, 0o600)
-        os.replace(tmp_name, destination)
-    except OSError:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
-    dst_fd = os.open(destination, os.O_RDONLY | nofollow)
-    with os.fdopen(dst_fd, "rb") as dst_file:
-        written = dst_file.read()
-    if written != content:
-        raise OSError("copied content does not match the source")
-    return src_stat
-
-
-def resolve_memory_path(
-    cwd: Path | None = None,
-    home: Path | None = None,
-    environ=None,
-    now: datetime | None = None,
-) -> str:
-    """Resolve the memory file location: override, then canonical, then legacy migration."""
+def resolve_memory_path(home: Path | None = None, environ=None) -> str:
+    """Resolve the memory file location: explicit override, else the per-user canonical path."""
     environ = os.environ if environ is None else environ
     override = environ.get("WALLET_MEMORY_PATH")
     if override:
         return override
-    cwd = Path.cwd() if cwd is None else cwd
     home = Path.home() if home is None else home
-    now = datetime.now() if now is None else now
     canonical = home / ".investidor10" / "memory.json"
-    legacy = cwd / "memory.json"
-    if os.path.abspath(legacy) == os.path.abspath(canonical):
-        try:
-            _ensure_canonical_dir(canonical.parent)
-            _ensure_not_symlink(canonical)
-        except OSError as exc:
-            fail(
-                CANONICAL_DIR_FAILED_MESSAGE.format(
-                    directory=canonical.parent, cause=exc
-                )
-            )
-        return str(canonical)
-    canonical_exists = os.path.lexists(canonical)
-    legacy_exists = os.path.lexists(legacy)
-    if canonical_exists and legacy_exists:
-        try:
-            _ensure_canonical_dir(canonical.parent)
-            _ensure_not_symlink(canonical)
-        except OSError as exc:
-            fail(
-                CANONICAL_DIR_FAILED_MESSAGE.format(
-                    directory=canonical.parent, cause=exc
-                )
-            )
-        stamp = now.strftime("%Y%m%d-%H%M%S-%f")
-        backup = legacy.with_name(f"memory.json.legacy-{stamp}")
-        try:
-            if os.path.lexists(backup):
-                raise FileExistsError(str(backup))
-            legacy.rename(backup)
-        except OSError:
-            backup = legacy
-        warn(
-            CONFLICT_RESOLVED_MESSAGE.format(
-                canonical=canonical, legacy=legacy, backup=backup
-            )
-        )
-        return str(canonical)
-    if legacy_exists:
-        try:
-            src_stat = _atomic_copy(legacy, canonical)
-            cur_stat = os.lstat(legacy)
-            if cur_stat.st_ino != src_stat.st_ino or cur_stat.st_dev != src_stat.st_dev:
-                raise OSError("arquivo legado alterado durante a migração")
-            legacy.unlink()
-        except OSError as exc:
-            try:
-                canonical.unlink()
-            except OSError:
-                pass
-            fail(
-                MIGRATION_FAILED_MESSAGE.format(
-                    legacy=legacy,
-                    canonical=canonical,
-                    cause=exc,
-                    directory=canonical.parent,
-                )
-            )
-        warn(MIGRATED_MESSAGE.format(legacy=legacy, canonical=canonical))
-        return str(canonical)
     try:
         _ensure_canonical_dir(canonical.parent)
         _ensure_not_symlink(canonical)

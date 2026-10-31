@@ -6,7 +6,7 @@ import sys
 
 from .. import wallet_client
 from . import ClientRegistration, InstallerSession, RegisterOutcome
-from .clients import ADAPTERS, _run
+from .clients import ADAPTERS, RUNNER_ARGS, RUNNER_COMMAND, _run
 
 VALID_CLIENTS = {"claude", "devin", "codex", "gemini"}
 
@@ -120,8 +120,8 @@ def run(argv: list[str]) -> int:
         )
         return 1
     reg = ClientRegistration(
-        command="uvx",
-        args=["mcp-investidor10-wallet"],
+        command=RUNNER_COMMAND,
+        args=list(RUNNER_ARGS),
         env={"WALLET_ID": wallet_id},
     )
     if args.dry_run:

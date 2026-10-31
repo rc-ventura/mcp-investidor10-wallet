@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
       - name: Build
         run: uv build
       - name: Check changelog section
@@ -41,4 +41,4 @@ jobs:
           echo "$stdio_out" | grep -q '"investidor10-wallet"' || { echo "expected initialize response on stdout, got: $stdio_out"; exit 1; }
           test -d /tmp/smoke-home/.investidor10 || { echo "expected canonical dir /tmp/smoke-home/.investidor10"; exit 1; }
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1

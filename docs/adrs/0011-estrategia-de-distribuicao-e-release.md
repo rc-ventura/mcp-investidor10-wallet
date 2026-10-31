@@ -1,6 +1,6 @@
 # ADR-0011: Estratégia de distribuição e release — PyPI via `uvx`, src layout, versionamento 0.x e pipeline OIDC
 
-- **Status**: Accepted
+- **Status**: Accepted (amended 2026-10-31)
 - **Date**: 2026-10-18
 - **Deciders**: Tech Leader + User (SDD final review cycle 2, spec 002)
 - **Related spec**: [`specs/002-distribution-readiness/`](../../specs/002-distribution-readiness/)
@@ -81,3 +81,20 @@ This decision should be **revisited** if:
 - `specs/002-distribution-readiness/research.md` (D1, D2, D6, D7)
 - `specs/002-distribution-readiness/contracts/packaging-and-config.md` (contratos C1–C7)
 - ADR-0001 (política de deps pinadas), ADR-0004 §4/§8 (sem segredos; postura de advisories), ADR-0009 (idioma PT-BR também no changelog), ADR-0010 (pipeline determinístico verificado pelo smoke test)
+
+### Emenda 2026-10-31 — SHA-pin das actions executado
+
+O carry-over do §Trade-offs ("actions em tags mutáveis, SHA-pin agendado")
+foi executado: `actions/checkout`, `astral-sh/setup-uv` e
+`pypa/gh-action-pypi-publish` passaram de `@v4`/`@v5`/`@release/v1` para o
+SHA do commit, com a tag preservada em comentário (`# v4`) para leitura
+humana e atualizações futuras. Tag de action é ponteiro móvel resolvido a
+cada execução — repontada para commit malicioso, o runner executa o código
+com os privilégios do workflow (no release, o token OIDC que publica no
+PyPI); o SHA elimina esse vetor. O trade-off aceito é updates congelados:
+correções nas actions só chegam por bump deliberado do hash. O ROADMAP
+(Fase 1) tem item próprio para o Dependabot, que transforma esse bump em
+PR revisável — fechando o ciclo de "auditoria detecta, automação traz o
+patch" já estabelecido no eixo de dependências pelo ADR-0001. Fora do
+escopo desta execução: `rev: v0.17.0` do `.pre-commit-config.yaml` segue
+em tag mutável (mesma exposição; coberto pelo mesmo item do ROADMAP).
