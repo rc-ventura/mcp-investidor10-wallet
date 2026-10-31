@@ -26,8 +26,10 @@ liga esses pontos e lista o que ainda está aberto. Não reescreve a história d
 
 ## Revisão SDD
 
-O relatório mais recente da spec 004 é o ciclo 5 e termina em **NEEDS WORK**. Não
-existe ciclo 6 que reverifique as correções feitas depois dele.
+O relatório mais recente da spec 004 é o **ciclo 6** (2026-10-31) e termina em
+**NEEDS WORK**: QA PASS, Segurança PASS com ressalvas, Tech Leader NEEDS WORK por
+dois itens de código e pelo registro do release. Os dois itens estão corrigidos na
+PR #10 e ainda não foram reverificados (ciclo 7).
 
 | Ciclo | Relatório | Veredito do Tech Leader |
 |-------|-----------|-------------------------|
@@ -36,42 +38,57 @@ existe ciclo 6 que reverifique as correções feitas depois dele.
 | 3 | `cycle-3-20261029-0732.md` | NEEDS WORK |
 | 4 | `cycle-4-20261029-0803.md` | NEEDS WORK |
 | 5 | `cycle-5-20261029-0832.md` | NEEDS WORK |
+| 6 | `cycle-6-20261031-1809.md` | NEEDS WORK |
 
-A mensagem do commit `1a32b55` fala em "cycles 1–2, APPROVED"; o diretório tem 5
+A mensagem do commit `1a32b55` fala em "cycles 1–2, APPROVED"; o diretório tem 6
 ciclos e só o 2 foi aprovado.
 
-Em 2026-10-31 todos os itens dos 5 ciclos foram conferidos contra o código, os
-testes e os docs. O resultado está numa seção "Resolution status" no fim de cada
-relatório (o texto histórico dos ciclos não foi editado):
+Em 2026-10-31 todos os itens dos 5 primeiros ciclos foram conferidos contra o
+código, os testes e os docs, e o ciclo 6 reverificou a conferência de forma
+independente. O resultado está numa seção "Resolution status" no fim de cada
+relatório (o texto histórico dos ciclos não foi editado). A conferência tinha
+erros, corrigidos depois do ciclo 6: T054 aparecia como pendente do merge da #9
+(já mergeada), a linha do `.lock` com `O_NOFOLLOW` estava errada (o
+`filelock==4.2.4` já o usa), cerca de oito citações de linha estavam fora do lugar
+e o ID da carteira nas mensagens de erro não estava em nenhuma tabela.
 
 | Ciclo | Itens conferidos | Resolvidos | Adiados (decisão registrada) | Abertos |
 |-------|------------------|------------|------------------------------|---------|
-| 1 | 17 | 15 | 0 | 2 (T054; T048/T055) |
-| 2 | 10 | 9 | 0 | 1 (T048/T054/T055 agrupados) |
+| 1 | 18 | 15 | 0 | 3 (ID da carteira nos erros, corrigido na #10; T054; T048/T055) |
+| 2 | 11 | 9 | 0 | 2 (ID da carteira nos erros, corrigido na #10; T048/T054/T055 agrupados) |
 | 3 | 17 | 14 | 0 | 3 (`avg_price`, nota de injeção no `PRIVACY.md`, T048/T054/T055 agrupados) |
-| 4 | 15 | 10 | 2 | 3 (`O_NOFOLLOW` no `.lock`, contagem de alertas, T048/T054/T055 agrupados) |
+| 4 | 15 | 11 | 2 | 2 (contagem de alertas, T048/T054/T055 agrupados) |
 | 5 | 12 | 7 | 1 | 4 (teste de dedupe sem ticker, texto do ADR-0002, T054, T048/T055) |
 
 O item bloqueante do ciclo 5 (maior `total` declarado entre páginas) está no código
 (`wallet_client.py`, `max(total, declared)`) e no teste
 `test_positions_adopt_a_larger_total_declared_by_a_later_page`.
 
-Achado novo da conferência: `server.py` tinha um comentário citando `ADR-0017`, o
-que a varredura de estilo da T053 proíbe. Foi removido nesta PR.
+Achado da conferência de 31/10: `server.py` tinha um comentário citando `ADR-0017`,
+o que a varredura de estilo da T053 proíbe. Foi removido nesta PR.
 
-Itens ainda abertos, de baixo risco: teste do fallback de dedupe para linhas sem
-ticker; nota no `PRIVACY.md` sobre texto livre vindo da fonte; `O_NOFOLLOW` ao abrir
-o `.lock`; limite para a quantidade de alertas; texto do ADR-0002 sobre arquivo
-maior que a RAM; confirmação do mantenedor sobre `avg_price` na lista do modo
-privacidade.
+O ciclo 6 acrescentou dois itens de código, tratados como bloqueios do 0.3.0 e
+corrigidos na PR #10:
+
+- O ID da carteira aparecia em toda mensagem de erro da fonte que volta ao modelo
+  (o caminho da requisição o contém). Agora `WalletClient._redact` o troca por
+  `<wallet>`; emenda de 31/10/2026 no ADR-0004.
+- `RecursionError` no `json.loads` da resposta da fonte, que derrubava o
+  `get_session_context`. Agora vira `unexpected_format`; lição
+  `recursionerror_nao_e_valueerror` estendida.
+
+Ainda abertos, de baixo risco: teste do fallback de dedupe para linhas sem ticker;
+nota no `PRIVACY.md` sobre texto livre vindo da fonte; limite para a quantidade de
+alertas; confirmação do mantenedor sobre `avg_price` na lista do modo privacidade.
+As pendências do 0.3.1 estão no ROADMAP.
 
 ## Estado das tarefas abertas em `tasks.md`
 
 | Tarefa | Estado | Observação |
 |--------|--------|------------|
 | T048 | Aberta | Exige um leitor humano que não conheça o projeto validando `docs/PRIVACY.md` (SC-007) |
-| T054 | Aberta | Local verde em 2026-10-31 (449 testes passam, `ruff check` e `ruff format --check` limpos). A PR #9 corrige o CI e ficou verde nos 10 jobs (audit, macOS, Linux e Windows em 3.11, 3.12 e 3.13); falta o merge em `main` |
-| T055 | Aberta | Falta o ciclo 6 do `/sdd-final-review`, a ser rodado pelo mantenedor sobre este estado |
+| T054 | Aberta | `main@5e0a422` está verde nos 10 jobs (run 41240580596). Falta confirmar o CI no commit final depois do merge da #10 e desta PR |
+| T055 | Aberta | Ciclo 6 feito (NEEDS WORK); falta o ciclo 7, só QA e Segurança, depois do merge da #10 |
 
 ## CI em `main` (execução do push `3c6f969`, run 41238678472)
 
@@ -88,24 +105,28 @@ macOS e Linux passavam em 3.11, 3.12 e 3.13. Falhavam:
      `read_text()` na codificação padrão do Windows (cp1252); o terceiro rodava o
      `bash` do PATH, que no runner é o lançador do WSL.
 
-**Corrigido na PR #9** (`spec-004/ci-verde`): `joserfc` 1.7.5 para 1.7.7 no
+**Corrigido na PR #9** (mergeada, `5e0a422`): `joserfc` 1.7.5 para 1.7.7 no
 `uv.lock` (publicada em 2026-10-19, dentro da regra de 7 dias); comparação pelo
 JSON decodificado; `encoding="utf-8"`; hooks rodados com o Git Bash no Windows. O
-CI da PR ficou verde nos 10 jobs. No Windows, 410 testes passaram e os mesmos 39
-foram pulados de antes, ou seja, o teste dos hooks rodou de verdade. O merge da
-#9 em `main` depende do mantenedor.
+CI de `main` em `5e0a422` ficou verde nos 10 jobs. No Windows, 410 testes passaram
+e os mesmos 39 foram pulados de antes, ou seja, o teste dos hooks rodou de verdade.
 
 ## Pendências para o release 0.3.0
 
-- [x] Corrigir o `audit` (`joserfc`) e os 5 testes do Windows (PR #9, verde; falta
-      o merge).
+- [x] Corrigir o `audit` (`joserfc`) e os 5 testes do Windows (PR #9, mergeada).
 - [x] Conferir os ciclos 1 a 5 contra o código e atualizar os relatórios.
-- [ ] Mergear a PR #9 e esta PR em `main`.
-- [ ] Rodar o ciclo 6 do `/sdd-final-review` (mantenedor) e registrar o relatório
-      em `reports/sdd-final-review/004/`.
-- [ ] Executar a T048 com um leitor humano.
-- [ ] Criar a tag `v0.3.0` e o release no PyPI, depois do ciclo 6 e do CI verde em
-      `main` (o `release.yml` publica via OIDC; só com decisão explícita do
+- [x] Ciclo 6 do `/sdd-final-review`, registrado em
+      `reports/sdd-final-review/004/cycle-6-20261031-1809.md`.
+- [ ] Mergear a PR #10 (ID da carteira nos erros, `RecursionError`, `ci.yml`, ADRs)
+      e esta PR em `main`.
+- [ ] Ciclo 7, só QA e Segurança: o ID não aparece em nenhum texto visível ao modelo
+      (incluindo `str(exc)` do `httpx`), JSON aninhado vira `unexpected_format`, os
+      testes novos falham sem a correção, as tabelas e este arquivo batem com o
+      repositório e o CI está verde no commit final.
+- [ ] Executar a T048 com um leitor humano e registrar aqui o aval do mantenedor
+      sobre `avg_price` na lista do modo privacidade.
+- [ ] Criar a tag `v0.3.0` e o release no PyPI, só depois de tudo acima (o
+      `release.yml` publica via OIDC e não se desfaz; só com decisão explícita do
       mantenedor).
 
 ## Processo daqui para frente
