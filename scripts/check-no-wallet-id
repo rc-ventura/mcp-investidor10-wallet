@@ -1,0 +1,11 @@
+#!/bin/sh
+if [ -z "${WALLET_ID:-}" ]; then
+  echo "check-no-wallet-id: WALLET_ID is not set, skipping the check" >&2
+  exit 0
+fi
+files=$(git grep -l -F -e "$WALLET_ID" -- . 2>/dev/null)
+if [ -n "$files" ]; then
+  echo "check-no-wallet-id: the wallet ID is in tracked files; replace it with <id>:" >&2
+  echo "$files" >&2
+  exit 1
+fi

@@ -13,6 +13,8 @@ modo privacidade e erros sinalizados como erro.
 
 ### Adicionado
 
+- `scripts/check-no-wallet-id` e um hook do pre-commit que falham se o ID da
+  carteira (lido da variável `WALLET_ID`) estiver em arquivo versionado.
 - **Trava da memória entre processos** (macOS, Linux e Windows): vários clientes
   abertos ao mesmo tempo não perdem gravações. Cada operação relê o arquivo sob
   uma trava (`memory.json.lock`); identificadores são únicos e um alerta é
@@ -59,6 +61,9 @@ modo privacidade e erros sinalizados como erro.
 
 ### Corrigido
 
+- O pacote-fonte (sdist) agora leva só `src/` e o `CHANGELOG.md`, além dos arquivos
+  que o empacotador sempre inclui. Antes ele incluía `reports/`, `specs/`, `docs/`
+  e as pastas locais dos clientes.
 - O ID da carteira não aparece mais nas mensagens de erro que chegam ao modelo
   (o caminho da requisição continha o ID, e o `mask_error_details` não cobre
   erros devolvidos como resultado). O ID aparece como `<wallet>`.

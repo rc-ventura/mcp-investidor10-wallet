@@ -42,3 +42,4 @@
 - [Um relógio só por decisão de frescor: monotônico dentro do processo, relógio de parede só na fronteira](./docs/learning-lessons/um_relogio_por_decisao_de_frescor.md) — 2026-10-29
 - [`RecursionError` não é `ValueError`: profundidade de aninhamento é uma falha à parte do JSON malformado](./docs/learning-lessons/recursionerror_nao_e_valueerror.md) — 2026-10-29
 - [Contador declarado pela fonte não é limite de laço: validar `total` antes de parar a paginação por ele](./docs/learning-lessons/contador_declarado_pela_fonte_nao_e_limite.md) — 2026-10-29
+- [Um relatório que prova a ausência de um segredo não pode citá-lo: use `<id>` e uma checagem que lê o valor do ambiente](./docs/learning-lessons/relatorio_que_prova_ausencia_de_segredo_nao_o_cita.md) — 2026-10-31

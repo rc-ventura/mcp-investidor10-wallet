@@ -30,6 +30,9 @@ path = "src/investidor10_wallet/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/investidor10_wallet"]
 
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/CHANGELOG.md"]
+
 [dependency-groups]
 dev = [
     "pre-commit==4.6.0",
