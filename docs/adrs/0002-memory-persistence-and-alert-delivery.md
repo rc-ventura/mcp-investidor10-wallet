@@ -57,3 +57,24 @@ that the boundary behavior was incomplete:
   one per trigger; failure semantics are all-or-nothing per evaluation.
 - Future migration to SQLite (research D5) must preserve these semantics:
   unique positive IDs per collection and all-or-nothing trigger persistence.
+## Emenda 2026-10-29 (revisão final da spec 004, ciclo 4)
+
+**Toda falha ao interpretar o arquivo segue o caminho de corrupção do §2,
+inclusive `RecursionError`.** Um `memory.json` aninhado demais fazia
+`json.loads` levantar `RecursionError`, que não é `ValueError`: a exceção
+escapava do tratamento, o store ficava com `available=True` e dados velhos,
+nenhum `.broken-*` era criado e toda operação seguinte falhava com erro
+genérico mascarado. Aninhamento moderado (centenas de níveis) passava pelo
+`json.loads`, mas quebrava depois em `copy.deepcopy` e em `json.dump(indent=2)`,
+que recursam em Python. Agora a carga rejeita, numa varredura iterativa,
+qualquer arquivo mais fundo que `MAX_NESTING_DEPTH` (32; o esquema usa 4
+níveis), e `RecursionError` entra no mesmo `except` de `ValueError`. Os dois
+casos geram backup, `available=False` e `memory_unavailable` estruturado.
+
+**O arquivo local não ganha teto de tamanho em bytes.** O cliente remoto tem
+`MAX_RESPONSE_BYTES` porque a resposta vem de terceiro. O `memory.json` pertence
+ao mesmo usuário que roda o servidor (ADR-0004), e quem consegue escrever nele
+já controla a conta. Um arquivo grande só custa tempo proporcional ao que o
+usuário gravou. Um teto transformaria uma memória legítima de longo prazo em
+`memory_unavailable`, sem caminho de migração. A profundidade é limitada porque
+derruba o processo de interpretação; o tamanho não, porque só custa tempo.

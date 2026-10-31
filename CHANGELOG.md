@@ -86,7 +86,44 @@ modo privacidade e erros sinalizados como erro.
   (objeto ou lista) é omitido, em vez de passar inteiro.
 - **Disponibilidade**: o cache em memória tem limite de 256 entradas e descarta
   as que já passaram da idade máxima, e respostas acima de 10 MB são
-  recusadas sem serem lidas inteiras.
+  recusadas sem serem lidas inteiras. A paginação de posições para em 400
+  páginas e marca `truncated: true`, de modo que uma fonte que devolva linhas
+  novas sem fim não prende o servidor.
+- **A idade da cotação nos alertas vem do relógio monotônico do cache**, e não
+  do `fetched_at`. Um relógio do sistema atrasado não faz mais uma cotação
+  vencida parecer fresca.
+- **A memória nunca é lida por link simbólico.** Um `memory.json` (ou
+  `WALLET_MEMORY_PATH`) que seja link fica indisponível, com aviso em PT-BR, e o
+  link não é seguido nem substituído. A trava também é restringida a 0600 sem
+  seguir link.
+- **`ENOLCK` (tabela de travas do kernel cheia) é tratado como passageiro**:
+  falha uma operação, e a memória não fica mais somente-leitura até reiniciar.
+- **Trava entre threads**: uma segunda thread do mesmo processo espera a trava
+  da memória em vez de passar direto.
+- `get_patrimony_history` valida `months` antes de checar o modo privacidade.
+  `get_session_context` mantém o `pending_check` quando a memória falha durante
+  a avaliação dos alertas.
+- O ID real da carteira do mantenedor foi trocado por `<id>` em specs, docs e
+  relatórios.
+- **Memória aninhada demais é tratada como corrompida.** Um `memory.json`
+  editado à mão com estruturas muito fundas derrubava toda operação com erro
+  genérico e não gerava backup. Agora ele gera `.broken-*` e a memória fica
+  indisponível, como qualquer arquivo corrompido.
+- **`get_wallet_positions` não confia num `total` impossível.** Um total zero,
+  negativo ou menor que as linhas recebidas encerrava a coleta na primeira
+  página sem marcar `truncated`. Agora esse total é ignorado e a coleta segue
+  até a última página. Se uma página seguinte declara um total maior, vale o
+  maior, e a coleta continua em vez de parar no primeiro.
+- `get_patrimony_history` aceita `months` de 1 a 600; um horizonte absurdo é
+  `invalid_params`, e não vai para a fonte.
+- **Um `memory.json` salvo com BOM** (Bloco de Notas do Windows) é lido
+  normalmente, e não tratado como corrompido.
+- **Apagar um `memory.json` rejeitado** (corrompido ou de versão futura) com o
+  servidor rodando não recria mais a memória vazia: ela segue indisponível até
+  o arquivo voltar ou o servidor reiniciar.
+- `get_session_context` mantém o resumo da memória quando a leitura dos alertas
+  falha, e informa `read_only` (e não `unavailable`) quando a trava deixa de ser
+  suportada durante a checagem das cotações.
 
 ### Removido
 

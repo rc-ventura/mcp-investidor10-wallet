@@ -98,3 +98,14 @@ e o ADR-0015:
   arquivo de trava `memory.json.lock`), fora do controle de versão
   (`.gitignore`) e sob a mesma fronteira de confiança do `memory.json`. Não há
   rotação nesta versão.
+
+## Emenda 2026-10-29 (revisão final da spec 004, ciclo 3) — ID real no repositório
+
+O ID da carteira do mantenedor aparecia em specs, docs e relatórios, embora a
+emenda acima o trate como credencial de leitura. Ele foi trocado por `<id>` em
+todos os arquivos do working tree, e os testes usam o fictício `1234567`. O ID
+continua no **histórico do git**, e reescrever o histórico de um repositório
+público não o tira de clones e forks já feitos. A decisão fica com o
+mantenedor, que tem duas saídas: aceitar que essa carteira é pública (ela já é
+pública por desenho do produto) ou deixá-la privada no Investidor10 e usar
+outra carteira pública para os testes live.

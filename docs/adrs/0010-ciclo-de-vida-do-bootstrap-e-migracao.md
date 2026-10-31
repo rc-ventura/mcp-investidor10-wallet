@@ -1,6 +1,6 @@
 # ADR-0010: Semântica do ciclo de vida do bootstrap e endurecimento da migração
 
-- **Status**: Accepted
+- **Status**: Accepted (amended 2026-10-29)
 - **Date**: 2026-10-18
 - **Deciders**: Tech Leader + User (SDD final review cycle 1, spec 002)
 - **Related spec**: [`specs/002-distribution-readiness/`](../../specs/002-distribution-readiness/)
@@ -114,3 +114,13 @@ ou define `WALLET_MEMORY_PATH`; a nota está no `CHANGELOG.md` da `0.3.0`.
 - ADR-0004 (modelo de ameaça e integridade on-disk §6)
 - ADR-0009 (idioma das mensagens: operador em PT-BR, modelo em inglês)
 - `specs/002-distribution-readiness/contracts/packaging-and-config.md` (contratos C1–C7)
+
+## Emenda 2026-10-29 (revisão final da spec 004, ciclo 3)
+
+**`WALLET_MEMORY_PATH` apontando para um link simbólico.** O override continua
+literal: o bootstrap não valida o caminho. Antes, porém, a primeira gravação
+atômica (`os.replace`) trocava o link por um arquivo comum, desligando-o do
+alvo em silêncio. Agora o store lê o arquivo com `O_NOFOLLOW`, então um link
+deixa a memória indisponível desde a partida, com aviso PT-BR pedindo para
+apontar a variável para o arquivo real (ADR-0013, emenda de 2026-10-29). Quem
+quer a memória em outro disco aponta `WALLET_MEMORY_PATH` direto para lá.

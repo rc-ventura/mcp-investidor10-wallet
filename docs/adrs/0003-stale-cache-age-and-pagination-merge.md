@@ -1,6 +1,6 @@
 # ADR-0003: Stale-cache age policy and boundary-semantics unification
 
-- **Status**: Accepted
+- **Status**: Accepted (amended 2026-10-29)
 - **Date**: 2026-10-17
 - **Deciders**: Tech Leader (SDD final review cycle 3, spec 001)
 
@@ -81,3 +81,35 @@ partially closed:
   direct (in-process) construction.
 - Operators can tighten `WALLET_CACHE_MAX_STALE_SECONDS` for fresher data
   guarantees (e.g. `3600` for 1h).
+## Emenda 2026-10-29 (revisão final da spec 004, ciclo 3)
+
+**A paginação de posições ganha um limite absoluto.** O §2 tirou o teto fixo de
+páginas e confiou nas guardas de progresso. Uma fonte com defeito ou hostil que
+devolve sempre 50 linhas novas, sem `total` ou com `total` inflado, mantinha o
+laço girando para sempre, com memória crescendo e requisições sem fim. Agora a
+coleta para em `MAX_POSITION_PAGES` (400 páginas, 20 mil linhas), muito acima
+de qualquer carteira real, e marca `truncated: true`. O resto do §2 continua:
+`total` nunca afirma mais linhas do que `data` contém. O sinal `truncated`,
+criado para a fonte que ignora `start`, cobre os dois casos.
+
+## Emenda 2026-10-29 (revisão final da spec 004, ciclo 4)
+
+**O `total` declarado pela fonte é um dado a validar, não um limite confiável
+do laço.** `get_positions` adotava qualquer `int` como total. Com `total=0`,
+negativo ou menor que a primeira página cheia, `len(rows) >= total` encerrava a
+coleta na página 1 e `len(rows) < total` dava falso: `truncated: false` sobre
+uma lista parcial, justamente o caso que o sinal existe para marcar. Agora só
+um inteiro positivo é adotado, e um total que as linhas coletadas superam é
+descartado, porque já se provou errado. Sem total válido, as guardas de página
+curta, de progresso e de `MAX_POSITION_PAGES` encerram a coleta, e a parada
+pelo teto continua marcando `truncated: true`.
+
+## Emenda 2026-10-29 (revisão final da spec 004, ciclo 5)
+
+**O total declarado pode mudar entre páginas, e vale o maior válido.** A emenda
+do ciclo 4 adotava o total só da primeira página que o declarasse. Com a página
+1 dizendo `total=100` e a página 2 dizendo `total=200`, a coleta parava em 100
+linhas com `truncated: false`, sobre uma lista que a própria fonte dizia estar
+incompleta. Agora cada página com total válido pode elevá-lo, e uma declaração
+menor nunca o reduz: o maior total é a afirmação de completude mais exigente.
+Se as linhas coletadas o superarem, ele é descartado como antes.

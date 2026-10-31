@@ -38,3 +38,7 @@
 - [filelock troca para soft lock em silêncio e cria o diretório pai — usar fallback_to_soft=False e guardar o diretório](./docs/learning-lessons/filelock_fallback_soft_silencioso.md) — 2026-10-28
 - [FastMCP descarta o texto da docstring que vem depois do bloco `Args:` — regras de uso das tools não chegavam ao modelo](./docs/learning-lessons/fastmcp_docstring_descarta_texto_apos_args.md) — 2026-10-28
 - [FastMCP: `mask_error_details` vem desligado e a exceção inesperada chega crua ao cliente — ligar a opção](./docs/learning-lessons/fastmcp_mask_error_details_padrao_falso.md) — 2026-10-28
+- [Arquivo local: abrir por descritor com `O_NOFOLLOW`, num ponto só, e não arquivo por arquivo](./docs/learning-lessons/arquivo_local_abrir_por_fd_sem_seguir_link.md) — 2026-10-29
+- [Um relógio só por decisão de frescor: monotônico dentro do processo, relógio de parede só na fronteira](./docs/learning-lessons/um_relogio_por_decisao_de_frescor.md) — 2026-10-29
+- [`RecursionError` não é `ValueError`: profundidade de aninhamento é uma falha à parte do JSON malformado](./docs/learning-lessons/recursionerror_nao_e_valueerror.md) — 2026-10-29
+- [Contador declarado pela fonte não é limite de laço: validar `total` antes de parar a paginação por ele](./docs/learning-lessons/contador_declarado_pela_fonte_nao_e_limite.md) — 2026-10-29

@@ -60,7 +60,7 @@ Instalaria `server`, `wallet_client`, `memory_store` como módulos globais do si
 
 - O release exige tag + changelog + aprovação de ambiente: fricção intencional por release (aceita — publicar é ato do mantenedor).
 - Actions do workflow permanecem em tags mutáveis (`@v4`, `@v5`, `@release/v1`) — carry-over conhecido, SHA-pin agendado como hardening.
-- GHSAs do FastMCP: `fastmcp==4.0.10` tinha GHSAs escopados aceitos (ADR-0004 §8); upgrade para `==4.0.11` executado em 2026-10-27 (patch do GHSA crítico do client), ≥4.1.0 segue agendado como hardening.
+- GHSAs do FastMCP: `fastmcp==4.0.10` tinha GHSAs escopados aceitos (ADR-0004 §8); upgrade para `==4.0.11` executado em 2026-10-27 (patch do GHSA crítico do client); upgrade para `==4.1.2` executado em 2026-10-28 (ADR-0001, emenda de atualização de dependências).
 
 ### Conditions that invalidate this decision
 

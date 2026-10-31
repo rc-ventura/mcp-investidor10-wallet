@@ -1,6 +1,6 @@
 # ADR-0012: Integração automática de clientes — assistente de instalação e plugin de comportamento
 
-- **Status**: Accepted
+- **Status**: Accepted (amended 2026-10-28)
 - **Date**: 2026-10-26
 - **Deciders**: Tech Leader + User (ciclo spec 003, decisões de produto fechadas com o mantenedor)
 - **Related spec**: [`specs/003-client-integration/`](../../specs/003-client-integration/)
@@ -129,3 +129,14 @@ This decision should be **revisited** if:
 - `docs/learning-lessons/devin_mcp_add_user_scope.md`,
   `docs/learning-lessons/claude_plugin_formato_verificado.md`
 - ADR-0011 (distribuição PyPI), ADR-0002 (memória é do usuário), ADR-0009 (PT-BR operador)
+## Emenda 2026-10-28 (pendências da revisão final da spec 004)
+
+**O servidor registrado fica na versão do assistente.** O assistente registra
+`uvx mcp-investidor10-wallet@<versão do assistente>` em todos os clientes, e não
+mais `uvx mcp-investidor10-wallet` sem versão. Sem versão, cada abertura de
+cliente baixava a release mais nova do PyPI, inclusive uma comprometida, sem
+nenhuma ação do operador. Com a versão fixa, o que roda é exatamente o que foi
+instalado. Para atualizar, roda-se o assistente da release nova
+(`uvx mcp-investidor10-wallet@latest install`), que reescreve o registro. Os
+comandos manuais do README continuam sem versão, porque o operador que os
+digita escolhe o que roda.
