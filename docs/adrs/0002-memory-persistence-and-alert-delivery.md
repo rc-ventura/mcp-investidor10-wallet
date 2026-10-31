@@ -74,7 +74,11 @@ casos geram backup, `available=False` e `memory_unavailable` estruturado.
 **O arquivo local não ganha teto de tamanho em bytes.** O cliente remoto tem
 `MAX_RESPONSE_BYTES` porque a resposta vem de terceiro. O `memory.json` pertence
 ao mesmo usuário que roda o servidor (ADR-0004), e quem consegue escrever nele
-já controla a conta. Um arquivo grande só custa tempo proporcional ao que o
-usuário gravou. Um teto transformaria uma memória legítima de longo prazo em
-`memory_unavailable`, sem caminho de migração. A profundidade é limitada porque
-derruba o processo de interpretação; o tamanho não, porque só custa tempo.
+já controla a conta. Um arquivo grande custa tempo e memória proporcionais ao
+que o usuário gravou. Um teto transformaria uma memória legítima de longo prazo
+em `memory_unavailable`, sem caminho de migração. A profundidade é limitada
+porque derruba o processo de interpretação; o tamanho não, porque o custo é o
+que o próprio usuário gravou. Um arquivo maior que a RAM disponível levanta
+`MemoryError`, que o `_reload` não captura: o erro chega ao cliente como falha
+genérica mascarada. O risco é aceito dentro da mesma fronteira, e uma política
+de limites para a memória fica registrada no ROADMAP.

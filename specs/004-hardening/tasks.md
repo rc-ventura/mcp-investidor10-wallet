@@ -275,7 +275,7 @@ revisada e aprovada antes do lote seguinte começar. A emenda da Constituição
 | L2 — US7 Sem migração | `spec-004/us7-sem-migracao` | T006–T009 | `test_bootstrap.py` verde; cwd intocado (SC-008) |
 | L3 — US1 Trava | `spec-004/us1-trava` | T010–T021 | V1/V2 validados em máquina real; concorrência com `spawn` verde nas 3 plataformas |
 | L4 — US4 Changelog | `spec-004/us4-changelog` | T022–T024 | V3 validado (uma linha por mutação) |
-| L5 — US5 Sinal de erro | `spec-004/us5-sinal-erro` | T025–T029 | 10 códigos com `isError`; sucesso inalterado |
+| L5 — US5 Sinal de erro | `spec-004/us5-sinal-erro` | T025–T029 | 12 códigos com `isError` (11 na entrega do L5, mais `state_conflict` da emenda de 28/10/2026); sucesso inalterado |
 | L6 — US3 Privacidade | `spec-004/us3-privacidade` | T030–T040 | V5 validado com a carteira real; 12 códigos cobertos |
 | L7 — US8 + US2 | `spec-004/us8-us2-docs` | T041–T048 | `instructions` visível; leitor novo passa no SC-007 |
 | L8 — Polish 0.3.0 | `spec-004/polish-0.3.0` | T049–T055 | Gates verdes + PR final com review SDD |

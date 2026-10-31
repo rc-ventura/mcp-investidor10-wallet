@@ -52,7 +52,7 @@ aviso em stderr.
 uv run pytest tests/contract/test_error_signal.py -v
 ```
 
-Esperado: cada um dos 11 códigos com `is_error=True` e o código visível
+Esperado: cada um dos 12 códigos com `is_error=True` e o código visível
 em `content[0].text`; respostas de sucesso idênticas ao snapshot.
 
 ## V5 — Modo privacidade (US3, SC-003)

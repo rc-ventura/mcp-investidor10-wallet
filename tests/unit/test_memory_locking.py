@@ -227,6 +227,24 @@ def test_preexisting_wide_lock_file_is_tightened(path, umask_022):
     assert os.stat(lock_path).st_mode & 0o777 == 0o600
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: symlink creation")
+def test_lock_path_that_is_a_symlink_is_refused_and_the_target_is_untouched(
+    tmp_path, path
+):
+    victim = tmp_path / "victim"
+    victim.write_text("VICTIM-DATA", encoding="utf-8")
+    victim.chmod(0o644)
+    os.symlink(victim, f"{path}.lock")
+
+    store = MemoryStore(path)
+
+    assert store.available is False
+    with pytest.raises(MemoryUnavailableError):
+        store.get_rules()
+    assert victim.read_text(encoding="utf-8") == "VICTIM-DATA"
+    assert victim.stat().st_mode & 0o777 == 0o644
+
+
 def test_full_kernel_lock_table_fails_one_operation_and_then_recovers(
     path, monkeypatch
 ):

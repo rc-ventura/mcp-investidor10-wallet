@@ -59,6 +59,12 @@ modo privacidade e erros sinalizados como erro.
 
 ### Corrigido
 
+- O ID da carteira não aparece mais nas mensagens de erro que chegam ao modelo
+  (o caminho da requisição continha o ID, e o `mask_error_details` não cobre
+  erros devolvidos como resultado). O ID aparece como `<wallet>`.
+- Um JSON da fonte aninhado demais (`RecursionError`) agora é
+  `unexpected_format`, e uma única cotação assim não derruba mais o
+  `get_session_context`.
 - As regras de uso de 5 ferramentas (`get_wallet_positions`, `get_asset_quote`
   com o aviso do atraso de ~15 minutos das cotações, `get_earnings`,
   `get_patrimony_history`, `create_price_alert`) estavam depois do bloco `Args:`

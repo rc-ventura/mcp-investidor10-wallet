@@ -26,6 +26,7 @@ MAX_STALE_SECONDS = 86400.0
 REQUEST_TIMEOUT_SECONDS = 20.0
 MAX_CACHE_ENTRIES = 256
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+WALLET_PLACEHOLDER = "<wallet>"
 MAX_POSITION_PAGES = 400
 MAX_HISTORY_MONTHS = 600
 
@@ -63,7 +64,9 @@ def _is_numeric(value) -> bool:
 class SourceError(Exception):
     """Structured failure of the Investidor10 data source.
 
-    Codes: source_unavailable (down/timeout), unexpected_format (schema drift).
+    Codes raised here: source_unavailable (down/timeout), unexpected_format
+    (schema drift), invalid_params and invalid_asset_type (bad arguments).
+    The message goes to the model, so it never carries the wallet ID.
     """
 
     def __init__(self, code: str, message: str, status_code: int | None = None):
@@ -77,7 +80,10 @@ class SourceError(Exception):
 
 
 async def _read_capped(response: httpx.Response, path: str) -> bytes:
-    """Read a streamed body, refusing one larger than MAX_RESPONSE_BYTES."""
+    """Read a streamed body, refusing one larger than MAX_RESPONSE_BYTES.
+
+    `path` is only used in the error text, so callers pass the redacted form.
+    """
     too_large = SourceError(
         "unexpected_format",
         f"Investidor10 API response for {path} is larger than "
@@ -154,6 +160,16 @@ class WalletClient:
         # cache_key -> (monotonic_timestamp, fetched_at_iso, payload)
         self._cache: dict[tuple, tuple[float, str, object]] = {}
 
+    def _redact(self, text: str) -> str:
+        """Replace the wallet ID in text that can reach the model."""
+        if not self.wallet_id:
+            return text
+        return re.sub(
+            rf"(?<![0-9]){re.escape(self.wallet_id)}(?![0-9])",
+            WALLET_PLACEHOLDER,
+            text,
+        )
+
     @staticmethod
     def _envelope(data, cached: bool, fetched_at: str) -> dict:
         return {"cached": cached, "fetched_at": fetched_at, "data": data}
@@ -192,7 +208,7 @@ class WalletClient:
             return self._envelope(data, cached=True, fetched_at=fetched_at)
         raise SourceError(
             "source_unavailable",
-            f"Investidor10 API request failed for {path} and the cached data is {age:.0f}s old, "
+            f"Investidor10 API request failed for {self._redact(path)} and the cached data is {age:.0f}s old, "
             f"older than the max stale age of {self.max_stale_seconds:.0f}s — refusing to serve it",
         )
 
@@ -212,6 +228,7 @@ class WalletClient:
         is within the max-stale bound; an older entry fails explicitly.
         """
         cache_key = (self.base_url, path, tuple(sorted((params or {}).items())))
+        shown = self._redact(path)
         hit = self._cache.get(cache_key)
         now = time.monotonic()
         if hit and now - hit[0] < self.ttl_seconds:
@@ -229,18 +246,19 @@ class WalletClient:
                 ) as response,
             ):
                 status = response.status_code
-                body = await _read_capped(response, path) if status < 400 else b""
+                body = await _read_capped(response, shown) if status < 400 else b""
         except (httpx.HTTPError, httpx.InvalidURL) as exc:
             if hit:
-                return self._stale_envelope(hit, path)
+                return self._stale_envelope(hit, shown)
             raise SourceError(
-                "source_unavailable", f"Investidor10 API request failed: {exc}"
+                "source_unavailable",
+                f"Investidor10 API request failed: {self._redact(str(exc))}",
             ) from exc
 
         if status >= 500 and hit:
-            return self._stale_envelope(hit, path)
+            return self._stale_envelope(hit, shown)
         if status >= 400:
-            message = f"Investidor10 API returned HTTP {status} for {path}"
+            message = f"Investidor10 API returned HTTP {status} for {shown}"
             if 400 <= status < 500 and self.base_url == WALLET_PROXY_BASE_URL:
                 message += " — check WALLET_ID"
             raise SourceError(
@@ -251,16 +269,16 @@ class WalletClient:
 
         try:
             data = json.loads(body)
-        except ValueError as exc:
+        except (ValueError, RecursionError) as exc:
             raise SourceError(
                 "unexpected_format",
-                f"Investidor10 API returned non-JSON body for {path}",
+                f"Investidor10 API returned non-JSON body for {shown}",
             ) from exc
 
         if expected_type is not None and not isinstance(data, expected_type):
             raise SourceError(
                 "unexpected_format",
-                f"Investidor10 API payload for {path} has an unexpected type",
+                f"Investidor10 API payload for {shown} has an unexpected type",
             )
         if required_keys is not None:
             missing = [
@@ -271,7 +289,7 @@ class WalletClient:
             if missing:
                 raise SourceError(
                     "unexpected_format",
-                    f"Investidor10 API payload for {path} is missing keys: {missing}",
+                    f"Investidor10 API payload for {shown} is missing keys: {missing}",
                 )
         if required_types is not None:
             for key, typ in required_types.items():
@@ -280,7 +298,7 @@ class WalletClient:
                 if not ok:
                     raise SourceError(
                         "unexpected_format",
-                        f"Investidor10 API payload for {path} field {key} has an unexpected type",
+                        f"Investidor10 API payload for {shown} field {key} has an unexpected type",
                     )
 
         fetched_at = _now_iso()

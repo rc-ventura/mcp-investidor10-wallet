@@ -1,6 +1,6 @@
 # ADR-0004: Threat model and security boundary of the single-user stdio server
 
-- **Status**: Accepted (amended 2026-10-28 — see "Emenda 2026-10-28" at the end)
+- **Status**: Accepted (amended 2026-10-31 — see "Emenda 2026-10-28" and "Emenda 2026-10-31" at the end)
 - **Date**: 2026-10-17
 - **Deciders**: Tech Leader + user (SDD final review cycle 4, spec 001)
 
@@ -109,3 +109,22 @@ público não o tira de clones e forks já feitos. A decisão fica com o
 mantenedor, que tem duas saídas: aceitar que essa carteira é pública (ela já é
 pública por desenho do produto) ou deixá-la privada no Investidor10 e usar
 outra carteira pública para os testes live.
+
+## Emenda 2026-10-31 (revisão final da spec 004, ciclo 6) — o ID não aparece em texto visível ao modelo
+
+A emenda de 28/10/2026 trata o ID da carteira como credencial de leitura, mas as
+mensagens de erro da fonte (`SourceError`) o repetiam: elas citavam o caminho da
+requisição, que contém o ID, e o `mask_error_details` não as cobre, porque o
+`SourceError` volta como resultado normal da tool, não como exceção. Com
+qualquer ferramenta de busca na web no cliente, ou com texto da fonte tentando
+instruir o modelo, o ID leria os valores brutos da API pública e anularia o
+`WALLET_MASK_VALUES`.
+
+Agora o `WalletClient` troca o ID por `<wallet>` num único ponto
+(`WalletClient._redact`), que cobre o caminho nas mensagens e o texto das
+exceções do `httpx`. A requisição e a chave do cache continuam usando o caminho
+real, e a dica "check WALLET_ID" dos 4xx do proxy permanece. A saída para o
+operador (stderr, `bootstrap`) não muda: quem opera o servidor é dono do ID
+(ADR-0009). O mesmo vale para o que o modelo vê em qualquer tool: nenhum texto
+de erro que ele recebe carrega o ID. Os caminhos absolutos da memória local em
+`memory_error_payload` seguem como pendência registrada no ROADMAP.
