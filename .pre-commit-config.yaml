@@ -4,3 +4,11 @@ repos:
     hooks:
       - id: ruff
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: no-wallet-id
+        name: no wallet ID in tracked files
+        entry: scripts/check-no-wallet-id
+        language: script
+        pass_filenames: false
+        always_run: true

@@ -128,3 +128,29 @@ operador (stderr, `bootstrap`) não muda: quem opera o servidor é dono do ID
 (ADR-0009). O mesmo vale para o que o modelo vê em qualquer tool: nenhum texto
 de erro que ele recebe carrega o ID. Os caminhos absolutos da memória local em
 `memory_error_payload` seguem como pendência registrada no ROADMAP.
+
+## Emenda 2026-10-31 (revisão final da spec 004, ciclo 7) — o ID voltou a um arquivo versionado
+
+O ciclo 7 achou o ID real da carteira num relatório do ciclo 5 (a linha de
+verificação de que ele havia sido removido o citava), versionado desde
+31/10/2026 em `main` e nas branches `spec-004/*`. Isso reabriu, depois da
+reescrita de 29/10/2026, o que a emenda "ID real no repositório" havia fechado.
+Pior, o sdist da `0.3.0` incluía `reports/`, `specs/` e `docs/`, e um build local
+levava junto a config local do Devin com o ID, porque o empacotador só respeita o
+`.gitignore`.
+
+Medidas no working tree (sem reescrever o histórico):
+
+- O ID foi trocado por `<id>` no relatório.
+- `scripts/check-no-wallet-id`, hook local do pre-commit, lê `WALLET_ID` do
+  ambiente e falha se o valor estiver em arquivo versionado; ele não é ligado ao
+  CI, porque isso exigiria guardar o ID como secret do repositório.
+- O sdist inclui só `/src` e `/CHANGELOG.md`; o wheel já continha só o pacote.
+  Um sdist e um wheel construídos depois da mudança não têm o ID.
+
+**Pendente do mantenedor:** o ID segue no histórico de `main` e das branches
+`spec-004/*`, e reescrevê-lo exige force-push num repositório público, sem
+remover o ID dos `refs/pull/*`, de clones e forks nem de sdists antigos do PyPI.
+A decisão (aceitar que a carteira é pública, reescrever de novo, ou trocar o link
+da carteira no Investidor10) ainda não foi tomada nem registrada.
+

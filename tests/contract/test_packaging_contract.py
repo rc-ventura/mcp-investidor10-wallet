@@ -39,6 +39,13 @@ def test_wheel_target_exports_only_package_namespace():
         assert not (PROJECT_ROOT / top_level).exists()
 
 
+def test_sdist_ships_only_the_source_and_the_changelog():
+    with open(PROJECT_ROOT / "pyproject.toml", "rb") as f:
+        pyproject = tomllib.load(f)
+    include = pyproject["tool"]["hatch"]["build"]["targets"]["sdist"]["include"]
+    assert include == ["/src", "/CHANGELOG.md"]
+
+
 def test_server_main_serves_stdio_initialize_handshake(tmp_path):
     init_request = {
         "jsonrpc": "2.0",
