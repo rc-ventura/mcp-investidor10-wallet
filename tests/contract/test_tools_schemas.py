@@ -381,6 +381,53 @@ class TestPriceAlerts:
             {"ticker": "MXRF11", "reason": "asset_type_not_supported"}
         ]
 
+    async def test_digest_survives_a_memory_failure_while_listing_alerts(
+        self, fresh_memory, monkeypatch
+    ):
+        fresh_memory.save_rule("never sell at a loss")
+
+        def unavailable(state=None):
+            raise memory_store.MemoryUnavailableError("gone")
+
+        monkeypatch.setattr(fresh_memory, "list_price_alerts", unavailable)
+        async with Client(mcp) as client:
+            result = await client.call_tool("get_session_context", {})
+        assert result.data["memory_status"] == "unavailable"
+        assert result.data["memory"]["rules"][0]["text"] == "never sell at a loss"
+
+    async def test_read_only_latched_during_quote_checks_is_reported_as_read_only(
+        self, fresh_memory, monkeypatch
+    ):
+        fresh_memory.create_price_alert("MXRF11", "below", 999.0)
+
+        def read_only(quotes):
+            raise memory_store.MemoryReadOnlyError("no locks")
+
+        monkeypatch.setattr(fresh_memory, "evaluate_alerts", read_only)
+        with respx.mock:
+            respx.get(f"{wallet_client.REST_BASE_URL}/assets/tickers/MXRF11").respond(
+                status_code=410
+            )
+            wallet_client.rest_client._cache.clear()
+            async with Client(mcp) as client:
+                result = await client.call_tool("get_session_context", {})
+        assert result.data["memory_status"] == "read_only"
+        assert result.data["pending_check"] == [
+            {"ticker": "MXRF11", "reason": "asset_type_not_supported"}
+        ]
+
+    async def test_busy_memory_during_evaluation_is_a_memory_busy_error(
+        self, fresh_memory, monkeypatch
+    ):
+        def busy(quotes):
+            raise memory_store.MemoryBusyError("locked")
+
+        monkeypatch.setattr(fresh_memory, "evaluate_alerts", busy)
+        async with Client(mcp) as client:
+            result = await client.call_tool("get_session_context", {})
+        assert result.is_error
+        assert result.structured_content["error"]["code"] == "memory_busy"
+
     async def test_quote_cached_within_the_ttl_still_triggers(self, fresh_memory):
         fresh_memory.create_price_alert("PETR4", "below", 999.0)
         url = f"{wallet_client.REST_BASE_URL}/assets/tickers/PETR4"

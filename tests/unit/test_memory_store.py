@@ -111,6 +111,94 @@ def test_corrupted_file_degrades_without_crash_and_creates_backup(tmp_path):
     assert path.read_text(encoding="utf-8") == corrupt_content
 
 
+@pytest.mark.parametrize(
+    "depth",
+    [
+        40,  # past the schema bound, still parses: deepcopy and dump(indent) would recurse
+        600,  # json.loads parses it, copy.deepcopy alone would raise RecursionError
+        100_000,  # json.loads itself raises RecursionError (not a ValueError)
+    ],
+)
+def test_deeply_nested_file_takes_the_corruption_path(tmp_path, depth):
+    path = tmp_path / "memory.json"
+    nested = "[" * depth + "]" * depth
+    content = (
+        '{"version": 1, "wallet_goal": null, "theses": [], "rules": [], '
+        '"decisions": [], "insights_log": [], '
+        f'"alerts": [{{"id": 1, "note": {nested}}}]}}'
+    )
+    path.write_text(content, encoding="utf-8")
+
+    store = MemoryStore(str(path))
+    assert not store.available
+    # Every operation keeps failing with the structured error, not a crash.
+    for _ in range(2):
+        with pytest.raises(MemoryUnavailableError):
+            store.get_all("alerts")
+        with pytest.raises(MemoryUnavailableError):
+            store.add("rules", {"text": "x"})
+    backups = glob.glob(str(tmp_path / "memory.json.broken-*"))
+    assert len(backups) == 1
+    with open(backups[0], encoding="utf-8") as f:
+        assert f.read() == content
+    assert path.read_text(encoding="utf-8") == content
+
+
+def _store_nesting(depth: int, container: str = "list") -> str:
+    """A valid store whose deepest value sits at exactly `depth` levels."""
+    # The root object and the alerts list are levels 1 and 2, the entry is 3.
+    inner = depth - 3
+    if container == "list":
+        nested = "[" * inner + "]" * inner
+    else:
+        nested = '{"k": ' * (inner - 1) + "{}" + "}" * (inner - 1)
+    return (
+        '{"version": 1, "wallet_goal": null, "theses": [], "rules": [], '
+        '"decisions": [], "insights_log": [], '
+        f'"alerts": [{{"id": 1, "note": {nested}}}]}}'
+    )
+
+
+@pytest.mark.parametrize("container", ["list", "dict"])
+def test_nesting_bound_accepts_32_levels_and_rejects_33(tmp_path, container):
+    at_bound = tmp_path / "at.json"
+    at_bound.write_text(_store_nesting(32, container), encoding="utf-8")
+    assert MemoryStore(str(at_bound)).available
+
+    past = tmp_path / "past.json"
+    past.write_text(_store_nesting(33, container), encoding="utf-8")
+    assert not MemoryStore(str(past)).available
+    assert len(glob.glob(str(past) + ".broken-*")) == 1
+
+
+def test_a_file_saved_with_a_utf8_bom_is_valid_memory(tmp_path):
+    path = tmp_path / "memory.json"
+    MemoryStore(str(path)).save_rule("máximo 10% por ativo")
+    path.write_bytes(b"\xef\xbb\xbf" + path.read_bytes())
+
+    store = MemoryStore(str(path))
+    assert store.available
+    assert [rule["text"] for rule in store.get_rules()] == ["máximo 10% por ativo"]
+    assert glob.glob(str(path) + ".broken-*") == []
+
+
+@pytest.mark.parametrize("content", ["{not json", '{"version": 99}'])
+def test_a_rejected_file_deleted_mid_session_is_not_reset_empty(tmp_path, content):
+    """Corrupt or future-version: the file existed, so deleting it later takes
+    the vanished path, never the first-run empty reset."""
+    path = tmp_path / "memory.json"
+    path.write_text(content, encoding="utf-8")
+    store = MemoryStore(str(path))
+    assert not store.available
+    path.unlink()
+
+    with pytest.raises(MemoryUnavailableError):
+        store.get_rules()
+    with pytest.raises(MemoryUnavailableError):
+        store.save_rule("r")
+    assert not path.exists()
+
+
 def test_unknown_future_version_degrades_without_backup(tmp_path):
     path = tmp_path / "memory.json"
     future = {

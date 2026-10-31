@@ -371,8 +371,8 @@ async def test_quote_rejects_unparseable_price(value):
     assert excinfo.value.code == "unexpected_format"
 
 
-@pytest.mark.parametrize("months", [True, None, "12"])
-async def test_history_rejects_noninteger_months(months):
+@pytest.mark.parametrize("months", [True, None, "12", 601, 10**9])
+async def test_history_rejects_noninteger_or_unbounded_months(months):
     with pytest.raises(SourceError) as excinfo:
         await make_client().get_patrimony_history(months)
     assert excinfo.value.code == "invalid_params"
@@ -388,6 +388,12 @@ async def test_earnings_rejects_single_date_and_bad_type():
 async def test_earnings_rejects_compact_dates():
     with pytest.raises(SourceError) as excinfo:
         await make_client().get_earnings("20261017", "20261018")
+    assert excinfo.value.code == "invalid_params"
+
+
+async def test_earnings_rejects_well_formed_but_impossible_dates():
+    with pytest.raises(SourceError) as excinfo:
+        await make_client().get_earnings("2025-13-40", "2026-01-01")
     assert excinfo.value.code == "invalid_params"
 
 
@@ -434,10 +440,10 @@ async def test_positions_dedupe_overlapping_pages():
 
     # Page 2 overlaps page 1 (T40..T49 repeat) but adds new rows (T50..T89).
     respx.get(f"{BASE}/summary/actives/1234567/Ticker", params={"start": "0"}).respond(
-        json={"total": 70, "data": rows(0, 50), "weighted": {}, "draw": 0}
+        json={"total": 90, "data": rows(0, 50), "weighted": {}, "draw": 0}
     )
     respx.get(f"{BASE}/summary/actives/1234567/Ticker", params={"start": "50"}).respond(
-        json={"total": 70, "data": rows(40, 50), "weighted": {}, "draw": 0}
+        json={"total": 90, "data": rows(40, 50), "weighted": {}, "draw": 0}
     )
     envelope = await make_client().get_positions("Ticker")
     assert len(envelope["data"]["data"]) == 90
@@ -487,6 +493,71 @@ async def test_positions_stops_on_short_page_when_total_missing():
     assert len(envelope["data"]["data"]) == 57
     assert envelope["data"]["total"] == 57
     assert envelope["data"]["truncated"] is False  # no declared total to miss
+
+
+@respx.mock
+@pytest.mark.parametrize("declared", [0, -5, 3])
+async def test_positions_never_trust_an_impossible_declared_total(declared):
+    """A non-positive total, or one the first full page already exceeds, can
+    end neither the walk nor vouch for completeness: the walk continues until
+    the short page."""
+
+    def rows(start, count):
+        return [{"ticker": f"T{i}", "quantity": 1} for i in range(start, start + count)]
+
+    respx.get(f"{BASE}/summary/actives/1234567/Ticker", params={"start": "0"}).respond(
+        json={"total": declared, "data": rows(0, 50), "weighted": {}, "draw": 0}
+    )
+    respx.get(f"{BASE}/summary/actives/1234567/Ticker", params={"start": "50"}).respond(
+        json={"total": declared, "data": rows(50, 20), "weighted": {}, "draw": 0}
+    )
+    envelope = await make_client().get_positions("Ticker")
+    assert len(envelope["data"]["data"]) == 70
+    assert envelope["data"]["total"] == 70
+    assert envelope["data"]["truncated"] is False
+
+
+@respx.mock
+async def test_positions_adopt_a_larger_total_declared_by_a_later_page():
+    """A total that grows across pages must keep the walk going: stopping at
+    the first declaration would report truncated=false on a list the source
+    itself says is incomplete."""
+
+    def rows(start, count):
+        return [{"ticker": f"T{i}", "quantity": 1} for i in range(start, start + count)]
+
+    respx.get(f"{BASE}/summary/actives/1234567/Ticker", params={"start": "0"}).respond(
+        json={"total": 100, "data": rows(0, 50), "weighted": {}, "draw": 0}
+    )
+    respx.get(f"{BASE}/summary/actives/1234567/Ticker", params={"start": "50"}).respond(
+        json={"total": 200, "data": rows(50, 50), "weighted": {}, "draw": 0}
+    )
+    third = respx.get(
+        f"{BASE}/summary/actives/1234567/Ticker", params={"start": "100"}
+    ).respond(json={"total": 100, "data": rows(100, 30), "weighted": {}, "draw": 0})
+    envelope = await make_client().get_positions("Ticker")
+    assert third.called  # page 2 raised the bar, so collection continued
+    assert len(envelope["data"]["data"]) == 130
+    # A smaller later declaration never lowers it: 130 < 200 is incomplete.
+    assert envelope["data"]["truncated"] is True
+
+
+@respx.mock
+async def test_positions_flag_a_page_cap_stop_under_an_impossible_total(monkeypatch):
+    """The early-break failure the review found: an impossible total must never
+    turn an incomplete walk into truncated=false."""
+    monkeypatch.setattr(wallet_client, "MAX_POSITION_PAGES", 2)
+    route = respx.get(f"{BASE}/summary/actives/1234567/Ticker")
+
+    def endless(request):
+        start = int(request.url.params["start"])
+        rows = [{"ticker": f"T{i}"} for i in range(start, start + 50)]
+        return httpx.Response(200, json={"total": 0, "data": rows, "draw": 0})
+
+    route.side_effect = endless
+    envelope = await make_client().get_positions("Ticker")
+    assert route.call_count == 2
+    assert envelope["data"]["truncated"] is True
 
 
 @pytest.mark.parametrize(

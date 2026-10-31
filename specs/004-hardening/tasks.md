@@ -167,7 +167,7 @@ recurso + causa + próxima ação (FR-021…FR-025, FR-036).
 - [x] T028 [US5] Revisar as mensagens de erro previstas para o estilo recurso + causa + próxima ação, nomeando tool do servidor quando houver (tabela de `contracts/error-envelope.md`), em `src/investidor10_wallet/wallet_client.py` (`SourceError`), `src/investidor10_wallet/server.py` (`_not_found`, mensagem do middleware, que passa a nomear a tool e o parâmetro inválido quando disponível) e `src/investidor10_wallet/memory_store.py` (exceções); preservar as substrings que os testes existentes já afirmam; o teste da T025 passa a verde
 - [x] T029 [P] [US5] Criar `docs/adrs/0014-sinal-duplo-de-erro.md` (skill `adr`): `isError` + envelope por middleware único, conjunto fechado de 11 códigos (3 novos; 12 após a emenda de 28/10/2026, que acrescentou `state_conflict`), decisão de NÃO adicionar `retryable`/`category` (função do código, tabela no contrato), exceções inesperadas fora do conjunto, fundamentos (fastmcp 4.0.11 `tools/base.py`, docs gofastmcp.com `/clients/tools`, SEP-1303/2145); emendar `docs/adrs/0007-passthrough-envelope-and-structured-errors.md` com o conjunto de 11 códigos; acrescentar a `docs/research/tool-error-channels.md` a nota de que o ponto "Não marca `isError`" foi resolvido pela spec 004
 
-**Checkpoint (gate do Lote 5)**: 10 dos 11 códigos cobertos (o 11º, `privacy_mode_unavailable`, entra na US3); sucesso inalterado; suíte verde.
+**Checkpoint (gate do Lote 5)**: 11 dos 12 códigos cobertos (o 12º, `privacy_mode_unavailable`, entra na US3); sucesso inalterado; suíte verde.
 
 ---
 
@@ -198,7 +198,7 @@ saída serializada, `privacy.omitted` correto, percentuais intactos (SC-003).
 - [x] T039 [P] [US3] Criar `docs/adrs/0015-modo-privacidade-wallet-mask-values.md` (skill `adr`): env var e nunca parâmetro de tool (o modelo não pode desligar), allowlist fail-closed, aplicação depois do cache, marcador `privacy`, `get_patrimony_history` e `get_earnings` indisponíveis sem razão derivada, campos de semântica incerta (`weighted`, `gnr`, `gnp`, `ranking`) omitidos até haver evidência, texto livre da memória não mascarado, limite: o ID da carteira segue sendo a credencial
 - [x] T040 [US3] Validar o quickstart V5 com a carteira real: `WALLET_MASK_VALUES=1`, pedir "como está minha carteira e onde devo aportar?" e conferir análise por percentuais sem nenhum R$ ou quantidade, explicação do agente sobre os montantes omitidos e indisponibilidade de `get_earnings`/`get_patrimony_history`; `WALLET_MASK_VALUES=talvez` aborta com a mensagem PT-BR
 
-**Checkpoint (gate do Lote 6)**: V5 validado; as 11 linhas do contrato de erro cobertas; suíte verde.
+**Checkpoint (gate do Lote 6)**: V5 validado; as 12 linhas do contrato de erro cobertas; suíte verde.
 
 ---
 
@@ -276,7 +276,7 @@ revisada e aprovada antes do lote seguinte começar. A emenda da Constituição
 | L3 — US1 Trava | `spec-004/us1-trava` | T010–T021 | V1/V2 validados em máquina real; concorrência com `spawn` verde nas 3 plataformas |
 | L4 — US4 Changelog | `spec-004/us4-changelog` | T022–T024 | V3 validado (uma linha por mutação) |
 | L5 — US5 Sinal de erro | `spec-004/us5-sinal-erro` | T025–T029 | 10 códigos com `isError`; sucesso inalterado |
-| L6 — US3 Privacidade | `spec-004/us3-privacidade` | T030–T040 | V5 validado com a carteira real; 11 códigos cobertos |
+| L6 — US3 Privacidade | `spec-004/us3-privacidade` | T030–T040 | V5 validado com a carteira real; 12 códigos cobertos |
 | L7 — US8 + US2 | `spec-004/us8-us2-docs` | T041–T048 | `instructions` visível; leitor novo passa no SC-007 |
 | L8 — Polish 0.3.0 | `spec-004/polish-0.3.0` | T049–T055 | Gates verdes + PR final com review SDD |
 
