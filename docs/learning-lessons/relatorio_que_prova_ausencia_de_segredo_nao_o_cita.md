@@ -32,6 +32,6 @@ Duas armadilhas ligadas a esta:
 
 ## Relation to ADRs and next steps
 
-- **ADR-0004**, emenda de 31/10/2026 (ciclo 7): o ID reapareceu num relatório e foi trocado por `<id>`; a decisão sobre reescrever o histórico fica com o mantenedor.
+- **ADR-0004**, emenda de 31/10/2026 (ciclo 7): o ID reapareceu num relatório e foi trocado por `<id>`; o mantenedor decidiu em 31/10/2026 aceitar que a carteira é pública e não reescrever o histórico.
 - O guarda no CI exigiria guardar o ID como secret do repositório; não foi ligado. O hook do pre-commit cobre quem usa `pre-commit`.
 - Ao registrar uma verificação de segredo em relatório, escreva `<id>` e o nome da variável.

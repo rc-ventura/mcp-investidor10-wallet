@@ -148,9 +148,13 @@ Medidas no working tree (sem reescrever o histórico):
 - O sdist inclui só `/src` e `/CHANGELOG.md`; o wheel já continha só o pacote.
   Um sdist e um wheel construídos depois da mudança não têm o ID.
 
-**Pendente do mantenedor:** o ID segue no histórico de `main` e das branches
-`spec-004/*`, e reescrevê-lo exige force-push num repositório público, sem
-remover o ID dos `refs/pull/*`, de clones e forks nem de sdists antigos do PyPI.
-A decisão (aceitar que a carteira é pública, reescrever de novo, ou trocar o link
-da carteira no Investidor10) ainda não foi tomada nem registrada.
+**Decisão do mantenedor (2026-10-31): aceitar que a carteira é pública.** O ID
+segue no histórico de `main` e das branches `spec-004/*`. Reescrevê-lo exigiria
+force-push num repositório público e não o tiraria dos `refs/pull/*`, de clones e
+forks nem de sdists antigos do PyPI; o mantenedor escolheu não reescrever e manter
+a carteira pública, que já é pública por desenho do produto (opção A das três
+avaliadas, junto com reescrever o histórico e trocar ou privar o link no
+Investidor10). Consequência aceita: o ID antigo continua alcançável nesses lugares.
+O que a medida acima garante é que ele não volte ao working tree nem entre no
+sdist e no wheel publicados daqui para frente.
 

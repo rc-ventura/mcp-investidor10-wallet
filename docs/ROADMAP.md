@@ -77,9 +77,9 @@ entram na matriz.
    27/10/2026 (ver item na Fase 1). Vem primeiro
    porque o Desktop da 005 aumenta o número de processos sobre o mesmo
    `memory.json`. **Entregue na 0.3.0** (28-29/10/2026), com revisão final em
-   7 ciclos (`reports/sdd-final-review/004/`). A T048 foi aprovada pelo mantenedor
-   em 31/10/2026; faltam T054 (CI verde no commit da tag) e T055 (aval do
-   mantenedor). A sequência até a tag está em `specs/004-hardening/fechamento.md`.
+   7 ciclos (`reports/sdd-final-review/004/`). A T048 e a T055 foram aprovadas pelo
+   mantenedor em 31/10/2026 e a T054 fechou com o CI verde em `main`; falta
+   criar a tag. A sequência está em `specs/004-hardening/fechamento.md`.
 2. **Spec 005 — Distribuição Desktop**: `.mcpb` do Claude Desktop, teste do
    Devin Desktop e validação em máquina limpa (V2 real, Codex, Gemini);
    suporte à carteira restrita com configuração interativa (link →

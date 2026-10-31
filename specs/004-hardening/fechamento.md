@@ -105,8 +105,8 @@ presença de `avg_price` na lista do modo privacidade); ver "Aprovação do mant
 | Tarefa | Estado | Observação |
 |--------|--------|------------|
 | T048 | Aprovada pelo mantenedor em 31/10/2026 | O registro é a aprovação do mantenedor, sem detalhar quem leu o `docs/PRIVACY.md` nem como (SC-007) |
-| T054 | Aberta | `main` verde nos 10 jobs em `7cd559f` (run 41243292164) e `a169f91` (run 41243532223). Fecha com o CI verde no commit da tag |
-| T055 | Aberta | Ciclos 6 e 7 feitos. Falta o aval do mantenedor com a decisão sobre o ID no histórico escrita no ADR-0004 |
+| T054 | Concluída | `main` verde nos 10 jobs (audit, macOS, Linux e Windows em 3.11, 3.12 e 3.13) em `a169f91` (run 41243532223), `cc2e3ec` (run 41250964826), `942eaa6` (run 41250981542) e `18d2ee2` (run 41250999762). O commit da tag é conferido antes de `git tag` |
+| T055 | Concluída | Ciclos 6 e 7 feitos. O mantenedor aprovou o ciclo 7 em 31/10/2026 e decidiu aceitar que a carteira é pública (ADR-0004, emenda do ciclo 7) |
 
 ## CI em `main` (execução do push `3c6f969`, run 41238678472)
 
@@ -138,16 +138,15 @@ e os mesmos 39 foram pulados de antes, ou seja, o teste dos hooks rodou de verda
       a #8 e a #11 em `main`.
 - [x] T048 e o aval sobre `avg_price` na lista do modo privacidade: aprovados pelo
       mantenedor em 31/10/2026 (ver abaixo).
-- [ ] Mergear a PR #12 (relatório do ciclo 7), a #13 (ID fora do versionado, guarda e
-      sdist) e a PR deste registro.
-- [ ] Rodar, no commit da tag, os comandos do ciclo 7: `git grep -F -- "$WALLET_ID"`
+- [x] Mergear a PR #12 (relatório do ciclo 7), a #13 (ID fora do versionado, guarda e
+      sdist) e a #14 (refresh dos registros).
+- [ ] Rodar, no commit da tag (já passaram em `18d2ee2`), os comandos do ciclo 7: `git grep -F -- "$WALLET_ID"`
       sem resultado; `uv build` com o sdist sem nenhum caminho em `reports/`; o ID
       ausente do sdist e do wheel.
-- [ ] Decisão do mantenedor sobre o ID no histórico (aceitar que a carteira é
-      pública, reescrever o histórico ou trocar o link da carteira no Investidor10),
-      escrita no ADR-0004.
-- [ ] T054 (CI verde no commit da tag) e T055 (aval do mantenedor), registrados aqui
-      e em `tasks.md` antes de `git tag v0.3.0`.
+- [x] Decisão do mantenedor sobre o ID no histórico: aceitar que a carteira é
+      pública, sem reescrever o histórico, registrada no ADR-0004.
+- [x] T054 (CI verde) e T055 (aval do mantenedor), registrados aqui e em `tasks.md`
+      antes de `git tag v0.3.0`.
 - [ ] Criar a tag `v0.3.0` e o release no PyPI, só depois de tudo acima (o
       `release.yml` publica via OIDC e não se desfaz; só com decisão explícita do
       mantenedor).
