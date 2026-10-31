@@ -26,10 +26,11 @@ liga esses pontos e lista o que ainda está aberto. Não reescreve a história d
 
 ## Revisão SDD
 
-O relatório mais recente da spec 004 é o **ciclo 6** (2026-10-31) e termina em
-**NEEDS WORK**: QA PASS, Segurança PASS com ressalvas, Tech Leader NEEDS WORK por
-dois itens de código e pelo registro do release. Os dois itens estão corrigidos na
-PR #10 e ainda não foram reverificados (ciclo 7).
+O relatório mais recente da spec 004 é o **ciclo 7** (2026-10-31): QA PASS,
+Segurança PASS e Tech Leader **APPROVED condicional** a quatro itens antes da tag
+`v0.3.0` (ver "Pendências para o release 0.3.0"). O ciclo 6 havia terminado em
+NEEDS WORK por dois itens de código, corrigidos na PR #10 e reverificados no ciclo 7
+(18 dos 22 testes novos falham sem a correção).
 
 | Ciclo | Relatório | Veredito do Tech Leader |
 |-------|-----------|-------------------------|
@@ -39,26 +40,29 @@ PR #10 e ainda não foram reverificados (ciclo 7).
 | 4 | `cycle-4-20261029-0803.md` | NEEDS WORK |
 | 5 | `cycle-5-20261029-0832.md` | NEEDS WORK |
 | 6 | `cycle-6-20261031-1809.md` | NEEDS WORK |
+| 7 | `cycle-7-20261031-1840.md` | APPROVED (condicional) |
 
-A mensagem do commit `1a32b55` fala em "cycles 1–2, APPROVED"; o diretório tem 6
-ciclos e só o 2 foi aprovado.
+A mensagem do commit `1a32b55` fala em "cycles 1–2, APPROVED"; o diretório tem 7
+ciclos; o 2 foi aprovado e o 7 é aprovado só sob condição.
 
 Em 2026-10-31 todos os itens dos 5 primeiros ciclos foram conferidos contra o
-código, os testes e os docs, e o ciclo 6 reverificou a conferência de forma
+código, os testes e os docs, e os ciclos 6 e 7 reverificaram a conferência de forma
 independente. O resultado está numa seção "Resolution status" no fim de cada
 relatório (o texto histórico dos ciclos não foi editado). A conferência tinha
-erros, corrigidos depois do ciclo 6: T054 aparecia como pendente do merge da #9
-(já mergeada), a linha do `.lock` com `O_NOFOLLOW` estava errada (o
-`filelock==4.2.4` já o usa), cerca de oito citações de linha estavam fora do lugar
-e o ID da carteira nas mensagens de erro não estava em nenhuma tabela.
+erros, apontados pelos ciclos 6 e 7 e corrigidos: T054 aparecia como pendente do
+merge da #9 (já mergeada), a linha do `.lock` com `O_NOFOLLOW` estava errada (o
+`filelock==4.2.4` já o usa), citações de linha ficaram deslocadas depois do merge
+da #10 e o ID da carteira nas mensagens de erro não estava em nenhuma tabela. As
+citações de `wallet_client.py` e `test_memory_locking.py` foram reconferidas contra
+`a169f91`.
 
 | Ciclo | Itens conferidos | Resolvidos | Adiados (decisão registrada) | Abertos |
 |-------|------------------|------------|------------------------------|---------|
-| 1 | 18 | 15 | 0 | 3 (ID da carteira nos erros, corrigido na #10; T054; T048/T055) |
-| 2 | 11 | 9 | 0 | 2 (ID da carteira nos erros, corrigido na #10; T048/T054/T055 agrupados) |
-| 3 | 17 | 14 | 0 | 3 (`avg_price`, nota de injeção no `PRIVACY.md`, T048/T054/T055 agrupados) |
-| 4 | 15 | 11 | 2 | 2 (contagem de alertas, T048/T054/T055 agrupados) |
-| 5 | 12 | 7 | 1 | 4 (teste de dedupe sem ticker, texto do ADR-0002, T054, T048/T055) |
+| 1 | 18 | 16 | 0 | 2 (T054; T048/T055) |
+| 2 | 11 | 10 | 0 | 1 (T048/T054/T055 agrupados) |
+| 3 | 17 | 15 | 0 | 2 (nota de injeção no `PRIVACY.md`; T048/T054/T055 agrupados) |
+| 4 | 15 | 11 | 2 | 2 (contagem de alertas; T048/T054/T055 agrupados) |
+| 5 | 12 | 8 | 1 | 3 (teste de dedupe sem ticker; T054; T048/T055) |
 
 O item bloqueante do ciclo 5 (maior `total` declarado entre páginas) está no código
 (`wallet_client.py`, `max(total, declared)`) e no teste
@@ -77,19 +81,32 @@ corrigidos na PR #10:
   `get_session_context`. Agora vira `unexpected_format`; lição
   `recursionerror_nao_e_valueerror` estendida.
 
+O ciclo 7 acrescentou, e a Segurança e o Tech Leader classificaram:
+
+- **Bloqueia a tag:** o ID real da carteira estava versionado em um relatório do
+  ciclo 5 (a linha de verificação o citava), e o sdist da `0.3.0` incluía
+  `reports/`, `specs/` e `docs/` (e, num build local, a config local do Devin).
+  Tratado na PR #13: ID trocado por `<id>`, guarda `scripts/check-no-wallet-id` no
+  pre-commit e sdist limitado a `/src` e `/CHANGELOG.md`. O ID segue no histórico;
+  a decisão de reescrever fica com o mantenedor (ADR-0004).
+- **Fica para a 0.3.1**, sem bloquear: guarda de profundidade do JSON depois do
+  `json.loads` (payloads de ~256 a ~9 000 níveis, só com upstream hostil), guarda do
+  `Content-Length` (só reproduzível com mocks), caminho da memória nos erros e o
+  ADR-0018, caminhos locais em 3 arquivos antigos, fonte do plugin sem pin no
+  instalador e `uvx` sem lock. Estão no ROADMAP.
+
 Ainda abertos, de baixo risco: teste do fallback de dedupe para linhas sem ticker;
 nota no `PRIVACY.md` sobre texto livre vindo da fonte; limite para a quantidade de
 alertas. O mantenedor aprovou em 31/10/2026 o item 3 da lista do ciclo 6 (T048 e a
 presença de `avg_price` na lista do modo privacidade); ver "Aprovação do mantenedor".
-As pendências do 0.3.1 estão no ROADMAP.
 
 ## Estado das tarefas abertas em `tasks.md`
 
 | Tarefa | Estado | Observação |
 |--------|--------|------------|
 | T048 | Aprovada pelo mantenedor em 31/10/2026 | O registro é a aprovação do mantenedor, sem detalhar quem leu o `docs/PRIVACY.md` nem como (SC-007) |
-| T054 | Aberta | `main@5e0a422` está verde nos 10 jobs (run 41240580596). A #10 e a #8 já estão em `main` (`7cd559f`); falta o CI desse commit e do commit final fechar verde |
-| T055 | Aberta | Ciclo 6 feito (NEEDS WORK); falta o ciclo 7, só QA e Segurança, depois do merge da #10 |
+| T054 | Aberta | `main` verde nos 10 jobs em `7cd559f` (run 41243292164) e `a169f91` (run 41243532223). Fecha com o CI verde no commit da tag |
+| T055 | Aberta | Ciclos 6 e 7 feitos. Falta o aval do mantenedor com a decisão sobre o ID no histórico escrita no ADR-0004 |
 
 ## CI em `main` (execução do push `3c6f969`, run 41238678472)
 
@@ -116,16 +133,21 @@ e os mesmos 39 foram pulados de antes, ou seja, o teste dos hooks rodou de verda
 
 - [x] Corrigir o `audit` (`joserfc`) e os 5 testes do Windows (PR #9, mergeada).
 - [x] Conferir os ciclos 1 a 5 contra o código e atualizar os relatórios.
-- [x] Ciclo 6 do `/sdd-final-review`, registrado em
-      `reports/sdd-final-review/004/cycle-6-20261031-1809.md`.
-- [x] Mergear a PR #10 (ID da carteira nos erros, `RecursionError`, `ci.yml`, ADRs)
-      e esta PR em `main`.
-- [ ] Ciclo 7, só QA e Segurança: o ID não aparece em nenhum texto visível ao modelo
-      (incluindo `str(exc)` do `httpx`), JSON aninhado vira `unexpected_format`, os
-      testes novos falham sem a correção, as tabelas e este arquivo batem com o
-      repositório e o CI está verde no commit final.
+- [x] Ciclos 6 e 7 do `/sdd-final-review`, em `reports/sdd-final-review/004/`.
+- [x] Mergear a PR #10 (ID da carteira nos erros, `RecursionError`, `ci.yml`, ADRs),
+      a #8 e a #11 em `main`.
 - [x] T048 e o aval sobre `avg_price` na lista do modo privacidade: aprovados pelo
       mantenedor em 31/10/2026 (ver abaixo).
+- [ ] Mergear a PR #12 (relatório do ciclo 7), a #13 (ID fora do versionado, guarda e
+      sdist) e a PR deste registro.
+- [ ] Rodar, no commit da tag, os comandos do ciclo 7: `git grep -F -- "$WALLET_ID"`
+      sem resultado; `uv build` com o sdist sem nenhum caminho em `reports/`; o ID
+      ausente do sdist e do wheel.
+- [ ] Decisão do mantenedor sobre o ID no histórico (aceitar que a carteira é
+      pública, reescrever o histórico ou trocar o link da carteira no Investidor10),
+      escrita no ADR-0004.
+- [ ] T054 (CI verde no commit da tag) e T055 (aval do mantenedor), registrados aqui
+      e em `tasks.md` antes de `git tag v0.3.0`.
 - [ ] Criar a tag `v0.3.0` e o release no PyPI, só depois de tudo acima (o
       `release.yml` publica via OIDC e não se desfaz; só com decisão explícita do
       mantenedor).

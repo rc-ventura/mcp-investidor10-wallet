@@ -77,8 +77,9 @@ entram na matriz.
    27/10/2026 (ver item na Fase 1). Vem primeiro
    porque o Desktop da 005 aumenta o número de processos sobre o mesmo
    `memory.json`. **Entregue na 0.3.0** (28-29/10/2026), com revisão final em
-   3 ciclos (`reports/sdd-final-review/004/`). Faltam T048 (leitura humana do
-   `PRIVACY.md`), T054 (CI verde em macOS, Linux e Windows) e T055 (sign-off).
+   7 ciclos (`reports/sdd-final-review/004/`). A T048 foi aprovada pelo mantenedor
+   em 31/10/2026; faltam T054 (CI verde no commit da tag) e T055 (aval do
+   mantenedor). A sequência até a tag está em `specs/004-hardening/fechamento.md`.
 2. **Spec 005 — Distribuição Desktop**: `.mcpb` do Claude Desktop, teste do
    Devin Desktop e validação em máquina limpa (V2 real, Codex, Gemini);
    suporte à carteira restrita com configuração interativa (link →
@@ -340,6 +341,20 @@ entram na matriz.
     texto vira `memory_unavailable` em vez de `invalid_params`; decidir se
     `record_decision_outcome` pode sobrescrever um desfecho terminal; `cached` e
     `fetched_at` de `get_positions` descrevem só a última página.
+- [ ] **Pendências do ciclo 7 para a 0.3.1** (nenhuma bloqueia a 0.3.0):
+  - Guarda de profundidade depois do `json.loads` em `wallet_client.request`,
+    reaproveitando `memory_store._nests_deeper_than`: um corpo com ~256 a ~9 000
+    níveis passa pelo parser, entra no cache e falha na serialização da tool
+    (erro genérico mascarado, sem o envelope `{error:{code}}`, e a entrada
+    envenenada fica no cache pelo TTL). Só com upstream hostil; teste a ~500 níveis.
+  - `Content-Length` com `isdigit()` verdadeiro mas `int()` inválido levanta
+    `ValueError` em `wallet_client.py` (só reproduzível com mocks; o h11 recusa
+    valores assim numa conexão real). Proteger com `try/except` na mesma mudança.
+  - Caminhos absolutos com o usuário local em 3 arquivos antigos versionados
+    (`cycle-1-*.md`, `cycle-4-*.md` e `specs/001-mcp-investidor10-wallet/quickstart.md`).
+  - Fonte do plugin no instalador sem pin (marketplace, branch `#plugin` e URL da
+    extensão do Gemini seguem a branch padrão) e `uvx mcp-investidor10-wallet@<versão>`
+    resolvendo as dependências transitivas sem o `uv.lock`.
 - [ ] **Dependabot para actions e dependências** — complemento do pin por
   SHA (entregue na 0.3.0, item "Cadeia de suprimentos" acima): o SHA elimina
   o ataque de repontar tag, mas também congela correções de segurança —
