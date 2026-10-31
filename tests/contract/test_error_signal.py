@@ -41,8 +41,9 @@ def _assert_error(result, code):
     assert result.structured_content["error"]["code"] == code
     text = result.content[0].text
     assert code in text
-    assert result.structured_content["error"]["message"] in text
-    return result.structured_content["error"]["message"]
+    message = result.structured_content["error"]["message"]
+    assert json.loads(text)["error"]["message"] == message
+    return message
 
 
 @respx.mock
