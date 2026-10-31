@@ -51,7 +51,7 @@ pydantic em vez de JSON com `code`.
 
 **Não resolve**:
 
-1. **Não marca `isError`** — no metadata do protocolo a chamada consta como
+1. **Não marca `isError`** (resolvido na spec 004, ADR-0014: o middleware passou a marcar `isError` em todo erro previsto) — no metadata do protocolo a chamada constava como
    sucesso. Cliente/modelo que só olhe nível A/B não percebe o erro (é o
    mesmo modo de falha observado no smolagents: erro dentro de conteúdo que
    precisa ser lido, não sinalizado).
