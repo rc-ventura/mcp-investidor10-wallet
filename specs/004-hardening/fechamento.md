@@ -79,15 +79,16 @@ corrigidos na PR #10:
 
 Ainda abertos, de baixo risco: teste do fallback de dedupe para linhas sem ticker;
 nota no `PRIVACY.md` sobre texto livre vindo da fonte; limite para a quantidade de
-alertas; confirmação do mantenedor sobre `avg_price` na lista do modo privacidade.
+alertas. O mantenedor aprovou em 31/10/2026 o item 3 da lista do ciclo 6 (T048 e a
+presença de `avg_price` na lista do modo privacidade); ver "Aprovação do mantenedor".
 As pendências do 0.3.1 estão no ROADMAP.
 
 ## Estado das tarefas abertas em `tasks.md`
 
 | Tarefa | Estado | Observação |
 |--------|--------|------------|
-| T048 | Aberta | Exige um leitor humano que não conheça o projeto validando `docs/PRIVACY.md` (SC-007) |
-| T054 | Aberta | `main@5e0a422` está verde nos 10 jobs (run 41240580596). Falta confirmar o CI no commit final depois do merge da #10 e desta PR |
+| T048 | Aprovada pelo mantenedor em 31/10/2026 | O registro é a aprovação do mantenedor, sem detalhar quem leu o `docs/PRIVACY.md` nem como (SC-007) |
+| T054 | Aberta | `main@5e0a422` está verde nos 10 jobs (run 41240580596). A #10 e a #8 já estão em `main` (`7cd559f`); falta o CI desse commit e do commit final fechar verde |
 | T055 | Aberta | Ciclo 6 feito (NEEDS WORK); falta o ciclo 7, só QA e Segurança, depois do merge da #10 |
 
 ## CI em `main` (execução do push `3c6f969`, run 41238678472)
@@ -117,17 +118,29 @@ e os mesmos 39 foram pulados de antes, ou seja, o teste dos hooks rodou de verda
 - [x] Conferir os ciclos 1 a 5 contra o código e atualizar os relatórios.
 - [x] Ciclo 6 do `/sdd-final-review`, registrado em
       `reports/sdd-final-review/004/cycle-6-20261031-1809.md`.
-- [ ] Mergear a PR #10 (ID da carteira nos erros, `RecursionError`, `ci.yml`, ADRs)
+- [x] Mergear a PR #10 (ID da carteira nos erros, `RecursionError`, `ci.yml`, ADRs)
       e esta PR em `main`.
 - [ ] Ciclo 7, só QA e Segurança: o ID não aparece em nenhum texto visível ao modelo
       (incluindo `str(exc)` do `httpx`), JSON aninhado vira `unexpected_format`, os
       testes novos falham sem a correção, as tabelas e este arquivo batem com o
       repositório e o CI está verde no commit final.
-- [ ] Executar a T048 com um leitor humano e registrar aqui o aval do mantenedor
-      sobre `avg_price` na lista do modo privacidade.
+- [x] T048 e o aval sobre `avg_price` na lista do modo privacidade: aprovados pelo
+      mantenedor em 31/10/2026 (ver abaixo).
 - [ ] Criar a tag `v0.3.0` e o release no PyPI, só depois de tudo acima (o
       `release.yml` publica via OIDC e não se desfaz; só com decisão explícita do
       mantenedor).
+
+## Aprovação do mantenedor
+
+Em 2026-10-31 o mantenedor aprovou o item 3 da lista de passos do ciclo 6:
+
+- **T048** (validação do SC-007 do `docs/PRIVACY.md`). Este registro guarda só a
+  aprovação do mantenedor; não descreve quem leu o documento nem as respostas às
+  quatro perguntas do SC-007.
+- **`avg_price`, `user_avg_price` e `avg_price_treasure` na lista do modo
+  privacidade.** Os campos continuam liberados, como o ADR-0015, o
+  `docs/PRIVACY.md` e a `spec.md` já descrevem: o preço médio de compra por ativo
+  não revela quantidade nem valor investido.
 
 ## Processo daqui para frente
 
