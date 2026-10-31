@@ -98,7 +98,7 @@ specs/004-hardening/
 ├── data-model.md                # arquivos irmãos, changelog, estados do store
 ├── quickstart.md                # V0–V7
 ├── contracts/
-│   ├── error-envelope.md        # isError + 11 códigos
+│   ├── error-envelope.md        # isError + 12 códigos
 │   ├── privacy-mode.md          # WALLET_MASK_VALUES + allowlists
 │   ├── memory-concurrency.md    # trava, changelog, caminho, plataformas
 │   └── ops-and-docs.md          # PRIVACY.md, instructions, ADR-0016, CHANGELOG
@@ -125,7 +125,7 @@ tests/
 ├── unit/test_bootstrap.py               # sem testes de migração; WALLET_MASK_VALUES; cwd ignorado
 ├── unit/test_privacy.py                 # NOVO — allowlists, fail-closed
 ├── integration/test_memory_concurrency.py  # NOVO — multiprocessing spawn
-├── contract/test_error_signal.py        # NOVO — 11 códigos, sucesso inalterado
+├── contract/test_error_signal.py        # NOVO — 12 códigos, sucesso inalterado
 ├── contract/test_privacy_mode.py        # NOVO — SC-003
 └── contract/test_tools_schemas.py       # raise_on_error=False onde lê erro
 

@@ -314,6 +314,32 @@ entram na matriz.
   com vários alertas. Corrigir com um teto total de tempo, ou checagem concorrente
   limitada, quando o número de alertas crescer; o que passar do teto vai para
   `pending_check`.
+- [x] **Corrigido na 0.3.0 (ciclo 6)** — ID da carteira fora das mensagens de
+  erro visíveis ao modelo (`WalletClient._redact`, ADR-0004 emenda de 31/10/2026)
+  e `RecursionError` do JSON da fonte tratado como `unexpected_format`.
+- [ ] **Pendências do ciclo 6 para a 0.3.1** (LOW, nenhuma bloqueia a 0.3.0):
+  - `release.yml`: separar o job do smoke test (`pip install dist/*.whl`
+    resolve dependências transitivas sem pin) do job que publica, deixando
+    `id-token: write` só no segundo; ensaiar com TestPyPI ou pré-release.
+  - `installer/cli.py:150`: `zip(detected, session.outcomes)` pareia o adaptador
+    errado quando `--clients` cita um cliente ausente; parear cada adaptador com o
+    seu resultado. Em `clients.py`, `_run` deve tratar `TimeoutExpired` e
+    `FileNotFoundError`.
+  - Caminho absoluto da memória em `memory_error_payload` (e `str(exc)` de
+    `_memory_or_param_error`) chega ao modelo; tirar o caminho e escrever o
+    ADR-0018 "superfície de erro visível ao modelo".
+  - Política de limites: quantidade de alertas e de coleções, tamanho do texto,
+    linhas por página em `get_positions` e rotação do `memory.json.log`.
+    Decidir primeiro, depois registrar em ADR.
+  - `fdopen` em `_read_file` e `_backup_corrupt_file` ainda tem a janela de
+    vazamento de descritor que o changelog já fechou.
+  - Testes que faltam: `months` inválido com o modo privacidade ligado,
+    `months == 600`, dedupe de linhas sem ticker, `memory_store.py` no ramo do
+    `fdopen` e `pending_check` com `unexpected_format`.
+  - `alert_id=true` aceito como 1 (usar inteiro estrito); surrogate isolado em
+    texto vira `memory_unavailable` em vez de `invalid_params`; decidir se
+    `record_decision_outcome` pode sobrescrever um desfecho terminal; `cached` e
+    `fetched_at` de `get_positions` descrevem só a última página.
 - [ ] **Dependabot para actions e dependências** — complemento do pin por
   SHA (entregue na 0.3.0, item "Cadeia de suprimentos" acima): o SHA elimina
   o ataque de repontar tag, mas também congela correções de segurança —
