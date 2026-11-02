@@ -43,3 +43,28 @@
 - [`RecursionError` não é `ValueError`: profundidade de aninhamento é uma falha à parte do JSON malformado](./docs/learning-lessons/recursionerror_nao_e_valueerror.md) — 2026-10-29
 - [Contador declarado pela fonte não é limite de laço: validar `total` antes de parar a paginação por ele](./docs/learning-lessons/contador_declarado_pela_fonte_nao_e_limite.md) — 2026-10-29
 - [Um relatório que prova a ausência de um segredo não pode citá-lo: use `<id>` e uma checagem que lê o valor do ambiente](./docs/learning-lessons/relatorio_que_prova_ausencia_de_segredo_nao_o_cita.md) — 2026-10-31
+
+## Research
+
+> Folder: `./docs/research/` — o que as fontes dizem, sem reflexão nem recomendação. Decisões ficam nos ADRs, e aprendizados da prática, nas Learning Lessons. Novos fichamentos com `/research <tema> [-- motivo]`, em `./docs/research/fichamentos/`.
+
+### Fichamentos
+
+- [Superfícies do Claude Desktop e diferença entre desktop e web](./docs/research/fichamentos/claude-desktop-superficies.md) — 2026-11-01
+- [Componentes de plugin por superfície, instalação e hooks](./docs/research/fichamentos/plugins-claude-componentes-e-instalacao.md) — 2026-11-01
+- [Marketplace, versões e canais de plugin](./docs/research/fichamentos/marketplace-e-versoes-de-plugin.md) — 2026-11-01
+- [Formato MCPB e runtime de servidor local](./docs/research/fichamentos/mcpb-e-runtime-do-servidor-local.md) — 2026-11-01
+- [Como o usuário entrega dados a um servidor MCP](./docs/research/fichamentos/entrada-de-dados-do-usuario-em-mcp.md) — 2026-11-01
+- [Devin Desktop](./docs/research/fichamentos/devin-desktop.md) — 2026-11-01
+- [Modelos de branching](./docs/research/fichamentos/modelos-de-branching.md) — 2026-11-01
+- [Publicação de pacotes e promoção de artefatos](./docs/research/fichamentos/publicacao-de-pacotes-e-promocao-de-artefatos.md) — 2026-11-01
+- [Skills e subagentes de projeto no Claude Code](./docs/research/fichamentos/skills-e-subagentes-do-claude-code.md) — 2026-11-01
+
+### Pesquisas anteriores
+
+- [Comportamento do agente e clientes MCP](./docs/research/agent-behavior.md) — 2026-10-17
+- [Canais de erro de tool e envelope estruturado](./docs/research/tool-error-channels.md) — 2026-10-17
+- [Como criar plugins no Claude Code](./docs/research/plugins-claude-code.md) — 2026-10-24
+- [Plugins no Codex CLI](./docs/research/plugins-codex-cli.md) — 2026-10-24
+- [Plugins no Devin CLI e compatibilidade com o formato Claude](./docs/research/plugins-devin-cli.md) — 2026-10-24
+- [Extensões no Gemini CLI](./docs/research/plugins-gemini-cli.md) — 2026-10-24

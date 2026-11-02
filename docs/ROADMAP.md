@@ -60,6 +60,7 @@ externo; reavaliar depois.
 | **Could** | Alertas compostos e gatilhos por indicador | 2 | Depende de baseline real e de fonte de cotação |
 | **Could** | Snapshot de posições para diff entre sessões | 2 | `get_entries` cobre parte do caso |
 | **Could** | Coleção `trades` na memória | 2 | Caso de uso do mantenedor; `decisions` serve de contorno |
+| **Could** | Métricas de portfólio — beta, alfa, volatilidade e correlação vs índices | 2 | Motivação real de 31/10/2026: hoje o cálculo é feito na LLM com benchmark via web search — caso de uso direto da spec 006; v2 depende de fonte externa de séries de índices |
 | **Could** | Métricas locais + subcomando `doctor` | 3 | Diagnóstico de suporte sem telemetria: o usuário cola o resumo sanitizado numa issue |
 | **Won't (agora)** | Avaliação Ollama local + nota na doc | 1/3 | Depende do mask e de privacidade total como requisito |
 | **Won't (agora)** | Reconciliação corretora↔carteira | 2 | Grande; reavaliar após `get_entries` |
@@ -461,6 +462,35 @@ entram na matriz.
   Sinergia direta com a regra de monitor de juro longo (baseline DI) e
   com `get_entries` para conferir se o lançamento registrado no
   Investidor10 bate com o tranche declarado.
+- [ ] **Métricas de portfólio — beta, alfa, volatilidade e correlação vs
+  índices** — motivação real de 31/10/2026: o usuário pediu "alfa e beta
+  da carteira" e o cálculo foi feito na LLM — retornos mensais derivados
+  de `get_patrimony_history` (equity − fluxo, aporte assumido no fim do
+  mês), série do Ibov trazida por web search, e uma divergência detectada
+  na própria fonte (~+3,4% acumulado no histórico vs `profit_twr_12m`
+  +13,36% do summary). É o caso de uso exato da spec 006: número
+  financeiro calculado na LLM, com duas fontes de incerteza (série de
+  retornos da carteira e série do benchmark).
+  - **Retornos mensais determinísticos**: derivar a série TWR mensal de
+    `get_patrimony_history` — documentar a convenção de fluxo (fim vs.
+    meio do mês) e a divergência já observada contra `profit_twr_12m`;
+    validar o encadeamento contra o `profitability` do próprio endpoint.
+  - **Benchmarks múltiplos e composto**: Ibov, IFIX, CDI/Selic, S&P 500
+    em BRL e BTC — incluindo benchmark composto parametrizável alinhado
+    à alocação-alvo da memória (ex.: 35/20/20/20/5). **Dependência
+    externa**: nenhuma dessas séries existe na API do Investidor10 —
+    mesma dependência do item "Roteamento de cotação por tipo de ativo"
+    (brapi.dev / Yahoo Finance / B3); fonte só de índices, nunca de
+    dados da carteira.
+  - **Saída**: `{window_months, benchmark(s), returns, volatility, beta,
+    alpha_jensen, correlation, r_squared, notes}` — com a advertência de
+    resolução (mensal, ~12 observações) e o `fetched_at`/`cached` do
+    envelope.
+  - **Caminho honesto de escopo**: a v1 pode ser a tool determinística
+    recebendo as séries (carteira da API + benchmark injetado pelo
+    agente via web search) e computando as métricas — elimina erro de
+    aritmética sem depender de fonte nova; v2 faz o fetch do benchmark
+    externo quando o roteamento de cotação abrir o caminho.
 - [ ] **Tool de reconciliação corretora↔carteira** — responde à maior
   fricção do fluxo real (compra na corretora → Investidor10 fica stale → MCP
   lê carteira desatualizada). Read-only: usuário cola posições da corretora
