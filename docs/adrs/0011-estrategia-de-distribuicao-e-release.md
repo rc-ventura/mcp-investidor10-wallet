@@ -1,10 +1,15 @@
 # ADR-0011: Estratégia de distribuição e release — PyPI via `uvx`, src layout, versionamento 0.x e pipeline OIDC
 
-- **Status**: Accepted (amended 2026-10-31)
+- **Status**: Accepted (amended 2026-10-31, 2026-11-02)
 - **Date**: 2026-10-18
 - **Deciders**: Tech Leader + User (SDD final review cycle 2, spec 002)
 - **Related spec**: [`specs/002-distribution-readiness/`](../../specs/002-distribution-readiness/)
 - **Code**: `pyproject.toml`, `src/investidor10_wallet/server.py`, `.github/workflows/release.yml`, `.github/workflows/ci.yml`, `CHANGELOG.md`
+
+> **Emenda 2026-11-02 (spec 005):** a ordem do release passa a ser publicar antes de
+> promover para `main`. A tag `v*` é criada em `develop`, e `main` só recebe a versão
+> depois de publicada e verificada, por uma branch `promote/vX.Y.Z` com portão de CI.
+> O PyPI segue como único canal de código. Ver [ADR-0020](./0020-fluxo-de-branches-e-release.md).
 
 ---
 
