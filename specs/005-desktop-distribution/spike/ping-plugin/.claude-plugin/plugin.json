@@ -1,0 +1,6 @@
+{
+  "name": "spike-ping",
+  "version": "0.0.1",
+  "description": "Spike plugin: packaged uv server with ping, local page and MCP App form",
+  "mcpServers": "./servers/ping.mcpb"
+}
