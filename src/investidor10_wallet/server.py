@@ -104,7 +104,11 @@ NEXT_ACTIONS = {
 def source_error_payload(exc: wallet_client.SourceError) -> dict:
     """Convert a data-source failure into the structured error envelope."""
     payload = exc.to_payload()
-    hint = NEXT_ACTIONS.get(exc.code)
+    hint = (
+        None
+        if isinstance(exc, wallet_client.MarketClosedError)
+        else NEXT_ACTIONS.get(exc.code)
+    )
     if hint:
         payload["error"]["message"] = f"{exc.message} {hint}"
     return payload
@@ -232,7 +236,10 @@ async def get_asset_quote(ticker: str) -> dict:
     also in the wallet, cross the quote with the position's average price using
     get_wallet_positions. Unknown tickers return a ticker_not_found error with
     guidance to check spelling — never guess another ticker. Non-B3 assets (FIIs,
-    international ETFs, crypto, treasury) return asset_type_not_supported.
+    international ETFs, crypto, treasury) return asset_type_not_supported. A
+    ticker with no trading today (holiday, weekend or before the open) returns
+    source_unavailable saying there was no trading: tell the user no price is
+    available yet and never substitute an older price.
 
     For on-demand asset REPORTS: combine this quote and the wallet
     position (when held) with recent events found through your own web search,
@@ -385,7 +392,9 @@ async def get_session_context() -> dict:
     quote could not be fetched are returned in `pending_check` and remain
     active; so are alerts whose only quote is stale cached data served during
     a source outage (reason "stale_quote"), because a trigger is terminal and
-    must never fire on an old price. Use `pending_decisions` to follow up on earlier recommendations and
+    must never fire on an old price; and so are alerts for a ticker with no
+    trading today (holiday, weekend or before the open, reason "market_closed"):
+    tell the user they will be checked once the market trades. Use `pending_decisions` to follow up on earlier recommendations and
     `recent_insights` to never repeat an alert as if it were new.
 
     `memory_status` is "ok", "unavailable" or "read_only". If it is
@@ -435,6 +444,8 @@ async def get_session_context() -> dict:
                 pending_check.append({"ticker": ticker, "reason": "unexpected_format"})
             else:
                 quotes[ticker] = price
+        except wallet_client.MarketClosedError:
+            pending_check.append({"ticker": ticker, "reason": "market_closed"})
         except wallet_client.SourceError as exc:
             pending_check.append({"ticker": ticker, "reason": exc.code})
 

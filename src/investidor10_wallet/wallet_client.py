@@ -79,6 +79,10 @@ class SourceError(Exception):
         return {"error": {"code": self.code, "message": self.message}}
 
 
+class MarketClosedError(SourceError):
+    """A quote with no trading today: the source reports a zero day price."""
+
+
 async def _read_capped(response: httpx.Response, path: str) -> bytes:
     """Read a streamed body, refusing one larger than MAX_RESPONSE_BYTES.
 
@@ -470,13 +474,20 @@ class WalletClient:
             if isinstance(raw, bool):
                 raise ValueError
             price = float(str(raw).replace(",", "."))
-            if not math.isfinite(price) or price <= 0:
+            if not math.isfinite(price) or price < 0:
                 raise ValueError
         except (KeyError, TypeError, ValueError, OverflowError):
             raise SourceError(
                 "unexpected_format",
                 f"Investidor10 API returned an invalid quote for {normalized}",
             ) from None
+        if price == 0:
+            raise MarketClosedError(
+                "source_unavailable",
+                f"{normalized} has no price right now: there was no trading today "
+                "on the B3 (holiday, weekend or before the open). Try again after "
+                "the market opens and never use an older price.",
+            )
         return envelope
 
     @staticmethod

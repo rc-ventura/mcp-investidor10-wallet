@@ -371,6 +371,35 @@ async def test_quote_rejects_unparseable_price(value):
     assert excinfo.value.code == "unexpected_format"
 
 
+@pytest.mark.parametrize("value", [0, 0.0, "0", "0.00", "0,00"])
+@respx.mock
+async def test_quote_without_trading_today_is_market_closed_not_a_format_error(value):
+    respx.get(f"{BASE}/assets/tickers/PETR4").respond(
+        json={
+            "variation_day": {"last_quotation": value, "max": None, "min": None},
+            "currentQuotation": "52,71",
+        }
+    )
+    with pytest.raises(wallet_client.MarketClosedError) as excinfo:
+        await make_client().get_quote("PETR4")
+    assert isinstance(excinfo.value, SourceError)
+    assert excinfo.value.code == "source_unavailable"
+    assert "PETR4" in excinfo.value.message
+    assert "52" not in excinfo.value.message
+
+
+@pytest.mark.parametrize("value", [-1, "-0,5", "abc"])
+@respx.mock
+async def test_quote_with_other_invalid_prices_stays_unexpected_format(value):
+    respx.get(f"{BASE}/assets/tickers/PETR4").respond(
+        json={"variation_day": {"last_quotation": value}}
+    )
+    with pytest.raises(SourceError) as excinfo:
+        await make_client().get_quote("PETR4")
+    assert not isinstance(excinfo.value, wallet_client.MarketClosedError)
+    assert excinfo.value.code == "unexpected_format"
+
+
 @pytest.mark.parametrize("months", [True, None, "12", 601, 10**9])
 async def test_history_rejects_noninteger_or_unbounded_months(months):
     with pytest.raises(SourceError) as excinfo:
