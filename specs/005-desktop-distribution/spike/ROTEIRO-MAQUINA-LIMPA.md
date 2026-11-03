@@ -23,9 +23,9 @@ Esperado: nenhum caminho. Anote o que apareceu. Se aparecer um `uv`, a máquina 
 
 ## 2. Baixar o plugin
 
-Arquivo: `specs/005-desktop-distribution/spike/dist/ping-plugin.zip` na branch `spec-005/spike-mcpb`.
+Arquivo: `specs/005-desktop-distribution/spike/download/ping-plugin.zip` na branch `spec-005/spike-mcpb`.
 
-Link direto: https://github.com/rc-ventura/mcp-investidor10-wallet/raw/spec-005/spike-mcpb/specs/005-desktop-distribution/spike/dist/ping-plugin.zip
+Link direto: https://github.com/rc-ventura/mcp-investidor10-wallet/raw/spec-005/spike-mcpb/specs/005-desktop-distribution/spike/download/ping-plugin.zip
 
 Não descompacte o zip.
 
