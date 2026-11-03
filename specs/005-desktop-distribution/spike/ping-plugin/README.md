@@ -56,16 +56,23 @@ Anote versão do app e do Claude Code, sistema e data em cada coluna.
 
 | Passo | macOS | Windows | Linux |
 |---|---|---|---|
-| Validação `mcpb validate` | | | |
-| 1. Upload plugin aceito; Connectors sem passo extra | | | n/a |
-| 2. `ping` no Cowork | | | n/a |
-| 3. `abrir_pagina`: navegador abriu; arquivo gravado; valor fora da conversa | | | n/a |
-| 4. `formulario_app`: apareceu; valor fora da conversa e do histórico | | | n/a |
-| 5. `/mcp` no Claude Code (sincronizado) | | | |
-| 6. `/mcp` com sincronizado e local: aparece em dobro? | | | n/a |
-| 8. Subagente `probe-short-name` | | | |
-| 8. Subagente `probe-full-name` | | | |
-| 9. Branch padrão lida; `dono/repo#ref` aceito | | | n/a |
+| Validação `mcpb validate` 2.1.2 | Passou (03/11/2026) | | |
+| 1. Upload plugin aceito; Connectors sem passo extra | Aceito; sem passo extra (Desktop 4.16336.0, Cowork, plano pago) | | n/a |
+| 2. `ping` no Cowork | `pong`. Atenção: o app usou o `uv` já instalado no Mac (`~/.local/bin/uv`) e o cache do `uv` estava quente | | n/a |
+| 3. `abrir_pagina`: navegador abriu; arquivo gravado; valor fora da conversa | Navegador abriu; `valor_pagina.txt` gravado (pasta 700); valor não apareceu na conversa | | n/a |
+| 4. `formulario_app`: apareceu; valor fora da conversa e do histórico | Não renderizou: o modelo recebeu só `[Rendered Prefab UI]`; `valor_app.txt` não foi criado; sem erro nos logs do app | | n/a |
+| 5. `/mcp` no Claude Code (sincronizado) | Aba Code do Desktop: aparece 1 vez, conectado. CLI 2.1.317: ausente (`claude plugin list` mostra `spike-ping@synced` loaded; `claude mcp list` não lista o servidor) | | |
+| 6. Plugin carregado como local no CLI (`--plugin-dir`) | Plugin habilitado e agentes carregados; 1 erro: `MCPB manifest invalid ... Expected 'python' \| 'node' \| 'binary', received 'uv'` | | n/a |
+| 8. Subagente `probe-short-name` | Cowork: recusado, lista de tools vazia. CLI: `would be spawned with zero tools` (servidor não sobe no CLI) | | |
+| 8. Subagente `probe-full-name` | Igual ao curto. No Cowork o nome real da tool é `mcp__remote-devices__plugin_spike-ping_ping__ping` | | |
+| 9. Branch padrão lida; `dono/repo#ref` aceito | Pendente | | n/a |
+
+### Achados até aqui (macOS, 03/11/2026)
+
+- O Desktop resolve o comando `uv` pelo PATH do shell de login do usuário; não há sinal de `uv` embutido no app. O teste em máquina sem `uv` continua pendente.
+- O Claude Code CLI 2.1.317 valida o manifesto do `.mcpb` e só aceita `python`, `node` e `binary`; o servidor do plugin não sobe no CLI, e o resto do plugin (agentes) carrega.
+- O app anunciou 3 das 4 tools ao modelo: a de apoio do app (`visibility` `app`) fica oculta.
+- O nome da tool de plugin muda por superfície, então uma lista `tools` fixa no subagente não é confiável.
 
 Decisão da árvore de D1 (research.md): ramo 1, 2 ou 3, com a justificativa.
 
