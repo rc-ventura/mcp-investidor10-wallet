@@ -22,7 +22,6 @@ SURROUNDING_CHARS = " \t\r\n\"'`“”‘’<>()[]{}.,;:!?"
 WALLET_HOSTS = frozenset({"investidor10.com.br", "www.investidor10.com.br"})
 HTTPS_PORT = 443
 
-MODES = ("public", "restricted")
 SOURCES = ("setup_page", "installer", "configure")
 
 LINK_MESSAGES = {
