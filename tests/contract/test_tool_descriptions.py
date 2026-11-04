@@ -29,7 +29,8 @@ TOOLS = (
 )
 
 SERVED_RULES = {
-    "get_asset_quote": ("15 minutes", "fetched_at"),
+    "get_asset_quote": ("15 minutes", "fetched_at", "no trading"),
+    "get_session_context": ("market_closed",),
     "get_wallet_positions": ("percent_ideal", "fetched_at"),
     "get_earnings": ("data.sum", "fetched_at"),
     "get_patrimony_history": ("fetched_at",),

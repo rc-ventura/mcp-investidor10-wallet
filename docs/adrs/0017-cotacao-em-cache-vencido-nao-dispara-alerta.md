@@ -1,6 +1,6 @@
 # ADR-0017: Cotação em cache vencido não dispara alerta — `stale_quote` em `pending_check`
 
-- **Status**: Accepted (amended 2026-10-29)
+- **Status**: Accepted (amended 2026-10-29, 2026-11-02)
 - **Date**: 2026-10-28
 - **Deciders**: Tech Leader + User (pendência da revisão final da spec 004, ciclo 1)
 - **Related spec**: [`specs/004-hardening/`](../../specs/004-hardening/)
@@ -113,3 +113,13 @@ disparo terminal que este ADR proíbe. A idade agora é a da entrada do cache, n
 relógio monotônico que `request()` usa. Assim, uma única fonte decide TTL,
 cache vencido e alerta, e o relógio de parede só aparece no `fetched_at`
 mostrado ao usuário. Os itens 1 e 3 e o trade-off foram corrigidos no texto.
+
+## Emenda 2026-11-02 (cotação sem pregão)
+
+`pending_check` ganha o motivo `market_closed`, para um ticker cujo preço do dia
+vem zerado (feriado, fim de semana ou antes da abertura). Antes, esse caso
+aparecia como `unexpected_format` e culpava a fonte por uma situação normal. O
+alerta continua ativo e não dispara, como no `stale_quote`. O motivo não é um
+código de erro: o conjunto fechado do ADR-0014 não muda, e `get_asset_quote`
+usa `source_unavailable`. Ver a lição
+[cotação zerada sem pregão](../learning-lessons/cotacao_zerada_sem_pregao_nao_e_formato_inesperado.md).
