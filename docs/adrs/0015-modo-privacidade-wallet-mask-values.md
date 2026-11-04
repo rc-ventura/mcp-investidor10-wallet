@@ -1,10 +1,10 @@
 # ADR-0015: Modo privacidade — `WALLET_MASK_VALUES`, lista de campos permitidos e tools monetárias indisponíveis
 
-- **Status**: Accepted (amended 2026-10-28)
+- **Status**: Accepted (amended 2026-10-28, 2026-11-03)
 - **Date**: 2026-10-28
 - **Deciders**: Tech Leader + User (ciclo spec 004, clarificação de 2026-10-27)
 - **Related spec**: [`specs/004-hardening/`](../../specs/004-hardening/)
-- **Code**: `src/investidor10_wallet/privacy.py`, `src/investidor10_wallet/server.py`, `src/investidor10_wallet/bootstrap.py` (`_parse_mask`)
+- **Code**: `src/investidor10_wallet/privacy.py`, `src/investidor10_wallet/server.py`, `src/investidor10_wallet/bootstrap.py` (`parse_mask`)
 - **Research**: `specs/004-hardening/research.md` (D8); `specs/004-hardening/contracts/privacy-mode.md`
 
 ---
@@ -129,3 +129,17 @@ This decision should be **revisited** if:
 2. **`truncated` entra na allowlist do topo de posições.** O sinal de lista
    incompleta (pendência "Posições truncadas") é um booleano sem valor
    monetário e precisa chegar ao modelo também com o modo privacidade ligado.
+
+## Emenda 2026-11-03 (spec 005, ADR-0019) — o mascaramento também liga pelo arquivo
+
+A decisão 1 ("ativação só por variável de ambiente") muda de fonte, não de
+princípio. O mascaramento efetivo passa a ser `mask_values` de
+`~/.investidor10/config.json` **ou** `WALLET_MASK_VALUES` ligado: qualquer um
+ligando mascara, e a variável continua podendo reforçar o arquivo. O usuário
+leigo escolhe na página de configuração, sem terminal.
+
+O que não muda: nenhuma tool aceita parâmetro de privacidade e o modelo não
+pode desligar a proteção. Só o usuário, pela página local ou pelo terminal,
+altera `mask_values`. Uma flag de ambiente ilegível lida fora da inicialização
+falha fechada (mascara). A função de leitura da flag passou de `_parse_mask` a
+`parse_mask` para ser reutilizada pela resolução do estado.

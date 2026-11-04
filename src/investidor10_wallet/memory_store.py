@@ -9,12 +9,12 @@ import os
 import re
 import tempfile
 import threading
-import time
 from contextlib import contextmanager
 
 import filelock
 
-from . import bootstrap
+from . import bootstrap, local_files
+from .local_files import NO_FOLLOW
 
 SCHEMA_VERSION = 1
 COLLECTIONS = ("theses", "rules", "decisions", "insights_log", "alerts")
@@ -26,12 +26,9 @@ ALERT_DIRECTIONS = ("above", "below")
 ALERT_STATES = ("active", "triggered", "cancelled")
 
 LOCK_TIMEOUT_SECONDS = 5.0
-REPLACE_RETRY_DELAYS = (0.05, 0.1, 0.2, 0.4, 0.8)
 UNSUPPORTED_LOCK_ERRNOS = {
     getattr(errno, name) for name in ("ENOSYS", "EOPNOTSUPP") if hasattr(errno, name)
 }
-NO_FOLLOW = getattr(os, "O_NOFOLLOW", 0)
-BINARY = getattr(os, "O_BINARY", 0)
 MAX_NESTING_DEPTH = 32
 
 TICKER_PATTERN = re.compile(r"[A-Z][A-Z0-9]{3,11}")
@@ -240,9 +237,7 @@ class MemoryStore:
 
     def _read_file(self) -> bytes:
         """Read the memory file by fd, never through a symlink."""
-        fd = os.open(self.path, os.O_RDONLY | NO_FOLLOW | BINARY)
-        with os.fdopen(fd, "rb") as f:
-            return f.read()
+        return local_files.read_bytes_no_follow(self.path)
 
     def _reload(self) -> None:
         content = None
@@ -320,16 +315,6 @@ class MemoryStore:
         except OSError:
             pass
 
-    @staticmethod
-    def _replace_with_retry(source: str, destination: str) -> None:
-        for delay in REPLACE_RETRY_DELAYS:
-            try:
-                os.replace(source, destination)
-                return
-            except PermissionError:
-                time.sleep(delay)
-        os.replace(source, destination)
-
     def _write(self) -> None:
         tmp_path = None
         try:
@@ -344,7 +329,7 @@ class MemoryStore:
                 json.dump(self.data, f, ensure_ascii=False, indent=2, allow_nan=False)
                 f.flush()
                 os.fsync(f.fileno())  # durable before the rename (power loss)
-            self._replace_with_retry(tmp_path, self.path)
+            local_files.replace_with_retry(tmp_path, self.path)
             self._seen_file = True
         except (OSError, ValueError) as exc:
             self.available = False

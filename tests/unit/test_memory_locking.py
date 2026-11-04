@@ -8,7 +8,7 @@ import threading
 import filelock
 import pytest
 
-from investidor10_wallet import bootstrap, memory_store
+from investidor10_wallet import bootstrap, local_files, memory_store
 from investidor10_wallet.memory_store import (
     MemoryBusyError,
     MemoryReadOnlyError,
@@ -144,7 +144,7 @@ def _flaky_replace(monkeypatch, failures):
 
     sleeps = []
     monkeypatch.setattr(memory_store.os, "replace", replace)
-    monkeypatch.setattr(memory_store.time, "sleep", sleeps.append)
+    monkeypatch.setattr(local_files.time, "sleep", sleeps.append)
     return sleeps
 
 

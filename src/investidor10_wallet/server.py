@@ -625,7 +625,8 @@ def main() -> None:
     if privacy.enabled():
         bootstrap.warn(bootstrap.MASK_ACTIVE_MESSAGE)
     memory = MemoryStore(bootstrap.resolve_memory_path())
-    asyncio.run(wallet_client.validate_wallet(wallet_client.WALLET_ID))
+    if wallet_client.WALLET_ID:
+        asyncio.run(wallet_client.validate_wallet(wallet_client.WALLET_ID))
     mcp.run()
 
 

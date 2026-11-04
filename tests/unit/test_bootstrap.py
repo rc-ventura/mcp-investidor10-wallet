@@ -12,23 +12,33 @@ from investidor10_wallet import bootstrap, server, wallet_client
 from investidor10_wallet.memory_store import MemoryStore
 
 
-def test_missing_wallet_id_aborts_with_pt_br_message():
-    with pytest.raises(SystemExit) as exc:
-        bootstrap.load_config({})
-    assert "WALLET_ID" in str(exc.value)
-    assert "investidor10.com.br/carteira" in str(exc.value)
+def test_missing_wallet_id_no_longer_aborts_and_returns_no_wallet():
+    config = bootstrap.load_config({})
+    assert config["wallet_id"] == ""
+    assert config["mask_values"] is False
 
 
-def test_blank_wallet_id_aborts_with_pt_br_message():
+def test_blank_wallet_id_is_treated_as_missing():
+    assert bootstrap.load_config({"WALLET_ID": "   "})["wallet_id"] == ""
+
+
+def test_missing_wallet_id_message_is_gone():
+    assert not hasattr(bootstrap, "MISSING_WALLET_ID_MESSAGE")
+
+
+def test_missing_wallet_id_still_validates_the_other_variables():
     with pytest.raises(SystemExit) as exc:
-        bootstrap.load_config({"WALLET_ID": "   "})
-    assert "WALLET_ID" in str(exc.value)
+        bootstrap.load_config({"WALLET_CACHE_TTL_SECONDS": "abc"})
+    assert "WALLET_CACHE_TTL_SECONDS" in str(exc.value)
+    with pytest.raises(SystemExit) as exc:
+        bootstrap.load_config({"WALLET_MASK_VALUES": "talvez"})
+    assert "WALLET_MASK_VALUES" in str(exc.value)
 
 
 def test_non_numeric_wallet_id_aborts():
     with pytest.raises(SystemExit) as exc:
         bootstrap.load_config({"WALLET_ID": "abc123"})
-    assert "WALLET_ID" in str(exc.value)
+    assert str(exc.value) == bootstrap.INVALID_WALLET_ID_MESSAGE.format(value="abc123")
 
 
 def test_unicode_digits_wallet_id_aborts():
@@ -329,3 +339,38 @@ def test_main_runs_deterministic_pipeline_and_serves(tmp_path, monkeypatch):
     assert events == ["config", "memory_path", "probe:12345", "serve"]
     assert server.memory is not None
     assert server.memory.path == str(mem_file)
+
+
+def test_main_without_a_wallet_skips_the_probe_and_still_serves(tmp_path, monkeypatch):
+    events: list[str] = []
+    monkeypatch.setattr(wallet_client, "WALLET_ID", wallet_client.WALLET_ID)
+    monkeypatch.setattr(
+        wallet_client.wallet_client, "wallet_id", wallet_client.wallet_client.wallet_id
+    )
+    monkeypatch.setattr(
+        wallet_client.rest_client, "wallet_id", wallet_client.rest_client.wallet_id
+    )
+    monkeypatch.setattr(server, "memory", server.memory)
+    monkeypatch.setattr(
+        bootstrap,
+        "load_config",
+        lambda environ=None: {
+            "wallet_id": "",
+            "ttl_seconds": 300.0,
+            "max_stale_seconds": 7200.0,
+            "mask_values": False,
+        },
+    )
+    monkeypatch.setattr(
+        bootstrap, "resolve_memory_path", lambda *a, **k: str(tmp_path / "memory.json")
+    )
+
+    async def fake_validate_wallet(wallet_id: str, **_kwargs):
+        events.append("probe")
+
+    monkeypatch.setattr(wallet_client, "validate_wallet", fake_validate_wallet)
+    monkeypatch.setattr(server.mcp, "run", lambda *a, **k: events.append("serve"))
+
+    server.main()
+
+    assert events == ["serve"]
