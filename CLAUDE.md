@@ -23,6 +23,7 @@
 | [0015](./docs/adrs/0015-modo-privacidade-wallet-mask-values.md) | Modo privacidade `WALLET_MASK_VALUES` — allowlist fail-closed, tools monetárias indisponíveis | Accepted | 2026-10-28 |
 | [0016](./docs/adrs/0016-validacao-de-payloads-em-tools-novas.md) | Regra de validação de payloads para tools novas — pydantic validate-then-passthrough | Accepted | 2026-10-28 |
 | [0017](./docs/adrs/0017-cotacao-em-cache-vencido-nao-dispara-alerta.md) | Cotação em cache vencido não dispara alerta — `stale_quote` em `pending_check` | Accepted | 2026-10-28 |
+| [0020](./docs/adrs/0020-fluxo-de-branches-e-release.md) | Fluxo de branches e release — `main` só contém versões publicadas no índice, `develop`, portão de promoção | Accepted | 2026-11-02 |
 
 ## Learning Lessons
 
