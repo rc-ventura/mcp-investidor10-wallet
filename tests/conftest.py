@@ -12,6 +12,15 @@ _test_dir = tempfile.mkdtemp(prefix="mcp-investidor10-tests-")
 os.environ["WALLET_MEMORY_PATH"] = os.path.join(_test_dir, "memory.json")
 
 
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path_factory, monkeypatch):
+    """Keep every test away from the developer's real ~/.investidor10."""
+    home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    return home
+
+
 @pytest.fixture
 def fake_bin_dir(tmp_path, monkeypatch):
     """Create fake claude/devin/gemini/uv executables that log every invocation."""

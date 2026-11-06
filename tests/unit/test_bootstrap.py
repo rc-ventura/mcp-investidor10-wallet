@@ -221,19 +221,30 @@ async def test_probe_404_aborts_with_not_found_or_private_pt_br():
     )
 
 
-@pytest.mark.parametrize("status_code", [401, 403])
+@pytest.mark.parametrize("status_code", [301, 401, 403])
 @respx.mock
-async def test_probe_401_and_403_abort_with_private_pt_br(status_code):
+async def test_probe_access_denied_warns_and_never_aborts(status_code, capsys):
     respx.get(f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/1234567").mock(
         return_value=httpx.Response(status_code)
     )
 
-    with pytest.raises(SystemExit) as exc:
-        await wallet_client.validate_wallet("1234567")
+    await wallet_client.validate_wallet("1234567")
 
-    assert str(exc.value) == bootstrap.WALLET_PRIVATE_MESSAGE.format(
-        wallet_id="1234567"
-    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert bootstrap.ACCESS_DENIED_MESSAGE in captured.err
+    assert "1234567" not in captured.err
+
+
+@respx.mock
+async def test_probe_sends_the_credential_as_hash():
+    route = respx.get(
+        f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/1234567"
+    ).mock(return_value=httpx.Response(200, json={"applied": 1, "equity": 1}))
+
+    await wallet_client.validate_wallet("1234567", "abc_DEF-1")
+
+    assert route.calls.last.request.url.params["hash"] == "abc_DEF-1"
 
 
 @pytest.mark.parametrize("status_code", [500, 502, 503, 429])

@@ -60,6 +60,39 @@ async def test_unexpected_format_is_an_error_that_forbids_using_the_numbers():
     assert "do not use" in message.lower()
 
 
+@respx.mock
+async def test_access_denied_is_provoked_by_a_real_301_from_the_proxy():
+    respx.get(SUMMARY).respond(
+        status_code=301, headers={"content-type": "text/html; charset=UTF-8"}
+    )
+    result = await _call("get_wallet_summary")
+    message = _assert_error(result, "access_denied")
+    assert "open_wallet_setup" in message
+    assert "Retrying will not help" in message
+    assert wallet_client.WALLET_ID not in result.content[0].text
+    assert "hash=" not in result.content[0].text
+    assert "http" not in message
+
+
+@respx.mock
+async def test_access_denied_message_does_not_carry_the_credential(monkeypatch):
+    credential = "Zx9_credential-Q7"
+    monkeypatch.setattr(wallet_client.wallet_client, "share_hash", credential)
+    route = respx.get(SUMMARY).respond(status_code=301)
+    result = await _call("get_wallet_summary")
+    _assert_error(result, "access_denied")
+    assert route.calls.last.request.url.params["hash"] == credential
+    assert credential not in result.content[0].text
+
+
+@respx.mock
+async def test_a_4xx_source_unavailable_hint_names_the_setup_tool_not_wallet_id():
+    respx.get(SUMMARY).respond(status_code=404)
+    message = _assert_error(await _call("get_wallet_summary"), "source_unavailable")
+    assert "open_wallet_setup" in message
+    assert "WALLET_ID" not in message
+
+
 async def test_invalid_asset_type_is_an_error_listing_valid_types():
     result = await _call("get_wallet_positions", {"asset_type": "Foo"})
     message = _assert_error(result, "invalid_asset_type")

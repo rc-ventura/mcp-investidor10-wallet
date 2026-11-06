@@ -21,9 +21,11 @@ WALLET_NOT_FOUND_MESSAGE = (
     "nas configurações do Investidor10, deixe a carteira pública. Depois, reinicie o servidor."
 )
 
-WALLET_PRIVATE_MESSAGE = (
-    "Carteira {wallet_id} é privada. Nas configurações do Investidor10, deixe a carteira "
-    "pública e reinicie o servidor."
+ACCESS_DENIED_MESSAGE = (
+    "O Investidor10 recusou o acesso à carteira configurada. Se ela for restrita, o link "
+    "pode ter sido renovado; se for privada, torne-a pública ou restrita. Refaça a "
+    "configuração com 'mcp-investidor10-wallet configure'. O servidor iniciará mesmo "
+    "assim; as ferramentas de dados informarão o erro."
 )
 
 PROBE_UNAVAILABLE_MESSAGE = (

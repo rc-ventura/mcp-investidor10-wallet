@@ -98,6 +98,12 @@ NEXT_ACTIONS = {
         "The source changed its format: tell the user and do not use numbers "
         "from this response."
     ),
+    "access_denied": (
+        "The wallet is restricted and the share link is missing or no longer valid, "
+        "or it is private. Call open_wallet_setup so the user can enter the current "
+        "restricted share link, or ask them to make the wallet public. Retrying will "
+        "not help."
+    ),
 }
 
 
@@ -613,11 +619,15 @@ async def log_insight(kind: str, fingerprint: str, summary: str) -> dict:
 
 
 def main() -> None:
-    """Run the server, or the install assistant when argv starts with 'install'."""
+    """Run the server, or a subcommand: 'install' or 'configure'."""
     if len(sys.argv) > 1 and sys.argv[1] == "install":
         from .installer import cli
 
         raise SystemExit(cli.run(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "configure":
+        from .installer import cli
+
+        raise SystemExit(cli.run_configure(sys.argv[2:]))
     global memory
     config = bootstrap.load_config()
     wallet_client.configure(config)

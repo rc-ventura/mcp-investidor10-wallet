@@ -4,10 +4,12 @@ The API is fully mocked with respx; no network access happens here.
 """
 
 import datetime
+import json
 import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -271,14 +273,15 @@ def test_env_float_rejects_negative_and_nonfinite_values(bad):
 
 
 @respx.mock
-async def test_http_4xx_on_wallet_proxy_mentions_wallet_id():
+async def test_http_4xx_on_wallet_proxy_points_to_the_setup_tool():
     url = f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/1234567"
     respx.get(url).mock(return_value=httpx.Response(404))
     with pytest.raises(SourceError) as excinfo:
         await WalletClient(wallet_client.WALLET_PROXY_BASE_URL).request(
             "/summary/metrics/1234567"
         )
-    assert "check WALLET_ID" in excinfo.value.message
+    assert "open_wallet_setup" in excinfo.value.message
+    assert "WALLET_ID" not in excinfo.value.message
 
 
 @pytest.mark.parametrize(
@@ -707,3 +710,153 @@ async def test_positions_stop_at_the_page_cap_on_endless_new_rows(monkeypatch):
     assert route.call_count == 3
     assert envelope["data"]["total"] == len(envelope["data"]["data"]) == 150
     assert envelope["data"]["truncated"] is True
+
+
+FIXTURE_301 = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "proxy_301_access_denied.json"
+)
+PROXY = wallet_client.WALLET_PROXY_BASE_URL
+SUMMARY_URL = f"{PROXY}/summary/metrics/1234567"
+
+
+def _recorded_301() -> httpx.Response:
+    recorded = json.loads(FIXTURE_301.read_text(encoding="utf-8"))
+    return httpx.Response(
+        recorded["status_code"],
+        headers=recorded["headers"],
+        content=recorded["body"].encode("utf-8"),
+    )
+
+
+def _proxy_client(**kwargs) -> WalletClient:
+    return WalletClient(PROXY, wallet_id="1234567", **kwargs)
+
+
+@respx.mock
+async def test_recorded_301_without_location_is_access_denied_not_unexpected_format():
+    route = respx.get(SUMMARY_URL).mock(return_value=_recorded_301())
+
+    with pytest.raises(SourceError) as excinfo:
+        await _proxy_client().request("/summary/metrics/1234567")
+
+    assert excinfo.value.code == "access_denied"
+    assert excinfo.value.status_code == 301
+    assert route.call_count == 1
+
+
+@respx.mock
+async def test_access_denied_is_decided_before_the_body_is_read(monkeypatch):
+    async def explode(response, path):
+        raise AssertionError("the body of a refused request must not be read")
+
+    monkeypatch.setattr(wallet_client, "_read_capped", explode)
+    respx.get(SUMMARY_URL).mock(return_value=_recorded_301())
+
+    with pytest.raises(SourceError) as excinfo:
+        await _proxy_client().request("/summary/metrics/1234567")
+
+    assert excinfo.value.code == "access_denied"
+
+
+@pytest.mark.parametrize("status", [301, 302, 307, 401, 403])
+@respx.mock
+async def test_proxy_3xx_401_and_403_are_access_denied(status):
+    respx.get(SUMMARY_URL).mock(return_value=httpx.Response(status))
+
+    with pytest.raises(SourceError) as excinfo:
+        await _proxy_client().request("/summary/metrics/1234567")
+
+    assert excinfo.value.code == "access_denied"
+    assert excinfo.value.status_code == status
+
+
+@respx.mock
+async def test_access_denied_is_never_cached():
+    route = respx.get(SUMMARY_URL).mock(return_value=_recorded_301())
+    client = _proxy_client()
+
+    with pytest.raises(SourceError):
+        await client.request("/summary/metrics/1234567")
+    route.mock(return_value=httpx.Response(200, json=PAYLOAD))
+    envelope = await client.request("/summary/metrics/1234567")
+
+    assert route.call_count == 2
+    assert envelope["cached"] is False
+
+
+@pytest.mark.parametrize("status", [301, 401, 403])
+@respx.mock
+async def test_access_denied_never_serves_an_expired_cache_entry(status):
+    route = respx.get(SUMMARY_URL).mock(return_value=httpx.Response(200, json=PAYLOAD))
+    client = _proxy_client(ttl_seconds=600, max_stale_seconds=86400)
+    await client.request("/summary/metrics/1234567")
+    key = next(iter(client._cache))
+    _, fetched_at, data = client._cache[key]
+    client._cache[key] = (time.monotonic() - 700, fetched_at, data)
+    route.mock(return_value=httpx.Response(status))
+
+    with pytest.raises(SourceError) as excinfo:
+        await client.request("/summary/metrics/1234567")
+
+    assert excinfo.value.code == "access_denied"
+
+
+@pytest.mark.parametrize("status", [404, 410, 500, 503])
+@respx.mock
+async def test_other_statuses_on_the_proxy_stay_source_unavailable(status):
+    respx.get(SUMMARY_URL).mock(return_value=httpx.Response(status))
+
+    with pytest.raises(SourceError) as excinfo:
+        await _proxy_client().request("/summary/metrics/1234567")
+
+    assert excinfo.value.code == "source_unavailable"
+    assert excinfo.value.status_code == status
+
+
+@respx.mock
+async def test_3xx_on_the_quote_api_is_not_unexpected_format():
+    url = f"{wallet_client.REST_BASE_URL}/assets/tickers/PETR4"
+    respx.get(url).mock(return_value=httpx.Response(302))
+
+    with pytest.raises(SourceError) as excinfo:
+        await WalletClient(wallet_client.REST_BASE_URL).request("/assets/tickers/PETR4")
+
+    assert excinfo.value.code == "source_unavailable"
+
+
+@pytest.mark.parametrize(
+    ("mock", "expected"),
+    [
+        ({"return_value": httpx.Response(200, json=PAYLOAD)}, "valid"),
+        ({"return_value": httpx.Response(301)}, "access_denied"),
+        ({"return_value": httpx.Response(401)}, "access_denied"),
+        ({"return_value": httpx.Response(403)}, "access_denied"),
+        ({"return_value": httpx.Response(404)}, "not_found"),
+        ({"return_value": httpx.Response(500)}, "unavailable"),
+        ({"return_value": httpx.Response(429)}, "unavailable"),
+        ({"side_effect": httpx.ConnectTimeout("timed out")}, "unavailable"),
+    ],
+)
+@respx.mock
+async def test_check_wallet_classifies_the_source_answer(mock, expected):
+    respx.get(SUMMARY_URL).mock(**mock)
+
+    assert await wallet_client.check_wallet("1234567") == expected
+
+
+@respx.mock
+async def test_check_wallet_sends_the_credential_as_hash():
+    route = respx.get(SUMMARY_URL).mock(return_value=httpx.Response(200, json=PAYLOAD))
+
+    assert await wallet_client.check_wallet("1234567", "abc_DEF-123") == "valid"
+
+    assert route.calls.last.request.url.params["hash"] == "abc_DEF-123"
+
+
+@respx.mock
+async def test_check_wallet_without_credential_sends_no_hash():
+    route = respx.get(SUMMARY_URL).mock(return_value=httpx.Response(200, json=PAYLOAD))
+
+    await wallet_client.check_wallet("1234567")
+
+    assert "hash" not in route.calls.last.request.url.params
