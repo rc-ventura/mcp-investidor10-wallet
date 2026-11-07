@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import locale
 import os
 import subprocess
 import sys
@@ -60,7 +61,18 @@ def _responses(process: subprocess.Popen) -> dict:
     return found
 
 
+def _decode(raw: bytes) -> str:
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        # on Windows the child writes stderr in the console code page
+        return raw.decode(locale.getpreferredencoding(False), errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
     parser = argparse.ArgumentParser(
         description="Sobe o servidor MCP sem carteira e confere initialize e tools/list."
     )
@@ -73,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
 
     with (
         tempfile.TemporaryDirectory(prefix="smoke-home-") as home,
-        tempfile.TemporaryFile(mode="w+", encoding="utf-8") as errors,
+        tempfile.TemporaryFile() as errors,
     ):
         try:
             process = subprocess.Popen(
@@ -108,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
                 process.wait()
             process.stdout.close()
         errors.seek(0)
-        stderr = errors.read()
+        stderr = _decode(errors.read())
 
         if 1 not in found or 2 not in found:
             return _fail(
@@ -126,6 +138,8 @@ def main(argv: list[str] | None = None) -> int:
         if not (Path(home) / ".investidor10").is_dir():
             return _fail("o servidor não criou o diretório ~/.investidor10.")
     print(f"smoke_mcp: initialize ok, {len(tools)} tools, servidor sem carteira.")
+    if stderr.strip():
+        print(f"smoke_mcp: stderr do servidor:\n{stderr.strip()}")
     return 0
 
 

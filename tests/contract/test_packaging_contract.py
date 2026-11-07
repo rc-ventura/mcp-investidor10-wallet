@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -20,7 +21,10 @@ def test_version_matches_pyproject():
     with open(PROJECT_ROOT / "pyproject.toml", "rb") as f:
         pyproject = tomllib.load(f)
     assert pyproject["project"]["dynamic"] == ["version"]
-    assert __version__ == "0.3.0"
+    assert pyproject["tool"]["hatch"]["version"]["path"] == (
+        "src/investidor10_wallet/__init__.py"
+    )
+    assert re.fullmatch(r"\d+\.\d+\.\d+(rc\d+)?", __version__), __version__
 
 
 def test_console_script_points_to_main():

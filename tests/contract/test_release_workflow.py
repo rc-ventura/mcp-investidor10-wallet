@@ -94,3 +94,10 @@ def test_verify_installs_the_exact_version_from_the_index_on_three_systems():
     assert runs.count("scripts/smoke_mcp.py") >= 2
     assert "--expected-tools 20" in runs
     assert "dist/" not in runs
+
+
+def test_job_level_env_does_not_use_the_runner_context():
+    # the runner context only exists inside steps; GitHub rejects the whole file otherwise
+    for name, job in _workflow()["jobs"].items():
+        for key, value in (job.get("env") or {}).items():
+            assert "runner." not in str(value), (name, key)
