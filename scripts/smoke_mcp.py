@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import locale
 import os
 import subprocess
 import sys
@@ -60,7 +61,18 @@ def _responses(process: subprocess.Popen) -> dict:
     return found
 
 
+def _decode(raw: bytes) -> str:
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        # on Windows the child writes stderr in the console code page
+        return raw.decode(locale.getpreferredencoding(False), errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="backslashreplace")
     parser = argparse.ArgumentParser(
         description="Sobe o servidor MCP sem carteira e confere initialize e tools/list."
     )
@@ -108,8 +120,7 @@ def main(argv: list[str] | None = None) -> int:
                 process.wait()
             process.stdout.close()
         errors.seek(0)
-        # on Windows the child writes stderr in the console code page, not UTF-8
-        stderr = errors.read().decode("utf-8", errors="replace")
+        stderr = _decode(errors.read())
 
         if 1 not in found or 2 not in found:
             return _fail(
