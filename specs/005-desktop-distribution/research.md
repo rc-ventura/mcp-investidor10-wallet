@@ -583,17 +583,22 @@ mcp-investidor10-wallet==0.4.0rc1"), então D1 e D18 seguem sem revisão.
 | `uvx --from ==0.4.0rc1`, importação | verde | verde | verde |
 | `uvx --offline --from ==0.4.0rc1`, `initialize` e 20 tools | **vermelho** | verde | verde |
 
-- Causa do vermelho: o `uv` offline não fechou a resolução do `pydantic` com o
-  cache do passo anterior (`No solution found when resolving tool
-  dependencies`). Não reproduziu no macOS com cache limpo, com e sem
-  `--offline`; a causa exata no runner Linux não foi identificada. Também
-  não reproduziu num contêiner Linux (Debian bookworm, `uv` com Python 3.13,
-  cache limpo, 73 pacotes como no runner): o smoke deu `initialize ok, 20
-  tools` com e sem `--offline`. O contêiner usa a arquitetura da máquina do
-  mantenedor, que pode diferir da do runner.
-- Correção: o `--offline` saiu do `verify` (PR #21). Vale só para tags
-  futuras, porque um re-run usa o `release.yml` do commit da tag; o run da
-  `v0.4.0rc1` segue com o `verify (ubuntu-latest)` vermelho.
+- Causa do vermelho (identificada depois, com a `v0.4.0rc2`): não era o
+  `--offline`. O `smoke_mcp.py` troca o `HOME` do processo filho e aponta um
+  proxy morto. O passo anterior baixa o Python 3.13 gerenciado pelo `uv` no
+  `HOME` real; o `uvx` do smoke, com outro `HOME`, não o encontra e cai no
+  Python do sistema do runner Ubuntu (3.14.4), cujas wheels `cp314` o cache não
+  tem, e a busca morre no proxy morto. macOS e Windows passavam porque os
+  runners têm um 3.13 no sistema. Provado no runner real com a `0.4.0rc2` já
+  publicada (workflow temporário no PR #24, run 42387445884): passos antigos
+  vermelhos, com `uvx` em 3.13.18 com o `HOME` real e em 3.14.4 com o `HOME`
+  trocado; passos corrigidos verdes nos três sistemas. Learning lesson
+  `smoke_troca_home_e_uvx_perde_o_python_gerenciado.md`.
+- Correção: `UV_PYTHON_INSTALL_DIR` fixo no job e `--python 3.13` nos dois
+  `uvx` do `verify` (PR #24). O PR #21 (tirar o `--offline`) não resolvia: só
+  trocou a mensagem de erro, e a `v0.4.0rc2` saiu com o mesmo vermelho. Um
+  re-run usa o `release.yml` do commit da tag, então a prova completa é a
+  `v0.4.0rc3`.
 - Também verificado nesse run: o ambiente `pypi` aceitou a tag criada em
   `develop`. A publicação falhou duas vezes antes por um `500` do Rekor
   (`unexpected error communicating with inactive shard`), indisponibilidade do

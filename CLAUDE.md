@@ -48,6 +48,7 @@
 - [Cotação do dia zerada sem pregão não é formato inesperado: `variation_day.last_quotation` vem `0` com a B3 fechada](./docs/learning-lessons/cotacao_zerada_sem_pregao_nao_e_formato_inesperado.md) — 2026-11-02
 - [Proxy da carteira responde 301 sem `Location` para acesso recusado — 3xx, 401 e 403 são `access_denied`, não `unexpected_format`](./docs/learning-lessons/proxy_301_acesso_recusado_sem_location.md) — 2026-11-04
 - [`Referrer-Policy: no-referrer` faz o navegador mandar `Origin: null`: a página local recusava todo envio real](./docs/learning-lessons/referrer_policy_no_referrer_manda_origin_null.md) — 2026-11-06
+- [Teste que troca o `HOME` muda o Python do `uvx`: o `verify` do release só falhava no Ubuntu](./docs/learning-lessons/smoke_troca_home_e_uvx_perde_o_python_gerenciado.md) — 2026-11-07
 
 ## Research
 
