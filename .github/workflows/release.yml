@@ -81,4 +81,4 @@ jobs:
           done
           venv="$RUNNER_TEMP/verify-venv"
           if [ "$RUNNER_OS" = "Windows" ]; then py="$venv/Scripts/python.exe"; else py="$venv/bin/python"; fi
-          "$py" scripts/smoke_mcp.py --expected-tools 20 -- uvx --offline --from "mcp-investidor10-wallet==$version" mcp-investidor10-wallet
+          "$py" scripts/smoke_mcp.py --expected-tools 20 -- uvx --from "mcp-investidor10-wallet==$version" mcp-investidor10-wallet
