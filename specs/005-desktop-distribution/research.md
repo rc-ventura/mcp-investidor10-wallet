@@ -572,6 +572,30 @@ tags criadas em `develop` e em `hotfix/*`; (3) a instalação por versão exata
 de pré-lançamento funciona com pip e com `uvx` (a documentação do `uv` não
 cobre o caso).
 
+**Resultado da verificação (3), 2026-11-07 (`v0.4.0rc1`, run 42379935532)**:
+a versão exata de pré-lançamento instala com pip e com `uvx`; o `uvx` não
+ignora o `==0.4.0rc1` (o resolvedor reporta "you require
+mcp-investidor10-wallet==0.4.0rc1"), então D1 e D18 seguem sem revisão.
+
+| Verificação | Ubuntu | macOS | Windows |
+|---|---|---|---|
+| pip `==0.4.0rc1` em ambiente limpo, `initialize` e 20 tools | verde | verde | verde |
+| `uvx --from ==0.4.0rc1`, importação | verde | verde | verde |
+| `uvx --offline --from ==0.4.0rc1`, `initialize` e 20 tools | **vermelho** | verde | verde |
+
+- Causa do vermelho: o `uv` offline não fechou a resolução do `pydantic` com o
+  cache do passo anterior (`No solution found when resolving tool
+  dependencies`). Não reproduziu no macOS com cache limpo, com e sem
+  `--offline`; a causa exata no runner Linux não foi identificada.
+- Correção: o `--offline` saiu do `verify` (PR #21). Vale só para tags
+  futuras, porque um re-run usa o `release.yml` do commit da tag; o run da
+  `v0.4.0rc1` segue com o `verify (ubuntu-latest)` vermelho.
+- Também verificado nesse run: o ambiente `pypi` aceitou a tag criada em
+  `develop`. A publicação falhou duas vezes antes por um `500` do Rekor
+  (`unexpected error communicating with inactive shard`), indisponibilidade do
+  serviço do Sigstore, e passou na quarta tentativa sem mudança de código. Tags
+  em `hotfix/*` seguem sem verificação.
+
 ## Fontes
 
 Os achados por fonte, sem reflexão, estão nos fichamentos em
