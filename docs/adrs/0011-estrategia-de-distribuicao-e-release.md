@@ -1,6 +1,6 @@
 # ADR-0011: Estratégia de distribuição e release — PyPI via `uvx`, src layout, versionamento 0.x e pipeline OIDC
 
-- **Status**: Accepted (amended 2026-10-31, 2026-11-02)
+- **Status**: Accepted (amended 2026-10-31, 2026-11-02, 2026-11-06)
 - **Date**: 2026-10-18
 - **Deciders**: Tech Leader + User (SDD final review cycle 2, spec 002)
 - **Related spec**: [`specs/002-distribution-readiness/`](../../specs/002-distribution-readiness/)
@@ -10,6 +10,18 @@
 > promover para `main`. A tag `v*` é criada em `develop`, e `main` só recebe a versão
 > depois de publicada e verificada, por uma branch `promote/vX.Y.Z` com portão de CI.
 > O PyPI segue como único canal de código. Ver [ADR-0020](./0020-fluxo-de-branches-e-release.md).
+>
+> **Emenda 2026-11-06 (spec 005, Lote 4):** o servidor passa a subir sem carteira
+> (ADR-0019), então o teste de fumaça deixa de exigir saída 1 sem `WALLET_ID`. O
+> `release.yml` vira três jobs: `build` (sem permissão de publicar: confere a tag
+> contra `__version__` e o CHANGELOG com `scripts/check_release_tag.py`, onde uma
+> pré-versão `X.Y.ZrcN` usa a seção `[X.Y.Z]`; gera o wheel; roda
+> `scripts/smoke_mcp.py`, que exige `initialize`, 20 tools e `~/.investidor10`
+> sem carteira; envia os artefatos), `publish` (o único com `id-token`, ambiente
+> `pypi`, sem checkout nem testes, publica o artefato do `build`) e `verify`
+> (instala a versão exata do índice por pip e por `uvx` em Linux, macOS e Windows
+> e repete o teste de fumaça). A emenda completa do canal (plugin único e servidor
+> empacotado) continua prevista para o ADR-0018.
 
 ---
 

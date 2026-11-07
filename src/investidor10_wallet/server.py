@@ -6,8 +6,9 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ValidationError
 from fastmcp.server.middleware import Middleware
 from fastmcp.tools import ToolResult
+from mcp.types import ToolAnnotations
 
-from . import bootstrap, memory_store, privacy, wallet_client
+from . import bootstrap, memory_store, privacy, setup_page, wallet_client, wallet_config
 from .memory_store import (
     MemoryBusyError,
     MemoryReadOnlyError,
@@ -143,6 +144,57 @@ def _not_found(what: str) -> dict:
 
 MEMORY_ERRORS = (MemoryUnavailableError, StateConflictError, ValueError)
 
+WALLET_NOT_CONFIGURED_MESSAGE = (
+    "No Investidor10 wallet is configured yet. Call open_wallet_setup to open the "
+    "local setup page, and ask the user to enter their wallet link there, not in this "
+    "conversation. Do not invent wallet data."
+)
+SETUP_UNAVAILABLE_MESSAGE = (
+    "The local setup page could not start on this machine. Ask the user to run "
+    "`mcp-investidor10-wallet configure` in a terminal. Do not ask for the wallet "
+    "link in this conversation."
+)
+PENDING_NEXT_ACTION = (
+    "Call open_wallet_setup so the user can configure the wallet on the local page, "
+    "before any wallet analysis."
+)
+
+
+def _resolve_configuration() -> wallet_config.WalletState:
+    """Re-read the local configuration and point the clients and the mask at it."""
+    state = wallet_config.resolve_state()
+    privacy.apply_state(state)
+    if state.status == "configured":
+        wallet_client.apply_configuration(state)
+    return state
+
+
+def _wallet_not_configured() -> dict | None:
+    if _resolve_configuration().status == "configured":
+        return None
+    return {
+        "error": {
+            "code": "wallet_not_configured",
+            "message": WALLET_NOT_CONFIGURED_MESSAGE,
+        }
+    }
+
+
+def _configuration_block(state: wallet_config.WalletState) -> dict:
+    if state.status != "configured":
+        return {
+            "status": "pending",
+            "reason": state.reason,
+            "next_action": PENDING_NEXT_ACTION,
+        }
+    return {
+        "status": "configured",
+        "mode": state.mode,
+        "mask_values": privacy.enabled(),
+        "wallet": state.wallet,
+        "origin": state.origin,
+    }
+
 
 @mcp.tool
 async def get_wallet_summary() -> dict:
@@ -159,6 +211,8 @@ async def get_wallet_summary() -> dict:
     amounts and quantities: work with the percentages and ratios provided and
     never estimate or reconstruct the withheld values.
     """
+    if (pending := _wallet_not_configured()) is not None:
+        return pending
     try:
         envelope = await wallet_client.wallet_client.get_summary()
         return privacy.mask("summary", envelope)
@@ -184,6 +238,8 @@ async def get_wallet_allocation() -> dict:
     amounts and quantities: work with the percentages and ratios provided and
     never estimate or reconstruct the withheld values.
     """
+    if (pending := _wallet_not_configured()) is not None:
+        return pending
     try:
         envelope = await wallet_client.wallet_client.get_allocation()
         return privacy.mask("allocation", envelope)
@@ -223,6 +279,8 @@ async def get_wallet_positions(asset_type: str) -> dict:
             bonds), Crypto. Any case is accepted; other values return an
             invalid_asset_type error listing the valid types.
     """
+    if (pending := _wallet_not_configured()) is not None:
+        return pending
     try:
         envelope = await wallet_client.wallet_client.get_positions(asset_type)
         return privacy.mask("positions", envelope)
@@ -280,6 +338,8 @@ async def get_earnings(
         end_date: YYYY-MM-DD. Must be after start_date — an inverted range
             returns an invalid_params error (never a silent empty result).
     """
+    if (pending := _wallet_not_configured()) is not None:
+        return pending
     try:
         if privacy.enabled():
             wallet_client.wallet_client.resolve_earnings_period(start_date, end_date)
@@ -305,6 +365,8 @@ async def get_patrimony_history(months: int) -> dict:
     Args:
         months: Integer horizon from 1 to 600 (e.g. 12, 24, 60).
     """
+    if (pending := _wallet_not_configured()) is not None:
+        return pending
     try:
         # Arguments first: a bad horizon is invalid_params even in privacy mode.
         wallet_client.check_months(months)
@@ -409,22 +471,29 @@ async def get_session_context() -> dict:
     written (alerts are not evaluated): tell the user and do not attempt to
     save anything. A memory_busy error means another client is writing: retry
     this tool call.
+
+    `configuration` says whether a wallet is set up. When its status is "pending",
+    guide the user through the setup with open_wallet_setup
+    before any wallet analysis, and never ask for the wallet link in this
+    conversation. When it is "configured", `wallet` is masked on purpose: never
+    ask for the full number.
     """
+    configuration = _configuration_block(_resolve_configuration())
     try:
         digest = memory.session_digest()
     except MemoryBusyError as exc:
         return memory_error_payload(exc)
     except MemoryUnavailableError:
-        return _session_context(None, [], [], "unavailable")
+        return _session_context(configuration, None, [], [], "unavailable")
     try:
         active_alerts = memory.list_price_alerts("active")
     except MemoryBusyError as exc:
         return memory_error_payload(exc)
     except MemoryUnavailableError:
-        return _session_context(digest, [], [], "unavailable")
+        return _session_context(configuration, digest, [], [], "unavailable")
 
     if memory.read_only:
-        return _session_context(digest, [], [], "read_only")
+        return _session_context(configuration, digest, [], [], "read_only")
 
     quotes: dict = {}
     pending_check: list = []
@@ -460,14 +529,17 @@ async def get_session_context() -> dict:
     except MemoryBusyError as exc:
         return memory_error_payload(exc)
     except MemoryReadOnlyError:
-        return _session_context(digest, [], pending_check, "read_only")
+        return _session_context(configuration, digest, [], pending_check, "read_only")
     except MemoryUnavailableError:
-        return _session_context(digest, [], pending_check, "unavailable")
-    return _session_context(digest, triggered, pending_check, "ok")
+        return _session_context(configuration, digest, [], pending_check, "unavailable")
+    return _session_context(configuration, digest, triggered, pending_check, "ok")
 
 
-def _session_context(digest, triggered: list, pending_check: list, status: str) -> dict:
+def _session_context(
+    configuration: dict, digest, triggered: list, pending_check: list, status: str
+) -> dict:
     return {
+        "configuration": configuration,
         "memory": digest,
         "triggered_alerts": triggered,
         "pending_check": pending_check,
@@ -618,6 +690,39 @@ async def log_insight(kind: str, fingerprint: str, summary: str) -> dict:
         return _memory_or_param_error(exc)
 
 
+@mcp.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
+    )
+)
+async def open_wallet_setup() -> dict:
+    """Open the local wallet setup page in the user's browser, where the user
+    enters the Investidor10 wallet link (public or restricted) and the privacy
+    mode. It takes no argument: the link never passes through this tool or you.
+
+    Call it when get_session_context says the configuration is pending, when a
+    wallet tool returns wallet_not_configured or access_denied, or when the user
+    asks to change the wallet link or the privacy mode. Ask the user to paste the
+    link on the page, never in this conversation. If the user pastes a link in the
+    conversation anyway, do not repeat or reuse it: point them to the page.
+    After the user says they saved, check the configuration block of get_session_context.
+
+    Returns status "opened", "already_open" or "open_manually" (then with
+    setup_url and terminal_alternative, because the browser could not be opened).
+    A setup_unavailable error means the local page cannot start on this machine:
+    ask the user to run the terminal command it names.
+    """
+    try:
+        return await asyncio.to_thread(setup_page.open_setup)
+    except setup_page.SetupUnavailable:
+        return {
+            "error": {"code": "setup_unavailable", "message": SETUP_UNAVAILABLE_MESSAGE}
+        }
+
+
 def main() -> None:
     """Run the server, or a subcommand: 'install' or 'configure'."""
     if len(sys.argv) > 1 and sys.argv[1] == "install":
@@ -632,11 +737,18 @@ def main() -> None:
     config = bootstrap.load_config()
     wallet_client.configure(config)
     privacy.configure(config)
+    state = _resolve_configuration()
     if privacy.enabled():
         bootstrap.warn(bootstrap.MASK_ACTIVE_MESSAGE)
     memory = MemoryStore(bootstrap.resolve_memory_path())
-    if wallet_client.WALLET_ID:
-        asyncio.run(wallet_client.validate_wallet(wallet_client.WALLET_ID))
+    if state.status == "configured":
+        asyncio.run(
+            wallet_client.validate_wallet(
+                state.wallet_id,
+                share_hash=state.share_hash,
+                strict=state.origin == "environment",
+            )
+        )
     mcp.run()
 
 

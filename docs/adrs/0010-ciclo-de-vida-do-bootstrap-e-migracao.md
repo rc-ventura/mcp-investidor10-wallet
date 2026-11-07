@@ -1,6 +1,6 @@
 # ADR-0010: Semântica do ciclo de vida do bootstrap e endurecimento da migração
 
-- **Status**: Accepted (amended 2026-10-29)
+- **Status**: Accepted (amended 2026-10-29, 2026-11-06)
 - **Date**: 2026-10-18
 - **Deciders**: Tech Leader + User (SDD final review cycle 1, spec 002)
 - **Related spec**: [`specs/002-distribution-readiness/`](../../specs/002-distribution-readiness/)
@@ -124,3 +124,26 @@ alvo em silêncio. Agora o store lê o arquivo com `O_NOFOLLOW`, então um link
 deixa a memória indisponível desde a partida, com aviso PT-BR pedindo para
 apontar a variável para o arquivo real (ADR-0013, emenda de 2026-10-29). Quem
 quer a memória em outro disco aponta `WALLET_MEMORY_PATH` direto para lá.
+
+## Emenda 2026-11-06 (spec 005, Lotes 3 e 4)
+
+**A sonda de inicialização deixa de abortar por acesso recusado, e só aborta
+por carteira inexistente no registro antigo.** O item 5 da decisão dizia que
+`404` e `401/403` abortam o startup. Com a configuração local (ADR-0019), a
+correção da carteira acontece pela página aberta pelo próprio servidor, e um
+servidor que não sobe deixa o usuário sem caminho para corrigir.
+
+- **3xx, 401 e 403** (acesso recusado, incluindo o 301 sem `Location` que a
+  fonte devolve para carteira restrita sem credencial válida e para privada):
+  avisam no stderr com `ACCESS_DENIED_MESSAGE`, sem o ID, e o servidor sobe.
+  As tools de carteira devolvem `access_denied` (ADR-0014, emenda de
+  2026-11-01). Mudança do Lote 3.
+- **404** só aborta quando a carteira vem de `WALLET_ID` no ambiente (o
+  registro antigo, em que quem errou foi quem registrou). Quando vem do
+  `config.json`, avisa com `CONFIGURED_WALLET_NOT_FOUND_MESSAGE` e o servidor
+  sobe. Mudança do Lote 4 (`validate_wallet(..., strict=False)`).
+- **Sem carteira configurada**, a sonda não roda (já valia desde o Lote 2).
+- `WALLET_ID` com formato inválido no ambiente continua abortando, como antes.
+
+A sonda envia a credencial como `hash` quando a carteira é restrita.
+

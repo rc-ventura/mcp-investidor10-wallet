@@ -312,6 +312,7 @@ def test_import_server_has_no_side_effects_without_env(tmp_path):
 
 def test_main_runs_deterministic_pipeline_and_serves(tmp_path, monkeypatch):
     events: list[str] = []
+    monkeypatch.setenv("WALLET_ID", "12345")
     mem_file = tmp_path / "memory.json"
     monkeypatch.setattr(wallet_client, "WALLET_ID", wallet_client.WALLET_ID)
     monkeypatch.setattr(
@@ -354,6 +355,7 @@ def test_main_runs_deterministic_pipeline_and_serves(tmp_path, monkeypatch):
 
 def test_main_without_a_wallet_skips_the_probe_and_still_serves(tmp_path, monkeypatch):
     events: list[str] = []
+    monkeypatch.delenv("WALLET_ID", raising=False)
     monkeypatch.setattr(wallet_client, "WALLET_ID", wallet_client.WALLET_ID)
     monkeypatch.setattr(
         wallet_client.wallet_client, "wallet_id", wallet_client.wallet_client.wallet_id
@@ -385,3 +387,52 @@ def test_main_without_a_wallet_skips_the_probe_and_still_serves(tmp_path, monkey
     server.main()
 
     assert events == ["serve"]
+
+
+def test_main_probes_the_local_configuration_without_aborting(
+    tmp_path, monkeypatch, isolated_home
+):
+    from investidor10_wallet import wallet_config
+
+    probes = []
+    monkeypatch.delenv("WALLET_ID", raising=False)
+    monkeypatch.setattr(server, "memory", server.memory)
+    monkeypatch.setattr(wallet_client, "WALLET_ID", wallet_client.WALLET_ID)
+    wallet_config.write_config(
+        isolated_home,
+        wallet_config.LocalConfig(
+            wallet_id="7654321",
+            share_hash="abc_DEF-1",
+            mode="restricted",
+            mask_values=False,
+            validated_at="2026-11-06T10:00:00-03:00",
+            source="setup_page",
+        ),
+    )
+    monkeypatch.setattr(
+        bootstrap, "resolve_memory_path", lambda *a, **k: str(tmp_path / "memory.json")
+    )
+
+    async def fake_validate_wallet(wallet_id, **kwargs):
+        probes.append((wallet_id, kwargs))
+
+    monkeypatch.setattr(wallet_client, "validate_wallet", fake_validate_wallet)
+    monkeypatch.setattr(server.mcp, "run", lambda *a, **k: None)
+
+    server.main()
+
+    assert probes == [("7654321", {"share_hash": "abc_DEF-1", "strict": False})]
+    assert wallet_client.wallet_client.share_hash == "abc_DEF-1"
+
+
+@respx.mock
+async def test_probe_of_a_local_configuration_warns_on_a_missing_wallet(capsys):
+    respx.get(f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/99999").mock(
+        return_value=httpx.Response(404)
+    )
+
+    await wallet_client.validate_wallet("99999", strict=False)
+
+    err = capsys.readouterr().err
+    assert bootstrap.CONFIGURED_WALLET_NOT_FOUND_MESSAGE in err
+    assert "99999" not in err

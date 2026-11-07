@@ -47,6 +47,7 @@
 - [Um relatório que prova a ausência de um segredo não pode citá-lo: use `<id>` e uma checagem que lê o valor do ambiente](./docs/learning-lessons/relatorio_que_prova_ausencia_de_segredo_nao_o_cita.md) — 2026-10-31
 - [Cotação do dia zerada sem pregão não é formato inesperado: `variation_day.last_quotation` vem `0` com a B3 fechada](./docs/learning-lessons/cotacao_zerada_sem_pregao_nao_e_formato_inesperado.md) — 2026-11-02
 - [Proxy da carteira responde 301 sem `Location` para acesso recusado — 3xx, 401 e 403 são `access_denied`, não `unexpected_format`](./docs/learning-lessons/proxy_301_acesso_recusado_sem_location.md) — 2026-11-04
+- [`Referrer-Policy: no-referrer` faz o navegador mandar `Origin: null`: a página local recusava todo envio real](./docs/learning-lessons/referrer_policy_no_referrer_manda_origin_null.md) — 2026-11-06
 
 ## Research
 
@@ -63,6 +64,7 @@
 - [Modelos de branching](./docs/research/fichamentos/modelos-de-branching.md) — 2026-11-01
 - [Publicação de pacotes e promoção de artefatos](./docs/research/fichamentos/publicacao-de-pacotes-e-promocao-de-artefatos.md) — 2026-11-01
 - [Skills e subagentes de projeto no Claude Code](./docs/research/fichamentos/skills-e-subagentes-do-claude-code.md) — 2026-11-01
+- [Como Anthropic e terceiros empacotam servidores MCP locais, plugins e extensões](./docs/research/fichamentos/distribuicao-de-servidores-mcp-em-plugins-e-extensoes.md) — 2026-11-06
 
 ### Pesquisas anteriores
 

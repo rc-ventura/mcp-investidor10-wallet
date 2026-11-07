@@ -658,17 +658,22 @@ async def validate_wallet(
     share_hash: str | None = None,
     base_url: str = WALLET_PROXY_BASE_URL,
     timeout: float = 10.0,
+    strict: bool = True,
 ) -> None:
     """Probe the configured wallet once at startup.
 
-    Aborts with PT-BR guidance only when the wallet does not exist; a refused
-    access or a source outage warns and keeps the server starting, so the user
-    can fix the configuration without a dead server.
+    A refused access or a source outage warns and keeps the server starting, so
+    the user can fix the configuration without a dead server. A missing wallet
+    aborts only when `strict` (the legacy WALLET_ID registration); for the local
+    configuration it warns, because the setup page needs a running server.
     """
     result = await check_wallet(wallet_id, share_hash, base_url, timeout)
     if result == "valid":
         return
     if result == "not_found":
+        if not strict:
+            bootstrap.warn(bootstrap.CONFIGURED_WALLET_NOT_FOUND_MESSAGE)
+            return
         bootstrap.fail(bootstrap.WALLET_NOT_FOUND_MESSAGE.format(wallet_id=wallet_id))
     if result == "access_denied":
         bootstrap.warn(bootstrap.ACCESS_DENIED_MESSAGE)

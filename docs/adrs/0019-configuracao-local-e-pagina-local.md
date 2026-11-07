@@ -1,10 +1,10 @@
 # ADR-0019: Configuração local única, carteira restrita, servidor sem configuração e página local
 
-- **Status**: Accepted
+- **Status**: Accepted (amended 2026-11-06)
 - **Date**: 2026-11-03
 - **Deciders**: Mantenedor + Claude (spec 005, Lote 2)
 - **Related spec**: [`specs/005-desktop-distribution/`](../../specs/005-desktop-distribution/) (FR-004 a FR-008a, FR-011, FR-012; research D2 a D6, D8, D15)
-- **Code**: `src/investidor10_wallet/wallet_config.py`, `src/investidor10_wallet/local_files.py`, `src/investidor10_wallet/bootstrap.py`
+- **Code**: `src/investidor10_wallet/wallet_config.py`, `src/investidor10_wallet/local_files.py`, `src/investidor10_wallet/bootstrap.py`, `src/investidor10_wallet/setup_page.py`, `src/investidor10_wallet/server.py` (`open_wallet_setup`, `_resolve_configuration`), `src/investidor10_wallet/privacy.py`
 - **Research**: [`docs/research/fichamentos/entrada-de-dados-do-usuario-em-mcp.md`](../research/fichamentos/entrada-de-dados-do-usuario-em-mcp.md), [`docs/research/fichamentos/plugins-claude-componentes-e-instalacao.md`](../research/fichamentos/plugins-claude-componentes-e-instalacao.md)
 
 ---
@@ -172,3 +172,52 @@ Esta decisão deve ser **revisitada** se:
 - Abertura de arquivo local: `docs/learning-lessons/arquivo_local_abrir_por_fd_sem_seguir_link.md`
 - Contrato da página e da tool: `specs/005-desktop-distribution/contracts/wallet-setup.md`
 - Esquema do arquivo e do estado: `specs/005-desktop-distribution/data-model.md`
+
+## Emenda 2026-11-06 (spec 005, Lote 4: implementação da página e do servidor)
+
+O Lote 2 decidiu e o Lote 4 implementou. Ficam registrados os pontos que a
+decisão deixava em aberto e como foram resolvidos:
+
+1. **Estado resolvido a cada chamada.** As cinco tools de carteira e o
+   `get_session_context` resolvem o estado no início da chamada: aplicam a
+   carteira e a credencial aos clientes HTTP (o cache só é esvaziado quando uma
+   das duas muda) e o mascaramento efetivo. Sem carteira, as tools de carteira
+   devolvem `wallet_not_configured` antes de qualquer requisição, inclusive
+   antes da validação de argumentos e do modo privacidade. A memória e a
+   cotação funcionam sem carteira.
+2. **"Uso único" do token.** O token deixa de valer quando a configuração é
+   gravada ou quando o prazo de 10 minutos (relógio monotônico) vence. Envios
+   que não gravam (link inválido, acesso recusado, fonte fora do ar, "nada
+   mudou", falha ao gravar) não consomem o token, para o usuário poder corrigir
+   e reenviar na mesma página. Depois de gravar ou vencer, a página encerra.
+3. **Troca de carteira sem repetir o link.** A confirmação de outra carteira
+   guarda o link já interpretado na memória do processo, ligado à sessão da
+   página; o envio de confirmação leva só o token. Nenhuma resposta da página
+   repete o link ou a credencial.
+4. **Cabeçalhos das respostas.** `Cache-Control: no-store`,
+   `Content-Security-Policy` sem recurso externo (`default-src 'none'`, script só
+   por nonce, `form-action 'self'`, `frame-ancestors 'none'`),
+   `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` e
+   `Referrer-Policy: same-origin`. Não `no-referrer`: com ele o navegador manda
+   `Origin: null` no envio do formulário e a conferência de `Origin` recusa todo
+   envio legítimo (learning lesson
+   `referrer_policy_no_referrer_manda_origin_null.md`). O token da URL continua
+   sem sair para outro site.
+5. **Respostas da tool.** `opened`, `already_open` (a mesma página, com o
+   navegador acionado de novo) e `open_manually` (só então com `setup_url` e
+   `terminal_alternative`). Porta local indisponível devolve `setup_unavailable`.
+   A abertura roda fora do loop de eventos.
+6. **Mascaramento efetivo.** Liga se o arquivo, a variável no início do
+   processo ou a variável no momento da chamada ligar. Nenhum dos três é
+   alterado por tool.
+7. **Sonda de inicialização.** Com o `config.json`, uma carteira inexistente só
+   avisa, para o servidor subir e a página poder corrigir (emenda de 2026-11-06
+   ao ADR-0010).
+
+**Limite verificado depois desta decisão:** a documentação da Anthropic diz que
+um servidor local roda no Claude Code e numa sessão Cowork no computador do
+usuário, "not in chat" (fichamento
+`distribuicao-de-servidores-mcp-em-plugins-e-extensoes.md`). A página local, por
+depender do servidor rodando no host, segue o mesmo limite: na conversa Chat não
+há servidor nem página.
+

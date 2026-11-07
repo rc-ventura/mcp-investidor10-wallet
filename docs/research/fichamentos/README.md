@@ -41,3 +41,4 @@ seções novas quando forem atualizados.
 | [modelos-de-branching](modelos-de-branching.md) | Git Flow, GitLab Flow, trunk-based e branch padrão | 2026-11-01 |
 | [publicacao-de-pacotes-e-promocao-de-artefatos](publicacao-de-pacotes-e-promocao-de-artefatos.md) | Pipeline de publicação, pré-lançamentos e ordem entre pacote e ponteiro | 2026-11-01 |
 | [skills-e-subagentes-do-claude-code](skills-e-subagentes-do-claude-code.md) | Formato de skills e subagentes de projeto | 2026-11-01 |
+| [distribuicao-de-servidores-mcp-em-plugins-e-extensoes](distribuicao-de-servidores-mcp-em-plugins-e-extensoes.md) | Como Anthropic e terceiros empacotam servidores MCP locais, plugins e extensões | 2026-11-06 |

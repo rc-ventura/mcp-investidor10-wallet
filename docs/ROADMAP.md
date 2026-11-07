@@ -370,6 +370,23 @@ entram na matriz.
   tag, mesma exposição) — pinar por SHA também ou cobrir com
   `pre-commit autoupdate`.
 
+### Pendência da spec 005 (Lote 4, 06/11/2026)
+
+- [ ] **Checagem de carteira configurada num único ponto** — hoje cinco tools de
+  carteira (`get_wallet_summary`, `get_wallet_allocation`, `get_wallet_positions`,
+  `get_patrimony_history`, `get_earnings`) repetem a mesma checagem e devolvem
+  `wallet_not_configured`. Troca proposta: metadata `requires_wallet=True` nas
+  tools que dependem da carteira, e um middleware (no `ErrorSignalMiddleware`, que
+  já existe) que faz a checagem antes da chamada. Um teste confere que as tools
+  marcadas são exatamente as cinco, e que memória e cotação nunca são marcadas. A
+  checagem continua por chamada, porque a configuração pode mudar com o servidor
+  rodando. Antes de implementar: confirmar se o middleware do FastMCP 4.1.2 recebe a
+  chamada antes da validação de argumentos, porque o teste atual exige que
+  argumento inválido com carteira ausente continue devolvendo
+  `wallet_not_configured`.
+
+---
+
 ## Fase 2 — Valor de produto (oriundo das learning lessons)
 
 - [ ] **`get_earnings_detailed`** — ver
@@ -687,6 +704,90 @@ entram na matriz.
      máxima ~24a), IPCA+ 2040, Renda+ 2065 — explicar que acima de 2040
      não existe DI, é juro real de NTN-B.
   Vale para os 4 clientes do bundle (SKILL.md é o denominador comum).
+
+---
+
+## Fase 5 — Gestão da memória (proposta de 06/11/2026, prioridade a definir)
+
+> Pedido do mantenedor: gerir a memória de forma auditável, com um gate de
+> atualização, um agente que reflete sobre as memórias e um sistema de
+> decaimento. Nada aqui está decidido: cada item precisa de ADR antes de
+> virar spec.
+
+**Ponto de partida (0.3.0 e spec 005):**
+- toda mutação já vai para `memory.json.log` (JSONL append-only, com
+  `before` e `after`), mas a linha não diz quem pediu nem por quê, e não há
+  como detectar um log truncado ou editado;
+- o "gate" de hoje é só instrução: a persona e o ADR-0002 mandam propor e
+  pedir confirmação, mas o servidor grava assim que o modelo chama `save_*`
+  e `log_*`;
+- nada envelhece: teses, regras e insights antigos voltam inteiros em todo
+  `get_session_context`, e o contexto cresce sem limite;
+- ninguém revisa a memória: tese contraditória com regra, decisão sem
+  `outcome` há meses e insight duplicado com fingerprint diferente ficam lá.
+
+**Ordem proposta:** auditoria → gate → decaimento → agente de reflexão. A
+reflexão depende das três anteriores: ela só propõe, e o que ela propõe
+passa pelo gate, entra no log e respeita o decaimento.
+
+- [ ] **1. Memória auditável** — base para os demais.
+  - Cada linha do log ganha `tool`, `client` (do `clientInfo` do
+    `initialize`, quando houver), `reason` (texto curto informado pelo
+    modelo, opcional) e o hash da linha anterior: uma cadeia de hashes torna
+    truncamento e edição detectáveis, sem prometer que impede.
+  - Tool de leitura `get_memory_history(collection, id)` para responder
+    "quando e por que esta regra mudou?".
+  - Verificação da cadeia no `doctor` (spec 005, US5) e política de rotação
+    do log (hoje adiada).
+  - Pergunta aberta: o protocolo é sem estado (ADR-0008), então não há id de
+    sessão confiável para agrupar mudanças.
+- [ ] **2. Gate de atualização** — tornar a confirmação um mecanismo, não só
+  uma instrução.
+  - Gravação em duas fases: `propose_memory_change` devolve um id e o diff,
+    nada é aplicado; a mudança só vale depois de aprovada.
+  - A aprovação **não pode ser uma tool que o próprio modelo chama** (ele se
+    aprovaria). Caminhos possíveis: a página local da spec 005 (mesmo
+    padrão de `open_wallet_setup`, com token de uso único) como tela de
+    revisão de mudanças pendentes; ou elicitation, quando o Claude Desktop
+    suportar (research D15).
+  - Política por risco: `log_insight` e `record_decision_outcome` podem
+    seguir diretos; sobrescrever regra, apagar ou trocar tese e mudar o
+    objetivo passam pelo gate. Recusa também vai para o log.
+  - Custo: mais tools e um passo a mais na conversa; medir a fricção antes
+    de estender o gate para tudo.
+- [ ] **3. Decaimento** — relevância que cai com o tempo, sem apagar nada.
+  - Cada item ganha `last_confirmed_at` e uma meia-vida por tipo (ponto de
+    partida para discutir: insight ~30 dias, tese ~180 dias com pedido de
+    reconfirmação, regra sem decaimento mas com revisão periódica, decisão
+    pendente cobrada depois do horizonte dela).
+  - Abaixo do limiar, o item vai para `archived`: sai do
+    `get_session_context`, continua no arquivo e no log, e volta com uma
+    reconfirmação. Decair nunca é apagar.
+  - `get_session_context` passa a trazer só os itens ativos e uma lista
+    curta "a revisar", o que também segura o crescimento do contexto.
+  - Exige memória v2 com migração (ADR-0010) e reabre a pergunta do SQLite
+    se o arquivo crescer além da escala humana.
+- [ ] **4. Agente de reflexão** — subagente do plugin, só leitura mais
+  propostas, no mesmo modelo do guardião de disciplina.
+  - Procura: tese que contradiz regra, tese cuja premissa não bate com os
+    dados atuais da carteira, itens duplicados, decisões sem `outcome`
+    vencidas, regras nunca usadas.
+  - Sai com propostas (consolidar, arquivar, reconfirmar, registrar
+    outcome) que passam pelo gate; nunca grava direto ("agente sugere,
+    nunca muta").
+  - Gatilho: skill "revisar memória" sob demanda e, opcionalmente, um
+    lembrete no início de sessão quando a última revisão passar de N dias
+    (o lembrete fica no hook, não no servidor).
+  - Registrar no log quais propostas vieram da reflexão, para medir se ela
+    ajuda ou só gera ruído.
+
+**Riscos e perguntas para o ADR:**
+- O número de tools cresce (hoje 20); cada tool nova pesa na descrição que
+  vai ao modelo em toda sessão.
+- O gate pela página local traz de volta a superfície da porta local
+  (ADR-0019) para outro uso; o mesmo modelo de ameaças precisa cobrir.
+- Meia-vida errada esconde uma regra que o usuário ainda segue; por isso
+  regra não decai por padrão e todo arquivamento é reversível.
 
 ---
 

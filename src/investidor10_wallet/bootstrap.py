@@ -21,6 +21,12 @@ WALLET_NOT_FOUND_MESSAGE = (
     "nas configurações do Investidor10, deixe a carteira pública. Depois, reinicie o servidor."
 )
 
+CONFIGURED_WALLET_NOT_FOUND_MESSAGE = (
+    "A carteira da configuração local não foi encontrada no Investidor10. Refaça a "
+    "configuração com 'mcp-investidor10-wallet configure' ou peça ao assistente para "
+    "abrir a página de configuração. O servidor iniciará mesmo assim."
+)
+
 ACCESS_DENIED_MESSAGE = (
     "O Investidor10 recusou o acesso à carteira configurada. Se ela for restrita, o link "
     "pode ter sido renovado; se for privada, torne-a pública ou restrita. Refaça a "

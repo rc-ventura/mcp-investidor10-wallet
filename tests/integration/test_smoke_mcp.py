@@ -1,0 +1,64 @@
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = ROOT / "scripts" / "smoke_mcp.py"
+
+
+def _run(*args):
+    env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), *args],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+        timeout=60,
+    )
+
+
+def test_the_server_starts_without_a_wallet_and_lists_twenty_tools():
+    result = _run(
+        "--expected-tools",
+        "20",
+        "--",
+        sys.executable,
+        "-m",
+        "investidor10_wallet.server",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "20 tools" in result.stdout
+
+
+def test_a_wrong_tool_count_fails():
+    result = _run(
+        "--expected-tools",
+        "19",
+        "--",
+        sys.executable,
+        "-m",
+        "investidor10_wallet.server",
+    )
+    assert result.returncode == 1
+    assert "19" in result.stderr
+
+
+def test_a_command_that_is_not_an_mcp_server_fails():
+    result = _run("--expected-tools", "20", "--", sys.executable, "-c", "print('no')")
+    assert result.returncode == 1
+
+
+def test_the_child_never_sees_a_wallet_or_the_real_home(tmp_path):
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "import os, sys\n"
+        "sys.stderr.write(repr((os.environ.get('WALLET_ID'), os.environ['HOME'])))\n",
+        encoding="utf-8",
+    )
+    env_home = os.environ["HOME"]
+    result = _run("--expected-tools", "20", "--", sys.executable, str(probe))
+    assert result.returncode == 1
+    assert "None" in result.stderr
+    assert env_home not in result.stderr
