@@ -586,7 +586,11 @@ mcp-investidor10-wallet==0.4.0rc1"), então D1 e D18 seguem sem revisão.
 - Causa do vermelho: o `uv` offline não fechou a resolução do `pydantic` com o
   cache do passo anterior (`No solution found when resolving tool
   dependencies`). Não reproduziu no macOS com cache limpo, com e sem
-  `--offline`; a causa exata no runner Linux não foi identificada.
+  `--offline`; a causa exata no runner Linux não foi identificada. Também
+  não reproduziu num contêiner Linux (Debian bookworm, `uv` com Python 3.13,
+  cache limpo, 73 pacotes como no runner): o smoke deu `initialize ok, 20
+  tools` com e sem `--offline`. O contêiner usa a arquitetura da máquina do
+  mantenedor, que pode diferir da do runner.
 - Correção: o `--offline` saiu do `verify` (PR #21). Vale só para tags
   futuras, porque um re-run usa o `release.yml` do commit da tag; o run da
   `v0.4.0rc1` segue com o `verify (ubuntu-latest)` vermelho.
