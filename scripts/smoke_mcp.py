@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
 
     with (
         tempfile.TemporaryDirectory(prefix="smoke-home-") as home,
-        tempfile.TemporaryFile(mode="w+", encoding="utf-8") as errors,
+        tempfile.TemporaryFile() as errors,
     ):
         try:
             process = subprocess.Popen(
@@ -108,7 +108,8 @@ def main(argv: list[str] | None = None) -> int:
                 process.wait()
             process.stdout.close()
         errors.seek(0)
-        stderr = errors.read()
+        # on Windows the child writes stderr in the console code page, not UTF-8
+        stderr = errors.read().decode("utf-8", errors="replace")
 
         if 1 not in found or 2 not in found:
             return _fail(
@@ -126,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
         if not (Path(home) / ".investidor10").is_dir():
             return _fail("o servidor não criou o diretório ~/.investidor10.")
     print(f"smoke_mcp: initialize ok, {len(tools)} tools, servidor sem carteira.")
+    if stderr.strip():
+        print(f"smoke_mcp: stderr do servidor:\n{stderr.strip()}")
     return 0
 
 

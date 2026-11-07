@@ -62,3 +62,15 @@ def test_the_child_never_sees_a_wallet_or_the_real_home(tmp_path):
     assert result.returncode == 1
     assert "None" in result.stderr
     assert env_home not in result.stderr
+
+
+def test_stderr_in_a_non_utf8_code_page_does_not_crash_the_script(tmp_path):
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "import sys\nsys.stderr.buffer.write(b'Aviso: n\\xe3o foi poss\\xedvel')\n",
+        encoding="utf-8",
+    )
+    result = _run("--expected-tools", "20", "--", sys.executable, str(probe))
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    assert "Aviso: n" in result.stderr
