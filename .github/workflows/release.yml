@@ -60,6 +60,10 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      # smoke_mcp.py troca o HOME do filho; sem este diretório fixo o uvx do
+      # smoke não vê o Python gerenciado baixado abaixo e cai no Python do sistema.
+      - name: Share one uv Python install dir across the steps
+        run: echo "UV_PYTHON_INSTALL_DIR=$RUNNER_TEMP/uv-python" >> "$GITHUB_ENV"
       - name: Install the exact version from the index with pip
         run: |
           version="${TAG#v}"
@@ -76,9 +80,9 @@ jobs:
         run: |
           version="${TAG#v}"
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            uvx --refresh --from "mcp-investidor10-wallet==$version" python -c "import investidor10_wallet" && break
+            uvx --refresh --python 3.13 --from "mcp-investidor10-wallet==$version" python -c "import investidor10_wallet" && break
             echo "version $version not available to uvx yet (attempt $attempt)"; sleep 30
           done
           venv="$RUNNER_TEMP/verify-venv"
           if [ "$RUNNER_OS" = "Windows" ]; then py="$venv/Scripts/python.exe"; else py="$venv/bin/python"; fi
-          "$py" scripts/smoke_mcp.py --expected-tools 20 -- uvx --from "mcp-investidor10-wallet==$version" mcp-investidor10-wallet
+          "$py" scripts/smoke_mcp.py --expected-tools 20 -- uvx --python 3.13 --from "mcp-investidor10-wallet==$version" mcp-investidor10-wallet
