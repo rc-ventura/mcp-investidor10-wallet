@@ -1,0 +1,69 @@
+# TEMPORÁRIO (PR #24): prova no runner real a causa e o conserto do verify do
+# release.yml contra a 0.4.0rc2 já publicada. Sai do PR antes do merge.
+name: verify-probe
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Passos do verify como estavam na 0.4.0rc2. Deve falhar no Ubuntu, e o Python
+  # do uvx com HOME trocado deve ser diferente do Python do uvx com HOME real.
+  old-ubuntu:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      version: 0.4.0rc2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - name: Old steps (expected to fail)
+        run: |
+          venv="$RUNNER_TEMP/verify-venv"
+          uv venv --seed --python 3.13 "$venv"
+          py="$venv/bin/python"
+          "$py" -m pip install -q --no-cache-dir "mcp-investidor10-wallet==$version"
+          echo "python do sistema: $(python3 --version)"
+          uvx --refresh --from "mcp-investidor10-wallet==$version" python -c "import sys; print('uvx, HOME real:', sys.version.split()[0])"
+          HOME="$(mktemp -d)" uvx --from "mcp-investidor10-wallet==$version" python -c "import sys; print('uvx, HOME trocado:', sys.version.split()[0])"
+          if "$py" scripts/smoke_mcp.py --expected-tools 20 -- uvx --from "mcp-investidor10-wallet==$version" mcp-investidor10-wallet; then
+            echo "::error::os passos antigos passaram; a causa raiz não se confirmou"; exit 1
+          fi
+          echo "os passos antigos falharam, como esperado"
+
+  # Passos do verify com o conserto do PR #24, nos três sistemas.
+  fixed:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      version: 0.4.0rc2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - name: Share one uv Python install dir across the steps
+        run: echo "UV_PYTHON_INSTALL_DIR=$RUNNER_TEMP/uv-python" >> "$GITHUB_ENV"
+      - name: Install the exact version from the index with pip
+        run: |
+          venv="$RUNNER_TEMP/verify-venv"
+          uv venv --seed --python 3.13 "$venv"
+          if [ "$RUNNER_OS" = "Windows" ]; then py="$venv/Scripts/python.exe"; else py="$venv/bin/python"; fi
+          "$py" -m pip install --no-cache-dir "mcp-investidor10-wallet==$version"
+          "$py" -c "import investidor10_wallet as m, sys; sys.exit(m.__version__ != '$version')"
+          "$py" scripts/smoke_mcp.py --expected-tools 20 -- "$py" -m investidor10_wallet.server
+      - name: Run the exact version from the index with uvx
+        run: |
+          uvx --refresh --python 3.13 --from "mcp-investidor10-wallet==$version" python -c "import investidor10_wallet"
+          HOME="$(mktemp -d)" uvx --python 3.13 --from "mcp-investidor10-wallet==$version" python -c "import sys; print('uvx, HOME trocado:', sys.version.split()[0])"
+          venv="$RUNNER_TEMP/verify-venv"
+          if [ "$RUNNER_OS" = "Windows" ]; then py="$venv/Scripts/python.exe"; else py="$venv/bin/python"; fi
+          "$py" scripts/smoke_mcp.py --expected-tools 20 -- uvx --python 3.13 --from "mcp-investidor10-wallet==$version" mcp-investidor10-wallet
