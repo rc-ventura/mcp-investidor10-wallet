@@ -29,11 +29,13 @@ jobs:
           "$py" -m pip install -q --no-cache-dir "mcp-investidor10-wallet==$version"
           echo "python do sistema: $(python3 --version)"
           uvx --refresh --from "mcp-investidor10-wallet==$version" python -c "import sys; print('uvx, HOME real:', sys.version.split()[0])"
-          HOME="$(mktemp -d)" uvx --from "mcp-investidor10-wallet==$version" python -c "import sys; print('uvx, HOME trocado:', sys.version.split()[0])"
+          # O smoke vem antes do diagnóstico com HOME trocado: o diagnóstico roda
+          # sem o proxy morto e esquentaria o cache com as wheels do outro Python.
           if "$py" scripts/smoke_mcp.py --expected-tools 20 -- uvx --from "mcp-investidor10-wallet==$version" mcp-investidor10-wallet; then
             echo "::error::os passos antigos passaram; a causa raiz não se confirmou"; exit 1
           fi
           echo "os passos antigos falharam, como esperado"
+          HOME="$(mktemp -d)" uvx --from "mcp-investidor10-wallet==$version" python -c "import sys; print('uvx, HOME trocado:', sys.version.split()[0])"
 
   # Passos do verify com o conserto do PR #24, nos três sistemas.
   fixed:
