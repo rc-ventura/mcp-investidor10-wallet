@@ -30,3 +30,6 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# Playwright MCP
+.playwright-mcp/

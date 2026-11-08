@@ -238,6 +238,7 @@ volta quando há exatamente um link inequívoco:
 | Entrada | Modo | Extrai |
 |---|---|---|
 | `https://investidor10.com.br/wallet/public/<id>?h=<hash>` | restrita | ID e credencial |
+| `https://investidor10.com.br/wallet/public/<id>` (sem `?h=`; emenda de 08/11/2026, rota observada no teste do Desktop) | pública | ID |
 | `https://investidor10.com.br/carteira/<id>` (e variações de rota com o mesmo ID) | pública | ID |
 | só dígitos (forma antiga do assistente) | pública | ID |
 

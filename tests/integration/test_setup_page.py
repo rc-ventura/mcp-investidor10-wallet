@@ -242,7 +242,7 @@ def test_the_same_values_change_nothing(page, isolated_home):
 def test_an_unreadable_link_lists_the_valid_forms(page, isolated_home, text):
     _, _, body = _save(page, text)
     assert _result(body) == "invalid_link"
-    assert "investidor10.com.br/carteira/" in body
+    assert "investidor10.com.br/wallet/public/" in body
     assert _saved(isolated_home) is None
 
 

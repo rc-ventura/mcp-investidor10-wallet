@@ -27,7 +27,7 @@ SOURCES = ("setup_page", "installer", "configure")
 LINK_MESSAGES = {
     "empty": (
         "Cole o link da sua carteira do Investidor10 (ou só o número dela). Link "
-        "de carteira pública: investidor10.com.br/carteira/<ID>."
+        "de carteira pública: investidor10.com.br/wallet/public/<ID>."
     ),
     "not_recognized": (
         "Não reconheci esse texto como link de carteira. Cole o link completo da "
@@ -45,7 +45,7 @@ LINK_MESSAGES = {
         "O número da carteira no link não é válido: ele deve conter apenas dígitos."
     ),
     "missing_credential": (
-        "O link da carteira restrita está sem a credencial (o trecho ?h=...). "
+        "O link tem o trecho ?h= mas sem a credencial (o código depois do =). "
         "Copie o link completo, como o Investidor10 mostra ao compartilhar."
     ),
     "invalid_credential": (
@@ -116,6 +116,10 @@ def _credential(query: str) -> str:
     return values[0]
 
 
+def _has_credential_key(query: str) -> bool:
+    return any(key == "h" for key, _ in parse_qsl(query, keep_blank_values=True))
+
+
 def _link_from_path(parts) -> WalletLink:
     segments = [segment for segment in parts.path.split("/") if segment]
     head = [segment.lower() for segment in segments[:2]]
@@ -123,6 +127,8 @@ def _link_from_path(parts) -> WalletLink:
         if len(segments) != 3:
             raise LinkError("not_recognized")
         wallet_id = _digits_or_refuse(segments[2])
+        if not _has_credential_key(parts.query):
+            return WalletLink(wallet_id, None, "public")
         return WalletLink(wallet_id, _credential(parts.query), "restricted")
     if head[:1] == ["carteira"] and len(segments) >= 2:
         return WalletLink(_digits_or_refuse(segments[1]), None, "public")
