@@ -599,6 +599,12 @@ mcp-investidor10-wallet==0.4.0rc1"), então D1 e D18 seguem sem revisão.
   trocou a mensagem de erro, e a `v0.4.0rc2` saiu com o mesmo vermelho. Um
   re-run usa o `release.yml` do commit da tag, então a prova completa é a
   `v0.4.0rc3`.
+- **Verificação final, `v0.4.0rc3` (run 42472567426, 2026-11-08)**: com o
+  conserto do PR #24, `build`, `publish` e `verify` passaram na primeira
+  tentativa, sem re-run, e o `verify` ficou verde nos três sistemas (pip e
+  `uvx`, `initialize` e 20 tools). A `0.4.0rc3` está no índice. A verificação
+  (3) fica fechada sem exceção: a instalação por versão exata de
+  pré-lançamento funciona com pip e com `uvx` em Ubuntu, macOS e Windows.
 - Também verificado nesse run: o ambiente `pypi` aceitou a tag criada em
   `develop`. A publicação falhou duas vezes antes por um `500` do Rekor
   (`unexpected error communicating with inactive shard`), indisponibilidade do
