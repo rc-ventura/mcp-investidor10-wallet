@@ -36,6 +36,9 @@ def test_restricted_link_variants(text):
 @pytest.mark.parametrize(
     "text",
     [
+        f"https://investidor10.com.br/wallet/public/{WALLET}",
+        f"https://www.investidor10.com.br/wallet/public/{WALLET}/",
+        f"https://investidor10.com.br/wallet/public/{WALLET}?utm_source=x",
         f"https://investidor10.com.br/carteira/{WALLET}",
         f"https://www.investidor10.com.br/carteira/{WALLET}/",
         f"https://investidor10.com.br/carteira/{WALLET}/proventos?utm_source=x",
@@ -87,7 +90,6 @@ def test_public_link_variants(text):
         ("https://investidor10.com.br/carteira/abc", "invalid_id"),
         (f"https://investidor10.com.br/wallet/public/abc?h={HASH}", "invalid_id"),
         ("12a", "not_recognized"),
-        (f"https://investidor10.com.br/wallet/public/{WALLET}", "missing_credential"),
         (
             f"https://investidor10.com.br/wallet/public/{WALLET}?h=",
             "missing_credential",

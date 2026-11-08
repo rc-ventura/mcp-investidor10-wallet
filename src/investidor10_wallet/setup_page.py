@@ -41,8 +41,8 @@ OPEN_MANUALLY_MESSAGE = (
 VALID_FORMS = (
     "Formas aceitas: o link da carteira restrita (o link de compartilhamento do "
     "Investidor10, que termina em ?h=...), o link da carteira pública "
-    "(https://investidor10.com.br/carteira/ seguido do número) ou só o número da "
-    "carteira."
+    "(https://investidor10.com.br/wallet/public/ seguido do número, sem ?h=) ou "
+    "só o número da carteira."
 )
 MASK_HELP = (
     "O modo privacidade impede que valores em reais e quantidades cheguem ao modelo. "
