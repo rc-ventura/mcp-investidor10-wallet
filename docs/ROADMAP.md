@@ -47,6 +47,7 @@ externo; reavaliar depois.
 | **Should** | ✅ Modo privacidade `WALLET_MASK_VALUES` — entregue na 0.3.0 | 1 | Passa a fazer sentido ao distribuir; env var, nunca parâmetro de tool |
 | **Should** | Action semanal de live tests | 1 | Aviso antecipado de drift para o mantenedor; o usuário já é protegido pela validação em tempo de execução. Fora da spec 004 — entra quando houver usuários além do mantenedor (após a 005) |
 | **Should** | Dependabot — updates revisáveis das actions pinadas por SHA e das deps | 1 | Complemento do pin por SHA entregue na 0.3.0: sem ele os hashes congelam e correções de segurança nunca chegam; com ele, cada update vira PR com diff revisável |
+| **Should** | Hardening do pipeline CI (auditoria de 07/11/2026) | 1 | Gate rodando o script da árvore do PR, environment `pypi` sem proteção documentada e scan de wallet ID só local são o elo fraco de uma cadeia que já tem SHA pinning e OIDC; relatório em `reports/003-ci-pipeline-audit.md` |
 | **Should** | ✅ Changelog append-only da memória (`memory.json.log`) — entregue na 0.3.0 | 1 | Escrita válida porém errada do modelo hoje é invisível; ~25 linhas |
 | **Should** | ✅ Sinal duplo de erro (`is_error` + envelope) — entregue na 0.3.0 | 1 | No protocolo, o erro aparece como sucesso |
 | **Should** | `get_entries` — log de lançamentos | 2 | Endpoint já validado; responde "o que comprei e quando" |
@@ -384,6 +385,40 @@ entram na matriz.
   chamada antes da validação de argumentos, porque o teste atual exige que
   argumento inválido com carteira ausente continue devolvendo
   `wallet_not_configured`.
+
+### Pendências da auditoria do pipeline CI (07/11/2026)
+
+> Auditoria dos 3 workflows contra a documentação oficial de security
+> hardening do GitHub Actions. Relatório completo:
+> [`reports/003-ci-pipeline-audit.md`](../reports/003-ci-pipeline-audit.md).
+> Ordem sugerida: S1 → S2 → eficiência → S3/S4 → Dependabot (item próprio
+> acima). S1, eficiência e S4 somam ~30 linhas de mudança.
+
+- [ ] **Gate script a partir da ref base (S1, médio)** — `main-gate` roda
+  `scripts/check_promotion.py` do checkout do merge commit (base+head), então
+  o próprio PR `promote/v*` pode adulterar o gate. Executar via
+  `git show "origin/$GITHUB_BASE_REF:scripts/check_promotion.py"`.
+- [ ] **Proteção do caminho tag→PyPI (S2, médio, settings do repo)** —
+  verificar e documentar: environment `pypi` com required reviewers ou
+  restrição de deploy a tags `v*`; ruleset restringindo criação de tag `v*`;
+  trusted publisher escopado a repo+workflow+environment.
+- [ ] **Scan de wallet ID no CI (S3, baixo)** — `check-no-wallet-id` só roda
+  no pre-commit local (`--no-verify`/web UI pulam); job no `ci.yml` com
+  `secrets.WALLET_ID`/`secrets.WALLET_HASH` no env.
+- [ ] **`persist-credentials: false` (S4, baixo)** — em todos os
+  `actions/checkout`; nenhum job precisa de auth git após o clone.
+- [ ] **`timeout-minutes` (E3)** — 15 (test), 10 (audit e main-gate),
+  25 (verify, que tem loops de retry de até ~10 min).
+- [ ] **Cache do uv (E1)** — `enable-cache: true` +
+  `cache-dependency-glob: uv.lock` no `setup-uv`; maior ganho de eficiência
+  (9 jobs de matrix baixam as deps a cada run).
+- [ ] **`concurrency` no `ci.yml` (E2)** — `group: ${{ github.workflow
+  }}-${{ github.ref }}` com `cancel-in-progress` em PR.
+- [ ] **`retention-days: 1` (E4)** — no artifact `dist` do `release.yml`
+  (só precisa viver até o job `publish`).
+- [ ] **Verificação extra (não auditada)** — CodeQL/OpenSSF Scorecard e
+  CODEOWNERS de `.github/workflows` ficam para quando houver colaboradores;
+  sem ação imediata.
 
 ---
 
