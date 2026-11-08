@@ -8,14 +8,16 @@ minor; correções incrementam o patch.
 
 ## [0.4.0] - não lançado
 
-Pré-lançamento `0.4.0rc2`. Distribuição para o Claude Desktop: o servidor passa a
+Pré-lançamento `0.4.0rc3`. Distribuição para o Claude Desktop: o servidor passa a
 subir sem carteira configurada e a carteira se configura por uma página local ou
 pelo terminal, inclusive a carteira restrita. O plugin único e o `doctor` entram nas
 próximas pré-versões; esta seção será completada na versão final.
 
-A `0.4.0rc2` não muda o servidor em relação à `0.4.0rc1`: repete a publicação para o
-`verify` do release passar nos três sistemas, depois que o `uvx --offline` saiu do
-workflow (a `0.4.0rc1` ficou com o `verify (ubuntu-latest)` vermelho nesse passo).
+A `0.4.0rc2` e a `0.4.0rc3` não mudam o servidor em relação à `0.4.0rc1`: repetem a
+publicação para o `verify` do release passar nos três sistemas. A `0.4.0rc1` e a
+`0.4.0rc2` ficaram com o `verify (ubuntu-latest)` vermelho porque o teste de fumaça
+troca o `HOME` do processo e o `uvx` passava a usar outro Python, não por defeito do
+pacote; a `0.4.0rc3` sai com o `verify` corrigido.
 
 ### Adicionado
 

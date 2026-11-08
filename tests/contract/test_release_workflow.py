@@ -79,6 +79,24 @@ def test_publish_only_publishes_with_the_only_id_token():
         assert "id-token" not in str(_job(name).get("permissions", {}))
 
 
+def test_verify_uvx_uses_the_same_python_as_the_rest_of_the_job():
+    # O smoke_mcp.py troca o HOME do filho e aponta um proxy morto. Sem um
+    # diretório de Pythons compartilhado e um Python explícito, o uvx do smoke
+    # não acha o Python gerenciado do passo anterior, cai no Python do sistema
+    # do runner (3.14 no Linux), precisa de wheels que o cache não tem e falha
+    # no proxy morto (0.4.0rc1 e 0.4.0rc2, verify do Ubuntu).
+    verify = _job("verify")
+    runs = _runs(verify)
+    assert "UV_PYTHON_INSTALL_DIR=" in runs
+    assert "$GITHUB_ENV" in runs
+    uvx_lines = [
+        line for line in runs.splitlines() if "uvx" in line and "--from" in line
+    ]
+    assert len(uvx_lines) >= 2
+    assert all("--python 3.13" in line for line in uvx_lines), uvx_lines
+    assert "--offline" not in runs
+
+
 def test_verify_installs_the_exact_version_from_the_index_on_three_systems():
     verify = _job("verify")
     assert verify["needs"] == "publish"
