@@ -21,13 +21,19 @@ where.exe uv; where.exe uvx
 
 Esperado: nenhum caminho. Anote o que apareceu. Se aparecer um `uv`, a máquina não serve para este teste.
 
-## 2. Baixar o plugin
+## 2. Obter o plugin
 
-Arquivo: `specs/005-desktop-distribution/spike/download/ping-plugin.zip` na branch `spec-005/spike-mcpb`.
+Os binários do spike (`ping-plugin.zip` e `servers/ping.mcpb`) foram removidos do repositório em
+08/11/2026; eles são reproduzíveis. Em outra máquina com o repositório clonado:
 
-Link direto: https://github.com/rc-ventura/mcp-investidor10-wallet/raw/spec-005/spike-mcpb/specs/005-desktop-distribution/spike/download/ping-plugin.zip
+```bash
+python3 specs/005-desktop-distribution/spike/ping-server/build.py
+cd specs/005-desktop-distribution/spike/ping-plugin && zip -r ../ping-plugin.zip .
+```
 
-Não descompacte o zip.
+O `ping-plugin.zip` fica em `specs/005-desktop-distribution/spike/` (ignorado pelo git). Não o
+descompacte. Este roteiro serviu ao teste de 08/11/2026; o resultado está em
+`docs/learning-lessons/mcpb_uv_dentro_de_plugin_no_desktop.md`.
 
 ## 3. Instalar e testar
 
