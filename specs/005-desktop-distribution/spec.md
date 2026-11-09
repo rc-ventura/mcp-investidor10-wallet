@@ -20,6 +20,20 @@ release.
 
 ## Clarifications
 
+### Session 2026-11-08
+
+- Q: O servidor empacotado dispensa o `uv` no Claude Desktop? → A: **não**.
+  O spike (Lote 1) mostrou que o Desktop usa o `uv` do usuário e que, sem
+  ele, o servidor não sobe nem como `.mcpb` tipo `uv` nem como `uvx` no
+  `plugin.json`; o Claude Code CLI ainda rejeita o tipo `uv`. O plugin do
+  Claude passa a declarar o servidor com `command: "uvx"` e a versão fixada,
+  e o **`uv` é pré-requisito documentado do Desktop**, com um tutorial
+  conservador (`docs/INSTALACAO-DESKTOP.md`). Isso revisa a FR-002 (o usuário
+  abre o terminal uma vez, só para instalar o `uv`) e fecha a FR-003 pelo
+  caminho que ela já previa. Binário por plataforma está descartado (assinatura,
+  notarização e Gatekeeper). O Claude Code segue pelo assistente de instalação.
+  As substituições estão em `research.md` D1 e na learning lesson do spike.
+
 ### Session 2026-11-01
 
 - Q: Como as tools e a configuração da carteira chegam às sessões do Claude
@@ -440,9 +454,13 @@ e chega ao plugin instalado no Desktop, sem pedir ajuda.
   registrada como emenda do ADR-0012. `--mcp-only` continua como escape no
   terminal, registrando só o servidor, sem o plugin.
 - **FR-002**: O usuário DEVE conseguir instalar e configurar o produto no
-  Claude Desktop sem abrir terminal e sem editar arquivo: adicionar o
+  Claude Desktop sem editar arquivo e com o menor uso possível de terminal:
+  instalar o `uv` uma única vez, com um comando de uma linha copiado de um
+  tutorial passo a passo (`docs/INSTALACAO-DESKTOP.md`); depois, adicionar o
   marketplace (um texto colado), instalar o plugin (um clique) e preencher,
   na página de configuração, o link da carteira e a escolha de mascaramento.
+  *(Revisada em 08/11/2026: o texto original dispensava o terminal; o spike
+  mostrou que o Desktop depende do `uv` da máquina. Ver Clarifications.)*
 - **FR-003**: O servidor do plugin DEVE iniciar numa máquina limpa, em macOS
   e Windows, que tenha só o Claude Desktop. O plano DEVE verificar na
   documentação oficial qual runtime o app oferece a servidores locais de
@@ -670,10 +688,12 @@ e chega ao plugin instalado no Desktop, sem pedir ajuda.
 
 ### Measurable Outcomes
 
-- **SC-001**: Um usuário sem terminal instala o produto no Claude Desktop e
-  recebe a primeira resposta com dados da própria carteira em até 5 minutos,
-  com zero edição de arquivo e no máximo três entradas (o endereço do
-  marketplace, o link da carteira e a resposta do mascaramento).
+- **SC-001**: Um usuário que já tem o `uv` instalado (ou que o instala seguindo
+  o tutorial) instala o produto no Claude Desktop e recebe a primeira resposta
+  com dados da própria carteira em até 5 minutos, com zero edição de arquivo e
+  no máximo três entradas (o endereço do marketplace, o link da carteira e a
+  resposta do mascaramento). O tempo de instalar o `uv` é medido à parte e
+  registrado, sem entrar nos 5 minutos *(revisado em 08/11/2026)*.
 - **SC-001a**: Em 100% das conversas novas sem configuração, o assistente
   abre a página antes de qualquer análise (10 de 10 conversas novas no roteiro
   de validação), e 0 respostas trazem valores da carteira antes da
