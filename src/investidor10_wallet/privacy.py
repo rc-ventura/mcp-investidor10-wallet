@@ -1,4 +1,5 @@
 _enabled = False
+_configured = False
 
 SUMMARY_FIELDS = frozenset(
     {"type", "variation", "profit_twr", "profit_twr_12m", "currency"}
@@ -68,8 +69,14 @@ def configure(config: dict) -> None:
     _enabled = bool(config.get("mask_values", False))
 
 
+def apply_state(state) -> None:
+    """Follow the mask of the resolved configuration (file or environment)."""
+    global _configured
+    _configured = bool(getattr(state, "mask_values", False))
+
+
 def enabled() -> bool:
-    return _enabled
+    return _enabled or _configured
 
 
 def _keep(mapping: dict, allowed: frozenset, omitted: set) -> dict:
@@ -87,7 +94,7 @@ def _keep_items(items: list, allowed: frozenset, omitted: set) -> list:
 
 
 def mask(tool: str, envelope: dict) -> dict:
-    if not _enabled:
+    if not enabled():
         return envelope
     omitted: set = set()
     data = envelope["data"]

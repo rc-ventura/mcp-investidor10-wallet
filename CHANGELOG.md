@@ -6,6 +6,61 @@ e o projeto adota [versionamento semântico](https://semver.org/lang/pt-BR/).
 Enquanto a versão for 0.x: mudanças de comportamento (features) incrementam o
 minor; correções incrementam o patch.
 
+## [0.4.0] - não lançado
+
+Pré-lançamento `0.4.0rc3`. Distribuição para o Claude Desktop: o servidor passa a
+subir sem carteira configurada e a carteira se configura por uma página local ou
+pelo terminal, inclusive a carteira restrita. O plugin único e o `doctor` entram nas
+próximas pré-versões; esta seção será completada na versão final.
+
+A `0.4.0rc2` e a `0.4.0rc3` não mudam o servidor em relação à `0.4.0rc1`: repetem a
+publicação para o `verify` do release passar nos três sistemas. A `0.4.0rc1` e a
+`0.4.0rc2` ficaram com o `verify (ubuntu-latest)` vermelho porque o teste de fumaça
+troca o `HOME` do processo e o `uvx` passava a usar outro Python, não por defeito do
+pacote; a `0.4.0rc3` sai com o `verify` corrigido.
+
+### Adicionado
+
+- **Configuração local única** (`~/.investidor10/config.json`, arquivo 0600): ID da
+  carteira, credencial do link de compartilhamento, modo (pública ou restrita) e
+  mascaramento de valores. Todos os clientes leem o mesmo arquivo, e uma mudança vale
+  na chamada seguinte, sem reiniciar.
+- **Carteira restrita**: o link de compartilhamento (`.../wallet/public/<id>?h=...`)
+  é aceito, a credencial vai à fonte só nas requisições da carteira e nunca aparece
+  em mensagens de erro, logs ou arquivos versionados.
+- **Página local de configuração** e a tool `open_wallet_setup` (a 20ª tool, sem
+  parâmetros): o usuário cola o link numa página aberta no navegador, em
+  `127.0.0.1`, com token de uso único de 10 minutos e conferência de `Host` e
+  `Origin`; o link não passa pela conversa.
+- **Bloco `configuration` em `get_session_context`**, com o estado da configuração e
+  a carteira mascarada.
+- **`mcp-investidor10-wallet configure`**: refaz o link e o mascaramento pelo
+  terminal, sem registrar nem instalar nada. O assistente de instalação ganhou
+  `--link` e `--mask`/`--no-mask`.
+- Três novos códigos de erro: `wallet_not_configured`, `access_denied` e
+  `setup_unavailable` (15 no total).
+- **Pipeline de release em três jobs** (`build`, `publish`, `verify`): o `verify`
+  instala a versão exata publicada, por pip e por `uvx`, em Linux, macOS e Windows.
+  Novos scripts `scripts/check_release_tag.py` e `scripts/smoke_mcp.py`.
+- `scripts/check-no-wallet-id` também procura a credencial (`WALLET_HASH`) em
+  arquivos versionados e dentro de pacotes `.mcpb`.
+
+### Alterado
+
+- O servidor sobe sem `WALLET_ID`. Sem carteira, as tools de carteira devolvem
+  `wallet_not_configured`; a memória e as cotações continuam funcionando.
+- Resposta 3xx, 401 ou 403 do proxy da carteira (como o 301 sem `Location` que a
+  fonte devolve para carteira restrita sem credencial válida) vira `access_denied`,
+  e não mais `unexpected_format`.
+- O mascaramento de valores liga se o arquivo de configuração **ou** `WALLET_MASK_VALUES`
+  ligar.
+- A sonda de inicialização só avisa quando o acesso é recusado, e quando a carteira da
+  configuração local não existe; carteira inexistente vinda de `WALLET_ID` continua
+  abortando.
+- Os clientes (Claude Code, Devin, Codex e Gemini) são registrados sem a variável
+  `WALLET_ID`.
+- `docs/PRIVACY.md` recomenda a carteira restrita e explica onde fica a credencial.
+
 ## [0.3.0] - 2026-10-28
 
 Hardening antes da distribuição Desktop: memória segura com vários clientes,

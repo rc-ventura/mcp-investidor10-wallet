@@ -37,3 +37,29 @@ def test_main_keeps_server_path_for_other_argv(monkeypatch):
         server.main()
 
     assert calls == []
+
+
+def test_main_dispatches_configure_subcommand_without_starting_server(monkeypatch):
+    calls = []
+    monkeypatch.setattr(cli, "run_configure", lambda argv: calls.append(argv) or 0)
+    monkeypatch.setattr(
+        server.sys, "argv", ["mcp-investidor10-wallet", "configure", "--mask"]
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        server.main()
+
+    assert exc_info.value.code == 0
+    assert calls == [["--mask"]]
+
+
+def test_main_does_not_send_configure_to_the_install_assistant(monkeypatch):
+    calls = []
+    monkeypatch.setattr(cli, "run", lambda argv: calls.append(argv) or 0)
+    monkeypatch.setattr(cli, "run_configure", lambda argv: 0)
+    monkeypatch.setattr(server.sys, "argv", ["mcp-investidor10-wallet", "configure"])
+
+    with pytest.raises(SystemExit):
+        server.main()
+
+    assert calls == []

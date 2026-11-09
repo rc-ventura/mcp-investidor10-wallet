@@ -9,7 +9,6 @@ STATUSES = ("registered", "updated", "skipped_present", "skipped_absent", "faile
 class ClientRegistration:
     command: str
     args: list[str]
-    env: dict[str, str]
     name: str = SERVER_ALIAS
 
 
@@ -22,7 +21,6 @@ class RegisterOutcome:
 
 @dataclass
 class InstallerSession:
-    wallet_id: str
     outcomes: list[RegisterOutcome] = field(default_factory=list)
     plugin_outcomes: list[RegisterOutcome] = field(default_factory=list)
     requested: set[str] = field(default_factory=set)

@@ -19,10 +19,12 @@
 | [0011](./docs/adrs/0011-estrategia-de-distribuicao-e-release.md) | Estratégia de distribuição e release — PyPI via `uvx`, src layout, versionamento 0.x e pipeline OIDC | Accepted | 2026-10-18 |
 | [0012](./docs/adrs/0012-integracao-automatica-de-clientes.md) | Integração automática de clientes — assistente de instalação e plugin de comportamento (bundle em 4 CLIs) | Accepted | 2026-10-26 |
 | [0013](./docs/adrs/0013-concorrencia-da-memoria-multiprocesso.md) | Concorrência da memória multiprocesso — trava `filelock` fail-closed, reload sob trava e modo somente-leitura | Accepted | 2026-10-28 |
-| [0014](./docs/adrs/0014-sinal-duplo-de-erro.md) | Sinal duplo de erro — `isError` do protocolo mais o envelope estruturado (12 códigos) | Accepted | 2026-10-28 |
+| [0014](./docs/adrs/0014-sinal-duplo-de-erro.md) | Sinal duplo de erro — `isError` do protocolo mais o envelope estruturado (15 códigos) | Accepted | 2026-10-28 |
 | [0015](./docs/adrs/0015-modo-privacidade-wallet-mask-values.md) | Modo privacidade `WALLET_MASK_VALUES` — allowlist fail-closed, tools monetárias indisponíveis | Accepted | 2026-10-28 |
 | [0016](./docs/adrs/0016-validacao-de-payloads-em-tools-novas.md) | Regra de validação de payloads para tools novas — pydantic validate-then-passthrough | Accepted | 2026-10-28 |
 | [0017](./docs/adrs/0017-cotacao-em-cache-vencido-nao-dispara-alerta.md) | Cotação em cache vencido não dispara alerta — `stale_quote` em `pending_check` | Accepted | 2026-10-28 |
+| [0019](./docs/adrs/0019-configuracao-local-e-pagina-local.md) | Configuração local única, carteira restrita, servidor sem configuração e página local | Accepted | 2026-11-03 |
+| [0020](./docs/adrs/0020-fluxo-de-branches-e-release.md) | Fluxo de branches e release — `main` só contém versões publicadas no índice, `develop`, portão de promoção | Accepted | 2026-11-02 |
 
 ## Learning Lessons
 
@@ -43,6 +45,10 @@
 - [`RecursionError` não é `ValueError`: profundidade de aninhamento é uma falha à parte do JSON malformado](./docs/learning-lessons/recursionerror_nao_e_valueerror.md) — 2026-10-29
 - [Contador declarado pela fonte não é limite de laço: validar `total` antes de parar a paginação por ele](./docs/learning-lessons/contador_declarado_pela_fonte_nao_e_limite.md) — 2026-10-29
 - [Um relatório que prova a ausência de um segredo não pode citá-lo: use `<id>` e uma checagem que lê o valor do ambiente](./docs/learning-lessons/relatorio_que_prova_ausencia_de_segredo_nao_o_cita.md) — 2026-10-31
+- [Cotação do dia zerada sem pregão não é formato inesperado: `variation_day.last_quotation` vem `0` com a B3 fechada](./docs/learning-lessons/cotacao_zerada_sem_pregao_nao_e_formato_inesperado.md) — 2026-11-02
+- [Proxy da carteira responde 301 sem `Location` para acesso recusado — 3xx, 401 e 403 são `access_denied`, não `unexpected_format`](./docs/learning-lessons/proxy_301_acesso_recusado_sem_location.md) — 2026-11-04
+- [`Referrer-Policy: no-referrer` faz o navegador mandar `Origin: null`: a página local recusava todo envio real](./docs/learning-lessons/referrer_policy_no_referrer_manda_origin_null.md) — 2026-11-06
+- [Teste que troca o `HOME` muda o Python do `uvx`: o `verify` do release só falhava no Ubuntu](./docs/learning-lessons/smoke_troca_home_e_uvx_perde_o_python_gerenciado.md) — 2026-11-07
 
 ## Research
 
@@ -59,6 +65,7 @@
 - [Modelos de branching](./docs/research/fichamentos/modelos-de-branching.md) — 2026-11-01
 - [Publicação de pacotes e promoção de artefatos](./docs/research/fichamentos/publicacao-de-pacotes-e-promocao-de-artefatos.md) — 2026-11-01
 - [Skills e subagentes de projeto no Claude Code](./docs/research/fichamentos/skills-e-subagentes-do-claude-code.md) — 2026-11-01
+- [Como Anthropic e terceiros empacotam servidores MCP locais, plugins e extensões](./docs/research/fichamentos/distribuicao-de-servidores-mcp-em-plugins-e-extensoes.md) — 2026-11-06
 
 ### Pesquisas anteriores
 

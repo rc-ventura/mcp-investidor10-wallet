@@ -1,10 +1,14 @@
 import copy
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+import respx
+from fastmcp import Client
 
-from investidor10_wallet import privacy
+from investidor10_wallet import privacy, wallet_client, wallet_config
+from investidor10_wallet.server import mcp
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "privacy"
 SENTINEL = "9988.77"
@@ -154,3 +158,73 @@ def test_unavailable_error_names_the_tool_and_the_alternatives():
     assert "get_earnings is unavailable" in message
     assert "get_wallet_allocation" in message and "get_wallet_positions" in message
     assert "do not estimate" in message
+
+
+def test_the_resolved_configuration_turns_the_mode_on_and_off():
+    privacy.configure({"mask_values": False})
+    privacy.apply_state(SimpleNamespace(mask_values=True))
+    assert privacy.enabled() is True
+    privacy.apply_state(SimpleNamespace(mask_values=False))
+    assert privacy.enabled() is False
+
+
+def test_the_startup_environment_keeps_the_mode_on_whatever_the_file_says():
+    privacy.configure({"mask_values": True})
+    try:
+        privacy.apply_state(SimpleNamespace(mask_values=False))
+        assert privacy.enabled() is True
+    finally:
+        privacy.configure({"mask_values": False})
+
+
+def _write_config(home, mask_values):
+    wallet_config.write_config(
+        home,
+        wallet_config.LocalConfig(
+            wallet_id="1234567",
+            share_hash=None,
+            mode="public",
+            mask_values=mask_values,
+            validated_at="2026-11-06T10:00:00-03:00",
+            source="configure",
+        ),
+    )
+
+
+@respx.mock
+async def test_the_mode_follows_the_local_configuration_without_restart(isolated_home):
+    respx.get(f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/1234567").respond(
+        json=_load("summary.json")
+    )
+    wallet_client.wallet_client._cache.clear()
+    try:
+        _write_config(isolated_home, mask_values=True)
+        async with Client(mcp) as client:
+            masked = await client.call_tool("get_wallet_summary", {})
+        assert masked.structured_content["privacy"]["masked"] is True
+        assert SENTINEL not in json.dumps(masked.structured_content)
+
+        _write_config(isolated_home, mask_values=False)
+        async with Client(mcp) as client:
+            plain = await client.call_tool("get_wallet_summary", {})
+        assert "privacy" not in plain.structured_content
+    finally:
+        wallet_client.wallet_client._cache.clear()
+
+
+@respx.mock
+async def test_the_environment_variable_turns_the_mode_on_at_call_time(
+    isolated_home, monkeypatch
+):
+    respx.get(f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/1234567").respond(
+        json=_load("summary.json")
+    )
+    wallet_client.wallet_client._cache.clear()
+    _write_config(isolated_home, mask_values=False)
+    monkeypatch.setenv("WALLET_MASK_VALUES", "1")
+    try:
+        async with Client(mcp) as client:
+            result = await client.call_tool("get_wallet_summary", {})
+        assert result.structured_content["privacy"]["masked"] is True
+    finally:
+        wallet_client.wallet_client._cache.clear()

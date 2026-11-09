@@ -27,6 +27,8 @@ REQUEST_TIMEOUT_SECONDS = 20.0
 MAX_CACHE_ENTRIES = 256
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 WALLET_PLACEHOLDER = "<wallet>"
+HASH_PLACEHOLDER = "<hash>"
+HASH_PARAM = "hash"
 MAX_POSITION_PAGES = 400
 MAX_HISTORY_MONTHS = 600
 
@@ -64,9 +66,10 @@ def _is_numeric(value) -> bool:
 class SourceError(Exception):
     """Structured failure of the Investidor10 data source.
 
-    Codes raised here: source_unavailable (down/timeout), unexpected_format
-    (schema drift), invalid_params and invalid_asset_type (bad arguments).
-    The message goes to the model, so it never carries the wallet ID.
+    Codes raised here: source_unavailable (down/timeout), access_denied (the
+    wallet proxy refused the wallet), unexpected_format (schema drift),
+    invalid_params and invalid_asset_type (bad arguments). The message goes to
+    the model, so it never carries the wallet ID or the share credential.
     """
 
     def __init__(self, code: str, message: str, status_code: int | None = None):
@@ -77,6 +80,10 @@ class SourceError(Exception):
 
     def to_payload(self) -> dict:
         return {"error": {"code": self.code, "message": self.message}}
+
+
+class MarketClosedError(SourceError):
+    """A quote with no trading today: the source reports a zero day price."""
 
 
 async def _read_capped(response: httpx.Response, path: str) -> bytes:
@@ -141,6 +148,7 @@ class WalletClient:
         timeout: float = REQUEST_TIMEOUT_SECONDS,
         max_stale_seconds: float | None = None,
         *,
+        share_hash: str | None = None,
         _allow_unconfigured: bool = False,
     ):
         if wallet_id is None:
@@ -151,6 +159,7 @@ class WalletClient:
             max_stale_seconds = MAX_STALE_SECONDS
         self.base_url = base_url.rstrip("/")
         self.wallet_id = str(wallet_id)
+        self.share_hash = share_hash
         if not _allow_unconfigured and not re.fullmatch(r"[0-9]+", self.wallet_id):
             raise SourceError("invalid_params", "WALLET_ID must be numeric")
         self.ttl_seconds = ttl_seconds
@@ -161,7 +170,13 @@ class WalletClient:
         self._cache: dict[tuple, tuple[float, str, object]] = {}
 
     def _redact(self, text: str) -> str:
-        """Replace the wallet ID in text that can reach the model."""
+        """Replace the wallet ID and the share credential in text that can reach the model."""
+        if self.share_hash:
+            text = re.sub(
+                rf"(?<![A-Za-z0-9_-]){re.escape(self.share_hash)}(?![A-Za-z0-9_-])",
+                HASH_PLACEHOLDER,
+                text,
+            )
         if not self.wallet_id:
             return text
         return re.sub(
@@ -234,6 +249,10 @@ class WalletClient:
         if hit and now - hit[0] < self.ttl_seconds:
             return self._envelope(hit[2], cached=True, fetched_at=hit[1])
 
+        send_params = params
+        if self.share_hash and self.base_url == WALLET_PROXY_BASE_URL:
+            send_params = {**(params or {}), HASH_PARAM: self.share_hash}
+
         try:
             async with (
                 httpx.AsyncClient(
@@ -242,11 +261,13 @@ class WalletClient:
                     follow_redirects=False,
                 ) as client,
                 client.stream(
-                    "GET", f"{self.base_url}{path}", params=params
+                    "GET", f"{self.base_url}{path}", params=send_params
                 ) as response,
             ):
                 status = response.status_code
-                body = await _read_capped(response, shown) if status < 400 else b""
+                body = (
+                    await _read_capped(response, shown) if 200 <= status < 300 else b""
+                )
         except (httpx.HTTPError, httpx.InvalidURL) as exc:
             if hit:
                 return self._stale_envelope(hit, shown)
@@ -255,12 +276,20 @@ class WalletClient:
                 f"Investidor10 API request failed: {self._redact(str(exc))}",
             ) from exc
 
+        if self.base_url == WALLET_PROXY_BASE_URL and (
+            300 <= status < 400 or status in (401, 403)
+        ):
+            raise SourceError(
+                "access_denied",
+                f"Investidor10 refused access to the configured wallet (HTTP {status}).",
+                status_code=status,
+            )
         if status >= 500 and hit:
             return self._stale_envelope(hit, shown)
-        if status >= 400:
+        if status < 200 or status >= 300:
             message = f"Investidor10 API returned HTTP {status} for {shown}"
             if 400 <= status < 500 and self.base_url == WALLET_PROXY_BASE_URL:
-                message += " — check WALLET_ID"
+                message += " — check the wallet link with open_wallet_setup"
             raise SourceError(
                 "source_unavailable",
                 message,
@@ -470,13 +499,20 @@ class WalletClient:
             if isinstance(raw, bool):
                 raise ValueError
             price = float(str(raw).replace(",", "."))
-            if not math.isfinite(price) or price <= 0:
+            if not math.isfinite(price) or price < 0:
                 raise ValueError
         except (KeyError, TypeError, ValueError, OverflowError):
             raise SourceError(
                 "unexpected_format",
                 f"Investidor10 API returned an invalid quote for {normalized}",
             ) from None
+        if price == 0:
+            raise MarketClosedError(
+                "source_unavailable",
+                f"{normalized} has no price right now: there was no trading today "
+                "on the B3 (holiday, weekend or before the open). Try again after "
+                "the market opens and never use an older price.",
+            )
         return envelope
 
     @staticmethod
@@ -566,15 +602,34 @@ def configure(config: dict) -> None:
         client.max_stale_seconds = MAX_STALE_SECONDS
 
 
-async def validate_wallet(
-    wallet_id: str, base_url: str = WALLET_PROXY_BASE_URL, timeout: float = 10.0
-) -> None:
-    """Probe the configured wallet once at startup.
+def apply_configuration(state) -> None:
+    """Point both clients at the wallet of a resolved configuration state.
 
-    Aborts with PT-BR guidance when the wallet is missing or private; on a
-    source outage the server warns and keeps starting, so a temporary failure
-    never blocks local operation.
+    The cache is emptied only when the wallet or the credential changes, so it
+    can never serve the data of a previous wallet.
     """
+    wallet_id = state.wallet_id or ""
+    share_hash = state.share_hash
+    if (wallet_client.wallet_id, wallet_client.share_hash) == (wallet_id, share_hash):
+        return
+    for client in (wallet_client, rest_client):
+        client.wallet_id = wallet_id
+        client.share_hash = share_hash
+        client._cache.clear()
+
+
+async def check_wallet(
+    wallet_id: str,
+    share_hash: str | None = None,
+    base_url: str = WALLET_PROXY_BASE_URL,
+    timeout: float = 10.0,
+) -> str:
+    """Probe one wallet and classify the answer.
+
+    Returns valid, access_denied (3xx, 401, 403), not_found (404) or
+    unavailable (anything else, including transport failures).
+    """
+    params = {HASH_PARAM: share_hash} if share_hash else None
     try:
         async with (
             httpx.AsyncClient(
@@ -582,16 +637,45 @@ async def validate_wallet(
                 timeout=timeout,
                 follow_redirects=False,
             ) as client,
-            client.stream("GET", f"{base_url}/summary/metrics/{wallet_id}") as response,
+            client.stream(
+                "GET", f"{base_url}/summary/metrics/{wallet_id}", params=params
+            ) as response,
         ):
             status = response.status_code
     except (httpx.HTTPError, httpx.InvalidURL):
-        bootstrap.warn(bootstrap.PROBE_UNAVAILABLE_MESSAGE.format(wallet_id=wallet_id))
-        return
+        return "unavailable"
     if status == 200:
-        return
+        return "valid"
+    if 300 <= status < 400 or status in (401, 403):
+        return "access_denied"
     if status == 404:
+        return "not_found"
+    return "unavailable"
+
+
+async def validate_wallet(
+    wallet_id: str,
+    share_hash: str | None = None,
+    base_url: str = WALLET_PROXY_BASE_URL,
+    timeout: float = 10.0,
+    strict: bool = True,
+) -> None:
+    """Probe the configured wallet once at startup.
+
+    A refused access or a source outage warns and keeps the server starting, so
+    the user can fix the configuration without a dead server. A missing wallet
+    aborts only when `strict` (the legacy WALLET_ID registration); for the local
+    configuration it warns, because the setup page needs a running server.
+    """
+    result = await check_wallet(wallet_id, share_hash, base_url, timeout)
+    if result == "valid":
+        return
+    if result == "not_found":
+        if not strict:
+            bootstrap.warn(bootstrap.CONFIGURED_WALLET_NOT_FOUND_MESSAGE)
+            return
         bootstrap.fail(bootstrap.WALLET_NOT_FOUND_MESSAGE.format(wallet_id=wallet_id))
-    if status in (401, 403):
-        bootstrap.fail(bootstrap.WALLET_PRIVATE_MESSAGE.format(wallet_id=wallet_id))
+    if result == "access_denied":
+        bootstrap.warn(bootstrap.ACCESS_DENIED_MESSAGE)
+        return
     bootstrap.warn(bootstrap.PROBE_UNAVAILABLE_MESSAGE.format(wallet_id=wallet_id))

@@ -6,39 +6,83 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
-    environment: pypi
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
-      - name: Build
-        run: uv build
-      - name: Check changelog section
+      - name: Check the tag against __version__ and the changelog
         env:
           TAG: ${{ github.ref_name }}
+        run: python3 scripts/check_release_tag.py --tag "$TAG"
+      - name: Build
+        run: uv build
+      - name: Smoke test the wheel without a wallet
         run: |
-          version="${TAG#v}"
-          grep -q "## \[${version}\]" CHANGELOG.md || {
-            echo "CHANGELOG.md does not have a [${version}] section"; exit 1; }
-      - name: Smoke test the wheel
-        run: |
-          python -m venv /tmp/smoke-venv
+          python3 -m venv /tmp/smoke-venv
           /tmp/smoke-venv/bin/pip install --quiet dist/*.whl
-          env -u WALLET_ID /tmp/smoke-venv/bin/python -c "import investidor10_wallet, investidor10_wallet.server; assert investidor10_wallet.__version__ == '${GITHUB_REF_NAME#v}'"
-          set +e
-          err_out=$(env -u WALLET_ID /tmp/smoke-venv/bin/mcp-investidor10-wallet 2>&1 >/dev/null)
-          rc=$?
-          set -e
-          test "$rc" -eq 1 || { echo "expected exit 1 without WALLET_ID, got $rc"; exit 1; }
-          echo "$err_out" | grep -q "WALLET_ID não configurado" || { echo "missing PT-BR guidance: $err_out"; exit 1; }
-          echo "$err_out" | grep -q "investidor10.com.br/carteira" || { echo "missing URL guidance: $err_out"; exit 1; }
-          init_req='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"release-smoke","version":"0.1.0"}}}'
-          stdio_out=$(printf '%s\n' "$init_req" | env WALLET_ID=1234567 HOME=/tmp/smoke-home HTTPS_PROXY=http://127.0.0.1:1 HTTP_PROXY=http://127.0.0.1:1 /tmp/smoke-venv/bin/mcp-investidor10-wallet)
-          echo "$stdio_out" | grep -q '"investidor10-wallet"' || { echo "expected initialize response on stdout, got: $stdio_out"; exit 1; }
-          test -d /tmp/smoke-home/.investidor10 || { echo "expected canonical dir /tmp/smoke-home/.investidor10"; exit 1; }
+          python3 scripts/smoke_mcp.py --expected-tools 20 -- /tmp/smoke-venv/bin/mcp-investidor10-wallet
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+
+  verify:
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      # smoke_mcp.py troca o HOME do filho; sem este diretório fixo o uvx do
+      # smoke não vê o Python gerenciado baixado abaixo e cai no Python do sistema.
+      - name: Share one uv Python install dir across the steps
+        run: echo "UV_PYTHON_INSTALL_DIR=$RUNNER_TEMP/uv-python" >> "$GITHUB_ENV"
+      - name: Install the exact version from the index with pip
+        run: |
+          version="${TAG#v}"
+          venv="$RUNNER_TEMP/verify-venv"
+          uv venv --seed --python 3.13 "$venv"
+          if [ "$RUNNER_OS" = "Windows" ]; then py="$venv/Scripts/python.exe"; else py="$venv/bin/python"; fi
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            "$py" -m pip install --no-cache-dir "mcp-investidor10-wallet==$version" && break
+            echo "version $version not on the index yet (attempt $attempt)"; sleep 30
+          done
+          "$py" -c "import investidor10_wallet as m, sys; sys.exit(m.__version__ != '$version')"
+          "$py" scripts/smoke_mcp.py --expected-tools 20 -- "$py" -m investidor10_wallet.server
+      - name: Run the exact version from the index with uvx
+        run: |
+          version="${TAG#v}"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            uvx --refresh --python 3.13 --from "mcp-investidor10-wallet==$version" python -c "import investidor10_wallet" && break
+            echo "version $version not available to uvx yet (attempt $attempt)"; sleep 30
+          done
+          venv="$RUNNER_TEMP/verify-venv"
+          if [ "$RUNNER_OS" = "Windows" ]; then py="$venv/Scripts/python.exe"; else py="$venv/bin/python"; fi
+          "$py" scripts/smoke_mcp.py --expected-tools 20 -- uvx --python 3.13 --from "mcp-investidor10-wallet==$version" mcp-investidor10-wallet

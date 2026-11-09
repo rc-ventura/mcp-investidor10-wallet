@@ -1,15 +1,10 @@
 import math
 import os
 import re
-import stat
 import sys
 from pathlib import Path
 
-MISSING_WALLET_ID_MESSAGE = (
-    "WALLET_ID não configurado. Defina a variável de ambiente WALLET_ID com o ID da sua "
-    "carteira. O ID aparece na URL pública: investidor10.com.br/carteira/<ID>. "
-    "Depois, reinicie o servidor."
-)
+from . import local_files
 
 INVALID_WALLET_ID_MESSAGE = (
     "WALLET_ID={value!r} inválido: use apenas dígitos. O ID aparece na URL pública: "
@@ -26,9 +21,17 @@ WALLET_NOT_FOUND_MESSAGE = (
     "nas configurações do Investidor10, deixe a carteira pública. Depois, reinicie o servidor."
 )
 
-WALLET_PRIVATE_MESSAGE = (
-    "Carteira {wallet_id} é privada. Nas configurações do Investidor10, deixe a carteira "
-    "pública e reinicie o servidor."
+CONFIGURED_WALLET_NOT_FOUND_MESSAGE = (
+    "A carteira da configuração local não foi encontrada no Investidor10. Refaça a "
+    "configuração com 'mcp-investidor10-wallet configure' ou peça ao assistente para "
+    "abrir a página de configuração. O servidor iniciará mesmo assim."
+)
+
+ACCESS_DENIED_MESSAGE = (
+    "O Investidor10 recusou o acesso à carteira configurada. Se ela for restrita, o link "
+    "pode ter sido renovado; se for privada, torne-a pública ou restrita. Refaça a "
+    "configuração com 'mcp-investidor10-wallet configure'. O servidor iniciará mesmo "
+    "assim; as ferramentas de dados informarão o erro."
 )
 
 PROBE_UNAVAILABLE_MESSAGE = (
@@ -100,7 +103,7 @@ def _parse_float(name: str, raw: str, default: str, environ) -> float:
     return number
 
 
-def _parse_mask(environ) -> bool:
+def parse_mask(environ) -> bool:
     raw = environ.get("WALLET_MASK_VALUES")
     if raw is None:
         return False
@@ -116,9 +119,7 @@ def load_config(environ=None) -> dict:
     """Parse the operator environment; abort with PT-BR guidance on bad config."""
     environ = os.environ if environ is None else environ
     wallet_id = str(environ.get("WALLET_ID", "")).strip()
-    if not wallet_id:
-        fail(MISSING_WALLET_ID_MESSAGE)
-    if not re.fullmatch(r"[0-9]+", wallet_id):
+    if wallet_id and not re.fullmatch(r"[0-9]+", wallet_id):
         fail(INVALID_WALLET_ID_MESSAGE.format(value=wallet_id))
     return {
         "wallet_id": wallet_id,
@@ -126,26 +127,8 @@ def load_config(environ=None) -> dict:
         "max_stale_seconds": _parse_float(
             "WALLET_CACHE_MAX_STALE_SECONDS", "", "86400", environ
         ),
-        "mask_values": _parse_mask(environ),
+        "mask_values": parse_mask(environ),
     }
-
-
-def _ensure_canonical_dir(directory: Path) -> None:
-    if os.path.lexists(directory):
-        st = os.lstat(directory)
-        if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
-            raise OSError(f"{directory} não é um diretório regular")
-    else:
-        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        st = os.lstat(directory)
-        if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
-            raise OSError(f"{directory} não é um diretório regular")
-    os.chmod(directory, 0o700)
-
-
-def _ensure_not_symlink(path: Path) -> None:
-    if os.path.lexists(path) and stat.S_ISLNK(os.lstat(path).st_mode):
-        raise OSError(f"{path} não pode ser um link simbólico")
 
 
 def resolve_memory_path(home: Path | None = None, environ=None) -> str:
@@ -157,8 +140,8 @@ def resolve_memory_path(home: Path | None = None, environ=None) -> str:
     home = Path.home() if home is None else home
     canonical = home / ".investidor10" / "memory.json"
     try:
-        _ensure_canonical_dir(canonical.parent)
-        _ensure_not_symlink(canonical)
+        local_files.ensure_private_dir(canonical.parent)
+        local_files.ensure_not_symlink(canonical)
     except OSError as exc:
         fail(CANONICAL_DIR_FAILED_MESSAGE.format(directory=canonical.parent, cause=exc))
     return str(canonical)

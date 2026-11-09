@@ -12,35 +12,64 @@ como parte da conversa, e a conversa vai para o provedor do modelo.
 
 | Destino | O que recebe | Observação |
 |---|---|---|
-| **Investidor10** (API pública) | Requisições com o ID da sua carteira e os tickers que você consulta | A fonte já tem os seus dados. O servidor não envia mais nada além do ID e dos tickers |
+| **Investidor10** (API pública) | Requisições com o ID da sua carteira, a credencial do link (só na carteira restrita) e os tickers que você consulta | A fonte já tem os seus dados. O servidor não envia mais nada além do ID, da credencial e dos tickers. A credencial vai só nas requisições da carteira, nunca nas de cotação |
 | **Provedor do modelo** (o agente que você usa) | Tudo que as ferramentas devolvem: valores, posições e proventos da carteira, e o conteúdo da memória (teses, regras, decisões, alertas) | É aqui que a exposição acontece. Cada resposta de ferramenta entra no contexto do modelo |
-| **Arquivos na sua máquina** | `memory.json` (sua memória), `memory.json.log` (histórico de mudanças da memória), `memory.json.lock` (controle de acesso) e cópias `memory.json.broken-*` (só se o arquivo ficar corrompido) | Ficam em `~/.investidor10/`, com acesso restrito ao seu usuário. Nada disso é enviado a outro lugar pelo servidor |
+| **Arquivos na sua máquina** | `config.json` (a configuração: ID, credencial do link, modo e mascaramento), `memory.json` (sua memória), `memory.json.log` (histórico de mudanças da memória), `memory.json.lock` (controle de acesso) e cópias `memory.json.broken-*` (só se o arquivo ficar corrompido) | Ficam em `~/.investidor10/`, com acesso restrito ao seu usuário (0600). Nada disso é enviado a outro lugar pelo servidor |
 
 O cache de respostas da API existe só na memória do processo e some quando o
 servidor termina.
 
 ## A credencial é o link
 
-O ID da sua carteira (o número que aparece no link público) funciona como uma
+O ID da sua carteira (o número que aparece no link) funciona como uma
 **senha**: quem o tem consegue ler todos os valores da carteira pela API,
 sem precisar de login.
 
 O botão de mascarar valores do site Investidor10 é só visual: ele esconde os
 números na tela, mas a API continua devolvendo tudo (verificado em 17/10/2026).
-Por isso:
 
-- não publique o ID nem o link da carteira em issues, prints ou repositórios;
-- trate o ID como você trataria uma senha;
-- se o ID vazar, deixe a carteira privada nas configurações do site.
+### Carteira pública ou restrita
+
+- **Pública** (`investidor10.com.br/carteira/<ID>`): qualquer pessoa com o
+  número lê a carteira, e a página pode ser **indexada por buscadores**.
+- **Restrita** (o link de compartilhamento, que termina em `?h=...`): só quem
+  tem o link completo lê a carteira. **É a escolha recomendada.** O trecho
+  `?h=...` é a credencial: ele é tão sensível quanto o ID, e os dois juntos são
+  a senha.
+
+### O que o produto faz com o link
+
+- A credencial é separada do link, enviada **só** ao Investidor10 (nas
+  requisições da carteira) e guardada em `~/.investidor10/config.json`, com
+  acesso restrito ao seu usuário. Desinstalar ou atualizar o plugin não apaga
+  esse arquivo.
+- Você informa o link na página local de configuração, aberta no seu
+  navegador, ou no comando `mcp-investidor10-wallet configure`. Nos dois casos
+  o link **não passa pelo modelo**.
+- O produto não escreve o ID nem a credencial em mensagens de erro, logs, saída
+  de diagnóstico, na memória ou em arquivos do projeto.
+
+### O que você precisa fazer
+
+- **Não cole o link na conversa.** Se colar, ele fica no histórico da conversa
+  e vai ao provedor do modelo; o assistente é instruído a não repeti-lo nem
+  reutilizá-lo, mas o histórico já o tem. Use a página local ou o `configure`.
+- Não publique o ID, o link nem a credencial em issues, prints ou repositórios.
+- Se o link vazar, deixe a carteira privada nas configurações do site: sem
+  acesso, o servidor passa a mostrar "acesso recusado". **Não confirmamos** que
+  gerar um link novo no site cancela o antigo; só a carteira privada garante
+  que o link vazado deixa de servir.
 
 ## Modo privacidade
 
 O modo privacidade impede que **valores em reais e quantidades** cheguem ao
-modelo. Para ligar, defina a variável de ambiente `WALLET_MASK_VALUES=1` no
-servidor, junto do `WALLET_ID` (os valores aceitos são `1`, `true`, `yes`
+modelo. Para ligar, responda "sim" à pergunta do assistente de instalação, use
+`mcp-investidor10-wallet configure --mask` ou defina a variável de ambiente
+`WALLET_MASK_VALUES=1` no servidor (os valores aceitos são `1`, `true`, `yes`
 e `on`; qualquer outro valor desconhecido faz o servidor se recusar a
-iniciar). Não há como ligar ou desligar pelo chat: de propósito, o próprio
-modelo não consegue desativar a proteção.
+iniciar). O modo fica ligado se **qualquer** das duas fontes o ligar. Não há
+como ligar ou desligar pelo chat: de propósito, o próprio modelo não consegue
+desativar a proteção.
 
 **O que continua funcionando** (porque usa só percentuais, razões e
 indicadores): análise de alocação, rebalanceamento por percentual,

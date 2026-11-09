@@ -10,11 +10,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _registration():
-    return ClientRegistration(
-        command="uvx",
-        args=["mcp-investidor10-wallet"],
-        env={"WALLET_ID": "1234567"},
-    )
+    return ClientRegistration(command="uvx", args=["mcp-investidor10-wallet"])
 
 
 def test_detect_false_when_binary_absent(monkeypatch, tmp_path):
@@ -26,40 +22,28 @@ def test_claude_registers_with_scope_user(fake_bin_dir):
     outcome = clients.ClaudeAdapter().register(_registration())
     assert outcome.status == "registered"
     log = (fake_bin_dir / "calls.log").read_text()
-    assert (
-        "claude mcp add carteira --scope user -- env WALLET_ID=1234567 uvx mcp-investidor10-wallet"
-        in log
-    )
+    assert "claude mcp add carteira --scope user -- uvx mcp-investidor10-wallet" in log
 
 
 def test_devin_registers_with_user_scope(fake_bin_dir):
     outcome = clients.DevinAdapter().register(_registration())
     assert outcome.status == "registered"
     log = (fake_bin_dir / "calls.log").read_text()
-    assert (
-        "devin mcp add -s user carteira -e WALLET_ID=1234567 -- uvx mcp-investidor10-wallet"
-        in log
-    )
+    assert "devin mcp add -s user carteira -- uvx mcp-investidor10-wallet" in log
 
 
-def test_codex_registers_with_env_flag(fake_bin_dir):
+def test_codex_registers_with_the_separator(fake_bin_dir):
     outcome = clients.CodexAdapter().register(_registration())
     assert outcome.status == "registered"
     log = (fake_bin_dir / "calls.log").read_text()
-    assert (
-        "codex mcp add carteira --env WALLET_ID=1234567 -- uvx mcp-investidor10-wallet"
-        in log
-    )
+    assert "codex mcp add carteira -- uvx mcp-investidor10-wallet" in log
 
 
 def test_gemini_registers_with_user_scope(fake_bin_dir):
     outcome = clients.GeminiAdapter().register(_registration())
     assert outcome.status == "registered"
     log = (fake_bin_dir / "calls.log").read_text()
-    assert (
-        "gemini mcp add -s user -e WALLET_ID=1234567 carteira uvx mcp-investidor10-wallet"
-        in log
-    )
+    assert "gemini mcp add -s user carteira uvx mcp-investidor10-wallet" in log
 
 
 def test_collision_skip_keeps_existing(fake_bin_dir, monkeypatch):
@@ -122,3 +106,23 @@ def test_failed_registration_reports_pt_br(fake_bin_dir):
 def test_codex_plugin_commands_empty_without_binary(monkeypatch, tmp_path):
     monkeypatch.setenv("PATH", str(tmp_path))
     assert clients.CodexAdapter().plugin_install_commands() == []
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    [
+        clients.ClaudeAdapter(),
+        clients.DevinAdapter(),
+        clients.CodexAdapter(),
+        clients.GeminiAdapter(),
+    ],
+    ids=lambda adapter: adapter.client_id,
+)
+def test_add_command_carries_no_wallet_variable(adapter):
+    command = adapter.add_command(_registration())
+    joined = " ".join(command)
+    assert "WALLET_ID" not in joined
+    assert "WALLET_HASH" not in joined
+    assert "-e" not in command
+    assert "--env" not in command
+    assert "env" not in command

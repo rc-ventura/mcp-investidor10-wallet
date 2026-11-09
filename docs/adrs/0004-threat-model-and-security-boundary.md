@@ -1,6 +1,6 @@
 # ADR-0004: Threat model and security boundary of the single-user stdio server
 
-- **Status**: Accepted (amended 2026-10-31 — see "Emenda 2026-10-28" and "Emenda 2026-10-31" at the end)
+- **Status**: Accepted (amended 2026-11-03 — see "Emenda 2026-10-28", "Emenda 2026-10-31" and "Emenda 2026-11-03" at the end)
 - **Date**: 2026-10-17
 - **Deciders**: Tech Leader + user (SDD final review cycle 4, spec 001)
 
@@ -158,3 +158,22 @@ Investidor10). Consequência aceita: o ID antigo continua alcançável nesses lu
 O que a medida acima garante é que ele não volte ao working tree nem entre no
 sdist e no wheel publicados daqui para frente.
 
+## Emenda 2026-11-03 (spec 005, ADR-0019) — porta local e credencial em arquivo
+
+O servidor deixa de ser só stdio. Dois itens entram no modelo de ameaças:
+
+- **Porta local temporária.** `open_wallet_setup` sobe uma página em
+  `127.0.0.1`, em porta escolhida pelo sistema, por até 10 minutos. Defesa:
+  token aleatório de uso único, conferência de `Host` e `Origin`, nada do corpo
+  do envio em log, link fora da URL. Outro site aberto no navegador do usuário
+  não consegue enviar o formulário sem o token.
+- **Credencial no arquivo.** `~/.investidor10/config.json` guarda o ID e, na
+  carteira restrita, a credencial do link, com as mesmas defesas da memória
+  (diretório 0700, arquivo 0600, abertura sem seguir link, gravação atômica). Um
+  processo do mesmo usuário já lê a memória, então o arquivo não amplia o que
+  ele alcança.
+
+A fronteira não muda de lugar: o link, a credencial e a escolha de mascaramento
+não passam por nenhuma tool, então não passam pelo modelo nem pelo provedor.
+Limite aceito, e registrado no ADR-0019: um agente com controle do navegador
+poderia abrir a página e preenchê-la.

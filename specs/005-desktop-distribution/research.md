@@ -572,6 +572,39 @@ tags criadas em `develop` e em `hotfix/*`; (3) a instalação por versão exata
 de pré-lançamento funciona com pip e com `uvx` (a documentação do `uv` não
 cobre o caso).
 
+**Resultado da verificação (3), 2026-11-07 (`v0.4.0rc1`, run 42379935532)**:
+a versão exata de pré-lançamento instala com pip e com `uvx`; o `uvx` não
+ignora o `==0.4.0rc1` (o resolvedor reporta "you require
+mcp-investidor10-wallet==0.4.0rc1"), então D1 e D18 seguem sem revisão.
+
+| Verificação | Ubuntu | macOS | Windows |
+|---|---|---|---|
+| pip `==0.4.0rc1` em ambiente limpo, `initialize` e 20 tools | verde | verde | verde |
+| `uvx --from ==0.4.0rc1`, importação | verde | verde | verde |
+| `uvx --offline --from ==0.4.0rc1`, `initialize` e 20 tools | **vermelho** | verde | verde |
+
+- Causa do vermelho (identificada depois, com a `v0.4.0rc2`): não era o
+  `--offline`. O `smoke_mcp.py` troca o `HOME` do processo filho e aponta um
+  proxy morto. O passo anterior baixa o Python 3.13 gerenciado pelo `uv` no
+  `HOME` real; o `uvx` do smoke, com outro `HOME`, não o encontra e cai no
+  Python do sistema do runner Ubuntu (3.14.4), cujas wheels `cp314` o cache não
+  tem, e a busca morre no proxy morto. macOS e Windows passavam porque os
+  runners têm um 3.13 no sistema. Provado no runner real com a `0.4.0rc2` já
+  publicada (workflow temporário no PR #24, run 42387445884): passos antigos
+  vermelhos, com `uvx` em 3.13.18 com o `HOME` real e em 3.14.4 com o `HOME`
+  trocado; passos corrigidos verdes nos três sistemas. Learning lesson
+  `smoke_troca_home_e_uvx_perde_o_python_gerenciado.md`.
+- Correção: `UV_PYTHON_INSTALL_DIR` fixo no job e `--python 3.13` nos dois
+  `uvx` do `verify` (PR #24). O PR #21 (tirar o `--offline`) não resolvia: só
+  trocou a mensagem de erro, e a `v0.4.0rc2` saiu com o mesmo vermelho. Um
+  re-run usa o `release.yml` do commit da tag, então a prova completa é a
+  `v0.4.0rc3`.
+- Também verificado nesse run: o ambiente `pypi` aceitou a tag criada em
+  `develop`. A publicação falhou duas vezes antes por um `500` do Rekor
+  (`unexpected error communicating with inactive shard`), indisponibilidade do
+  serviço do Sigstore, e passou na quarta tentativa sem mudança de código. Tags
+  em `hotfix/*` seguem sem verificação.
+
 ## Fontes
 
 Os achados por fonte, sem reflexão, estão nos fichamentos em

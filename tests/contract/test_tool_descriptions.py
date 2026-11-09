@@ -26,10 +26,25 @@ TOOLS = (
     "log_decision",
     "record_decision_outcome",
     "log_insight",
+    "open_wallet_setup",
 )
 
 SERVED_RULES = {
-    "get_asset_quote": ("15 minutes", "fetched_at"),
+    "get_asset_quote": ("15 minutes", "fetched_at", "no trading"),
+    "get_session_context": (
+        "market_closed",
+        "configuration",
+        'its status is "pending"',
+        "open_wallet_setup",
+        "before any wallet analysis",
+    ),
+    "open_wallet_setup": (
+        "configuration is pending",
+        "access_denied",
+        "never in this conversation",
+        "do not repeat or reuse",
+        "configuration block of get_session_context",
+    ),
     "get_wallet_positions": ("percent_ideal", "fetched_at"),
     "get_earnings": ("data.sum", "fetched_at"),
     "get_patrimony_history": ("fetched_at",),

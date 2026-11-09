@@ -47,6 +47,7 @@ externo; reavaliar depois.
 | **Should** | ✅ Modo privacidade `WALLET_MASK_VALUES` — entregue na 0.3.0 | 1 | Passa a fazer sentido ao distribuir; env var, nunca parâmetro de tool |
 | **Should** | Action semanal de live tests | 1 | Aviso antecipado de drift para o mantenedor; o usuário já é protegido pela validação em tempo de execução. Fora da spec 004 — entra quando houver usuários além do mantenedor (após a 005) |
 | **Should** | Dependabot — updates revisáveis das actions pinadas por SHA e das deps | 1 | Complemento do pin por SHA entregue na 0.3.0: sem ele os hashes congelam e correções de segurança nunca chegam; com ele, cada update vira PR com diff revisável |
+| **Should** | Hardening do pipeline CI (auditoria de 07/11/2026) | 1 | Gate rodando o script da árvore do PR, environment `pypi` sem proteção documentada e scan de wallet ID só local são o elo fraco de uma cadeia que já tem SHA pinning e OIDC; relatório em `reports/003-ci-pipeline-audit.md` |
 | **Should** | ✅ Changelog append-only da memória (`memory.json.log`) — entregue na 0.3.0 | 1 | Escrita válida porém errada do modelo hoje é invisível; ~25 linhas |
 | **Should** | ✅ Sinal duplo de erro (`is_error` + envelope) — entregue na 0.3.0 | 1 | No protocolo, o erro aparece como sucesso |
 | **Should** | `get_entries` — log de lançamentos | 2 | Endpoint já validado; responde "o que comprei e quando" |
@@ -370,6 +371,57 @@ entram na matriz.
   tag, mesma exposição) — pinar por SHA também ou cobrir com
   `pre-commit autoupdate`.
 
+### Pendência da spec 005 (Lote 4, 06/11/2026)
+
+- [ ] **Checagem de carteira configurada num único ponto** — hoje cinco tools de
+  carteira (`get_wallet_summary`, `get_wallet_allocation`, `get_wallet_positions`,
+  `get_patrimony_history`, `get_earnings`) repetem a mesma checagem e devolvem
+  `wallet_not_configured`. Troca proposta: metadata `requires_wallet=True` nas
+  tools que dependem da carteira, e um middleware (no `ErrorSignalMiddleware`, que
+  já existe) que faz a checagem antes da chamada. Um teste confere que as tools
+  marcadas são exatamente as cinco, e que memória e cotação nunca são marcadas. A
+  checagem continua por chamada, porque a configuração pode mudar com o servidor
+  rodando. Antes de implementar: confirmar se o middleware do FastMCP 4.1.2 recebe a
+  chamada antes da validação de argumentos, porque o teste atual exige que
+  argumento inválido com carteira ausente continue devolvendo
+  `wallet_not_configured`.
+
+### Pendências da auditoria do pipeline CI (07/11/2026)
+
+> Auditoria dos 3 workflows contra a documentação oficial de security
+> hardening do GitHub Actions. Relatório completo:
+> [`reports/003-ci-pipeline-audit.md`](../reports/003-ci-pipeline-audit.md).
+> Ordem sugerida: S1 → S2 → eficiência → S3/S4 → Dependabot (item próprio
+> acima). S1, eficiência e S4 somam ~30 linhas de mudança.
+
+- [ ] **Gate script a partir da ref base (S1, médio)** — `main-gate` roda
+  `scripts/check_promotion.py` do checkout do merge commit (base+head), então
+  o próprio PR `promote/v*` pode adulterar o gate. Executar via
+  `git show "origin/$GITHUB_BASE_REF:scripts/check_promotion.py"`.
+- [ ] **Proteção do caminho tag→PyPI (S2, médio, settings do repo)** —
+  verificar e documentar: environment `pypi` com required reviewers ou
+  restrição de deploy a tags `v*`; ruleset restringindo criação de tag `v*`;
+  trusted publisher escopado a repo+workflow+environment.
+- [ ] **Scan de wallet ID no CI (S3, baixo)** — `check-no-wallet-id` só roda
+  no pre-commit local (`--no-verify`/web UI pulam); job no `ci.yml` com
+  `secrets.WALLET_ID`/`secrets.WALLET_HASH` no env.
+- [ ] **`persist-credentials: false` (S4, baixo)** — em todos os
+  `actions/checkout`; nenhum job precisa de auth git após o clone.
+- [ ] **`timeout-minutes` (E3)** — 15 (test), 10 (audit e main-gate),
+  25 (verify, que tem loops de retry de até ~10 min).
+- [ ] **Cache do uv (E1)** — `enable-cache: true` +
+  `cache-dependency-glob: uv.lock` no `setup-uv`; maior ganho de eficiência
+  (9 jobs de matrix baixam as deps a cada run).
+- [ ] **`concurrency` no `ci.yml` (E2)** — `group: ${{ github.workflow
+  }}-${{ github.ref }}` com `cancel-in-progress` em PR.
+- [ ] **`retention-days: 1` (E4)** — no artifact `dist` do `release.yml`
+  (só precisa viver até o job `publish`).
+- [ ] **Verificação extra (não auditada)** — CodeQL/OpenSSF Scorecard e
+  CODEOWNERS de `.github/workflows` ficam para quando houver colaboradores;
+  sem ação imediata.
+
+---
+
 ## Fase 2 — Valor de produto (oriundo das learning lessons)
 
 - [ ] **`get_earnings_detailed`** — ver
@@ -687,6 +739,90 @@ entram na matriz.
      máxima ~24a), IPCA+ 2040, Renda+ 2065 — explicar que acima de 2040
      não existe DI, é juro real de NTN-B.
   Vale para os 4 clientes do bundle (SKILL.md é o denominador comum).
+
+---
+
+## Fase 5 — Gestão da memória (proposta de 06/11/2026, prioridade a definir)
+
+> Pedido do mantenedor: gerir a memória de forma auditável, com um gate de
+> atualização, um agente que reflete sobre as memórias e um sistema de
+> decaimento. Nada aqui está decidido: cada item precisa de ADR antes de
+> virar spec.
+
+**Ponto de partida (0.3.0 e spec 005):**
+- toda mutação já vai para `memory.json.log` (JSONL append-only, com
+  `before` e `after`), mas a linha não diz quem pediu nem por quê, e não há
+  como detectar um log truncado ou editado;
+- o "gate" de hoje é só instrução: a persona e o ADR-0002 mandam propor e
+  pedir confirmação, mas o servidor grava assim que o modelo chama `save_*`
+  e `log_*`;
+- nada envelhece: teses, regras e insights antigos voltam inteiros em todo
+  `get_session_context`, e o contexto cresce sem limite;
+- ninguém revisa a memória: tese contraditória com regra, decisão sem
+  `outcome` há meses e insight duplicado com fingerprint diferente ficam lá.
+
+**Ordem proposta:** auditoria → gate → decaimento → agente de reflexão. A
+reflexão depende das três anteriores: ela só propõe, e o que ela propõe
+passa pelo gate, entra no log e respeita o decaimento.
+
+- [ ] **1. Memória auditável** — base para os demais.
+  - Cada linha do log ganha `tool`, `client` (do `clientInfo` do
+    `initialize`, quando houver), `reason` (texto curto informado pelo
+    modelo, opcional) e o hash da linha anterior: uma cadeia de hashes torna
+    truncamento e edição detectáveis, sem prometer que impede.
+  - Tool de leitura `get_memory_history(collection, id)` para responder
+    "quando e por que esta regra mudou?".
+  - Verificação da cadeia no `doctor` (spec 005, US5) e política de rotação
+    do log (hoje adiada).
+  - Pergunta aberta: o protocolo é sem estado (ADR-0008), então não há id de
+    sessão confiável para agrupar mudanças.
+- [ ] **2. Gate de atualização** — tornar a confirmação um mecanismo, não só
+  uma instrução.
+  - Gravação em duas fases: `propose_memory_change` devolve um id e o diff,
+    nada é aplicado; a mudança só vale depois de aprovada.
+  - A aprovação **não pode ser uma tool que o próprio modelo chama** (ele se
+    aprovaria). Caminhos possíveis: a página local da spec 005 (mesmo
+    padrão de `open_wallet_setup`, com token de uso único) como tela de
+    revisão de mudanças pendentes; ou elicitation, quando o Claude Desktop
+    suportar (research D15).
+  - Política por risco: `log_insight` e `record_decision_outcome` podem
+    seguir diretos; sobrescrever regra, apagar ou trocar tese e mudar o
+    objetivo passam pelo gate. Recusa também vai para o log.
+  - Custo: mais tools e um passo a mais na conversa; medir a fricção antes
+    de estender o gate para tudo.
+- [ ] **3. Decaimento** — relevância que cai com o tempo, sem apagar nada.
+  - Cada item ganha `last_confirmed_at` e uma meia-vida por tipo (ponto de
+    partida para discutir: insight ~30 dias, tese ~180 dias com pedido de
+    reconfirmação, regra sem decaimento mas com revisão periódica, decisão
+    pendente cobrada depois do horizonte dela).
+  - Abaixo do limiar, o item vai para `archived`: sai do
+    `get_session_context`, continua no arquivo e no log, e volta com uma
+    reconfirmação. Decair nunca é apagar.
+  - `get_session_context` passa a trazer só os itens ativos e uma lista
+    curta "a revisar", o que também segura o crescimento do contexto.
+  - Exige memória v2 com migração (ADR-0010) e reabre a pergunta do SQLite
+    se o arquivo crescer além da escala humana.
+- [ ] **4. Agente de reflexão** — subagente do plugin, só leitura mais
+  propostas, no mesmo modelo do guardião de disciplina.
+  - Procura: tese que contradiz regra, tese cuja premissa não bate com os
+    dados atuais da carteira, itens duplicados, decisões sem `outcome`
+    vencidas, regras nunca usadas.
+  - Sai com propostas (consolidar, arquivar, reconfirmar, registrar
+    outcome) que passam pelo gate; nunca grava direto ("agente sugere,
+    nunca muta").
+  - Gatilho: skill "revisar memória" sob demanda e, opcionalmente, um
+    lembrete no início de sessão quando a última revisão passar de N dias
+    (o lembrete fica no hook, não no servidor).
+  - Registrar no log quais propostas vieram da reflexão, para medir se ela
+    ajuda ou só gera ruído.
+
+**Riscos e perguntas para o ADR:**
+- O número de tools cresce (hoje 20); cada tool nova pesa na descrição que
+  vai ao modelo em toda sessão.
+- O gate pela página local traz de volta a superfície da porta local
+  (ADR-0019) para outro uso; o mesmo modelo de ameaças precisa cobrir.
+- Meia-vida errada esconde uma regra que o usuário ainda segue; por isso
+  regra não decai por padrão e todo arquivamento é reversível.
 
 ---
 
