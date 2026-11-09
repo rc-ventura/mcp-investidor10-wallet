@@ -29,7 +29,35 @@ configura na página local (D4); ele não vê, não baixa e não abre o `.mcpb`.
 não é a opção A descartada na clarificação (extensão avulsa em Settings >
 Extensions com formulário).
 
-**Decision**: o manifesto Claude do plugin aponta `mcpServers` para um
+**Revisão de 08/11/2026 — resultado do spike (Lote 1), decisão vigente**:
+o ramo 1 não se sustentou e a decisão abaixo (marcada "decisão original")
+está **substituída**. O ramo escolhido é uma variante do **ramo 3**: o
+`plugin.json` do Claude declara o servidor com `mcpServers` inline,
+`command: "uvx"` e `args: ["--from", "mcp-investidor10-wallet==<versão>",
+"mcp-investidor10-wallet"]`, com a versão fixada igual à do pacote publicada
+no PyPI, e o `uv` é **pré-requisito documentado do Claude Desktop**, com um
+tutorial conservador (`docs/INSTALACAO-DESKTOP.md`). O Claude Code segue pelo
+assistente de instalação (`claude mcp add`, ADR-0012). Evidências e limites
+estão em `docs/learning-lessons/mcpb_uv_dentro_de_plugin_no_desktop.md`:
+
+- O Desktop usou o `uv` do usuário (log `Using MCP server command:
+  …/.local/bin/uv`); numa máquina sem `uv`, o plugin `.mcpb` tipo `uv` e o
+  plugin `uvx` falharam do mesmo modo (a mensagem exata não foi registrada).
+- O Claude Code CLI 2.1.317 rejeita o manifesto `server.type: "uv"`
+  (`Expected 'python' | 'node' | 'binary'`).
+- `abrir_pagina` funciona no computador real (macOS, com `uv`).
+  `formulario_app` (MCP App) não renderizou.
+- O binário por plataforma (ramo 2) está descartado: assinatura com Developer
+  ID, notarização e o bloqueio do Gatekeeper no macOS (o Sequoia removeu o
+  atalho de Control-click) pesam mais do que o ganho, e executar um binário
+  opaco não combina com um produto que guarda credencial de carteira.
+- A FR-002 é revista: o usuário abre o terminal uma única vez para instalar o
+  `uv`. Fica registrado como decisão do mantenedor.
+- **Não bloqueiam o Lote 5, mas seguem a validar:** reinício do Desktop depois
+  de instalar o `uv`, Windows e Linux, o mesmo plugin no Claude Code CLI, a
+  branch padrão e o `#ref` do Add marketplace, e a mensagem de erro sem `uv`.
+
+**Decision (decisão original, substituída pela revisão acima)**: o manifesto Claude do plugin aponta `mcpServers` para um
 pacote MCPB versionado dentro do próprio plugin,
 `plugin/servers/carteira.mcpb`, do tipo `server.type: "uv"`
 (`manifest_version` 0.4). O pacote **não leva o código**: seu `pyproject.toml`

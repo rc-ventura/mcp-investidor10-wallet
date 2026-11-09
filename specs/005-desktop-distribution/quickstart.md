@@ -1,5 +1,7 @@
 # Quickstart — validação da spec 005
 
+> **Revisão de 08/11/2026:** o servidor do plugin não é mais um `.mcpb`; o plugin declara `mcpServers` inline com `uvx` e o `uv` é pré-requisito do Desktop (research.md D1, spec.md Clarifications, learning lesson do spike). Trechos abaixo sobre `.mcpb`, `build_mcpb.py` e `servers/carteira.mcpb` estão substituídos.
+
 Roteiros que provam a feature de ponta a ponta. Detalhes de formato ficam
 nos contratos e no data-model; aqui só o que rodar e o que esperar. Nunca
 usar a carteira do mantenedor em registros: os exemplos usam `<id>` e

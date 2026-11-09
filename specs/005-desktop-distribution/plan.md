@@ -1,5 +1,7 @@
 # Implementation Plan: Distribuição Desktop — plugin único, página local de configuração e carteira restrita
 
+> **Revisão de 08/11/2026:** o servidor do plugin não é mais um `.mcpb`; o plugin declara `mcpServers` inline com `uvx` e o `uv` é pré-requisito do Desktop (research.md D1, spec.md Clarifications, learning lesson do spike). Trechos abaixo sobre `.mcpb`, `build_mcpb.py` e `servers/carteira.mcpb` estão substituídos.
+
 **Branch**: `005-desktop-distribution` | **Date**: 2026-11-01 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/005-desktop-distribution/spec.md`

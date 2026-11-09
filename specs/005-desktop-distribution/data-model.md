@@ -1,5 +1,7 @@
 # Data Model — Spec 005
 
+> **Revisão de 08/11/2026:** o servidor do plugin não é mais um `.mcpb`; o plugin declara `mcpServers` inline com `uvx` e o `uv` é pré-requisito do Desktop (research.md D1, spec.md Clarifications, learning lesson do spike). Trechos abaixo sobre `.mcpb`, `build_mcpb.py` e `servers/carteira.mcpb` estão substituídos.
+
 O schema da memória (`memory.json` v1) não muda. As entidades novas são a
 configuração local, o estado de configuração, o link interpretado e os
 artefatos de distribuição (plugin e servidor empacotado).

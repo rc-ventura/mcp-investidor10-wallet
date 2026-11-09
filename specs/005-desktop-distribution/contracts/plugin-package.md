@@ -6,11 +6,10 @@ Cobre FR-001, FR-003, FR-006, FR-009 a FR-009d, FR-026, FR-030, FR-031.
 
 ```text
 plugin/
-├── .claude-plugin/plugin.json      # version = pacote; mcpServers -> ./servers/carteira.mcpb
+├── .claude-plugin/plugin.json      # version = pacote; mcpServers inline (uvx, versão fixada)
 ├── .codex-plugin/plugin.json       # só a versão muda
 ├── .devin-plugin/plugin.json       # só a versão muda
 ├── gemini-extension.json           # só a versão muda
-├── servers/carteira.mcpb           # novo: servidor empacotado (tipo uv), gerado e commitado
 ├── agents/guardiao-de-disciplina.md
 ├── commands/*.toml                 # só Gemini, sem mudança
 ├── hooks/
@@ -36,7 +35,12 @@ plugin inteiro).
   "version": "<versão do pacote>",
   "description": "Assistente da sua carteira do Investidor10: tools da carteira, memória do investidor, skills, guardião de disciplina e persona",
   "license": "MIT",
-  "mcpServers": "./servers/carteira.mcpb"
+  "mcpServers": {
+    "carteira": {
+      "command": "uvx",
+      "args": ["--from", "mcp-investidor10-wallet==<versão do pacote>", "mcp-investidor10-wallet"]
+    }
+  }
 }
 ```
 
@@ -81,13 +85,15 @@ A skill não inventa valores quando as tools não estão disponíveis (conversa
 Chat): diz que as tools só carregam numa sessão Cowork no computador
 (FR-009a).
 
-## Servidor empacotado (`servers/carteira.mcpb`)
+## Servidor do plugin (`mcpServers` inline, `uvx`)
 
-Conteúdo e invariantes em data-model.md §6. Gerado por
-`scripts/build_mcpb.py` (stdlib, zip determinístico), só no PR de release; o
-pacote aponta para a versão publicada no PyPI e não leva o código. Validado na
-release com o CLI oficial `@anthropic-ai/mcpb@2.1.2` (`mcpb validate`), só como
-ferramenta de build.
+*(Revisado em 08/11/2026: o `.mcpb` tipo `uv` foi substituído, ver research.md
+D1 e a learning lesson do spike.)* O plugin não leva o código: o `command`
+`uvx` executa a versão fixada do PyPI, que é a versão testada na release. O
+`uv` é pré-requisito do Claude Desktop, instalado uma vez conforme
+`docs/INSTALACAO-DESKTOP.md`. A versão em `args` é sempre a do pacote e só
+muda no PR de release. Não há `servers/`, `scripts/build_mcpb.py` nem
+manifesto MCPB.
 
 ## Marketplace
 
@@ -106,13 +112,10 @@ leia a branch padrão ao adicionar o marketplace é verificado no spike.
 
 ## Verificações automatizadas (a cada build)
 
-- versão do pacote = `plugin.json` dos quatro manifestos = manifesto MCPB;
+- versão do pacote = `plugin.json` dos quatro manifestos = versão fixada em `mcpServers.carteira.args`;
 - no PR para a branch padrão, `plugin/` só muda junto com a versão;
 - a lista `tools` do guardião usa a forma de nome confirmada no spike;
 - `session-start.json` é JSON válido e só ASCII;
 - `claude plugin validate ./plugin` passa (quando o CLI estiver na CI);
 - nenhum `bin/` no topo do plugin;
-- guarda de ID e credencial também sobre o conteúdo do MCPB.
-
-Só na release (`--check`): tools do manifesto MCPB = tools listadas pelo
-servidor; MCPB commitado = MCPB gerado.
+- guarda de ID e credencial sobre todo o conteúdo de `plugin/`.
