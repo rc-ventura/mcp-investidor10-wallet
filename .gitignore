@@ -31,5 +31,5 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Playwright
+# Playwright MCP
 .playwright-mcp/

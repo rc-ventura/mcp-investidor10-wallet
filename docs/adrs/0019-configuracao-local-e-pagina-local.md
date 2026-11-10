@@ -63,7 +63,13 @@ ambiente, o que o usuário leigo também não consegue fazer.
    tool recebe link, credencial, carteira ou mascaramento.
 5. **Link interpretado, não adivinhado.** Formas aceitas: link de carteira
    restrita (`/wallet/public/<id>?h=<hash>`), de carteira pública
-   (`/carteira/<id>`) e só dígitos. Host diferente, mais de um link, ID não
+   (`/wallet/public/<id>` sem `?h=`, e `/carteira/<id>`) e só dígitos.
+   *Emenda de 2026-11-08:* a rota pública real do site é `/wallet/public/<id>`
+   sem credencial, descoberta no teste do plugin no Claude Desktop; a primeira
+   redação assumia só `/carteira/<id>` e recusava o link público como
+   credencial ausente. `?h=` presente e vazio continua recusado. Um link de
+   carteira restrita colado sem o `?h=` é aceito como público e falha na
+   validação com `access_denied`. Host diferente, mais de um link, ID não
    numérico e credencial fora de `[A-Za-z0-9_-]{1,256}` são recusados com
    orientação que nunca repete o texto recebido. A credencial vai à fonte como
    parâmetro `hash`, só nas requisições do proxy da carteira (Lote 3).
