@@ -1,8 +1,10 @@
 # Instalação no Claude Desktop
 
-> **Rascunho a validar.** Os passos marcados com *(a validar)* dependem do teste em
-> máquina sem `uv` (spec 005, Lote 1). Não publique este texto como definitivo antes
-> de rodar o roteiro no macOS e no Windows.
+> **Validado em 08/11/2026 no macOS**, numa máquina sem `uv`: instalar o `uv` pelo terminal,
+> fechar o terminal, reiniciar o Claude Desktop, instalar o plugin e abrir uma conversa nova.
+> O assistente abriu a página de configuração sozinho e o servidor da carteira rodou. Reiniciar
+> o Desktop foi feito nessa validação, mas pode não ser indispensável; fica como instrução
+> segura. Falta validar o Windows (spec 005, T061).
 
 O servidor da carteira roda com o `uv`, um programa gratuito que baixa e executa
 o servidor. O Claude Desktop **não traz o `uv`** (verificado em máquina sem `uv`, em
@@ -30,11 +32,11 @@ Você precisa de uma conta paga do Claude com o Claude Desktop instalado.
      powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
      ```
 
-3. **Confira a instalação.** *(a validar)* Feche o terminal, abra um novo e digite
+3. **Confira a instalação.** Feche o terminal, abra um novo e digite
    `uv --version`. Deve aparecer um número de versão. Se aparecer "comando não
    encontrado", repita o passo 2 e abra um terminal novo.
 
-4. **Feche o Claude Desktop por completo e abra de novo.** *(a validar)*
+4. **Feche o Claude Desktop por completo e abra de novo.** (Recomendado: foi o que se fez na validação no macOS; talvez baste abrir uma conversa nova, mas isso não foi medido.)
    - Mac: `Cmd + Q` (fechar só a janela não basta).
    - Windows: clique com o botão direito no ícone do Claude na bandeja e escolha Sair.
 

@@ -301,6 +301,12 @@ def run(argv: list[str]) -> int:
     reg = ClientRegistration(command=RUNNER_COMMAND, args=list(RUNNER_ARGS))
     if args.dry_run:
         for adapter in detected:
+            if adapter.client_id == "claude" and not args.mcp_only:
+                print(
+                    f"- {adapter.label}: instalaria o plugin, que já traz o "
+                    "servidor 'carteira'"
+                )
+                continue
             print(f"- {adapter.label}: registraria o servidor 'carteira'")
             if not args.mcp_only:
                 print(f"- {adapter.label}: instalaria o plugin")
@@ -317,41 +323,45 @@ def run(argv: list[str]) -> int:
             )
         )
     for adapter in detected:
-        session.outcomes.append(adapter.register(reg))
-    if not args.mcp_only:
-        for adapter, outcome in zip(detected, session.outcomes):
-            if outcome.status == "failed":
-                continue
-            commands = adapter.plugin_install_commands()
-            if not commands:
+        if adapter.client_id == "claude" and not args.mcp_only:
+            outcome, steps = adapter.install_plugin()
+            session.outcomes.append(outcome)
+            session.plugin_outcomes.extend(steps)
+            continue
+        outcome = adapter.register(reg)
+        session.outcomes.append(outcome)
+        if args.mcp_only or outcome.status == "failed":
+            continue
+        commands = adapter.plugin_install_commands()
+        if not commands:
+            session.plugin_outcomes.append(
+                RegisterOutcome(
+                    adapter.client_id,
+                    "failed",
+                    f"{adapter.label}: plugin não suportado nesta versão do CLI "
+                    "(Codex requer v0.122+); atualize e rode o assistente novamente.",
+                )
+            )
+            continue
+        for command in commands:
+            proc = _run(command)
+            if proc.returncode == 0:
+                session.plugin_outcomes.append(
+                    RegisterOutcome(
+                        adapter.client_id,
+                        "registered",
+                        f"{adapter.label}: plugin instalado (reinicie a sessão do cliente).",
+                    )
+                )
+            else:
+                detail = proc.stderr.strip() or f"código {proc.returncode}"
                 session.plugin_outcomes.append(
                     RegisterOutcome(
                         adapter.client_id,
                         "failed",
-                        f"{adapter.label}: plugin não suportado nesta versão do CLI "
-                        "(Codex requer v0.122+); atualize e rode o assistente novamente.",
+                        f"{adapter.label}: falha ao instalar o plugin — {detail}",
                     )
                 )
-                continue
-            for command in commands:
-                proc = _run(command)
-                if proc.returncode == 0:
-                    session.plugin_outcomes.append(
-                        RegisterOutcome(
-                            adapter.client_id,
-                            "registered",
-                            f"{adapter.label}: plugin instalado (reinicie a sessão do cliente).",
-                        )
-                    )
-                else:
-                    detail = proc.stderr.strip() or f"código {proc.returncode}"
-                    session.plugin_outcomes.append(
-                        RegisterOutcome(
-                            adapter.client_id,
-                            "failed",
-                            f"{adapter.label}: falha ao instalar o plugin — {detail}",
-                        )
-                    )
     for outcome in session.outcomes:
         print(f"- {outcome.message}")
     for outcome in session.plugin_outcomes:

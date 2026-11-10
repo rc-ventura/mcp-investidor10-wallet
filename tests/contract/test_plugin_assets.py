@@ -1,10 +1,13 @@
 import json
 import re
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from investidor10_wallet import __version__
 
 REPO = Path(__file__).resolve().parents[2]
 PLUGIN = REPO / "plugin"
@@ -27,17 +30,38 @@ def test_manifests_are_valid_json_with_matching_names():
     names = {m["name"] for m in data}
     versions = {m["version"] for m in data}
     assert names == {"investidor10-carteira"}
-    assert len(versions) == 1
+    assert versions == {__version__}
     assert all(m["description"] for m in data)
     market = _load(MARKETPLACE)
     assert market["plugins"][0]["name"] == data[0]["name"]
     assert "owner" in market
 
 
-def test_plugin_carries_no_mcp_server():
+def test_only_the_claude_manifest_declares_the_server():
     assert not (PLUGIN / ".mcp.json").exists()
-    for path in MANIFESTS:
+    for path in (DEVIN_MANIFEST, CODEX_MANIFEST, GEMINI_MANIFEST):
         assert "mcpServers" not in _load(path)
+    servers = _load(CLAUDE_MANIFEST)["mcpServers"]
+    assert set(servers) == {"carteira"}
+    carteira = servers["carteira"]
+    assert carteira["command"] == "uvx"
+    assert carteira["args"] == [
+        "--from",
+        f"mcp-investidor10-wallet=={__version__}",
+        "mcp-investidor10-wallet",
+    ]
+    assert "env" not in carteira
+
+
+def test_claude_manifest_has_display_name_and_license():
+    manifest = _load(CLAUDE_MANIFEST)
+    assert manifest["displayName"]
+    assert manifest["license"] == "MIT"
+
+
+def test_plugin_has_no_bundled_server_or_bin_directory():
+    assert not (PLUGIN / "servers").exists()
+    assert not (PLUGIN / "bin").exists()
 
 
 def test_all_declared_paths_exist():
@@ -51,7 +75,7 @@ def test_all_declared_paths_exist():
 
 def test_skills_present_with_required_frontmatter():
     skill_files = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
-    assert len(skill_files) == 3
+    assert len(skill_files) == 4
     for path in skill_files:
         content = path.read_text(encoding="utf-8")
         assert content.startswith("---")
@@ -73,22 +97,34 @@ def test_gemini_commands_mirror_the_skills():
 def test_hooks_cover_persona_and_memory_reminder():
     hooks = _load(PLUGIN / "hooks" / "hooks.json")["hooks"]
     assert set(hooks) == {"SessionStart", "Stop"}
-    persona = (PLUGIN / "hooks" / "session-start-persona.sh").read_text(
-        encoding="utf-8"
-    )
-    assert "additionalContext" in persona
-    assert "assistente de investimentos" in persona
+    start = hooks["SessionStart"][0]["hooks"][0]["command"]
+    assert start == 'cat "${CLAUDE_PLUGIN_ROOT}/hooks/session-start.json"'
+    stop = hooks["Stop"][0]["hooks"][0]["command"]
+    assert stop == 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/stop-memory-reminder.sh"'
     reminder = (PLUGIN / "hooks" / "stop-memory-reminder.sh").read_text(
         encoding="utf-8"
     )
     assert "confirmação" in reminder
 
 
+def test_session_start_is_static_ascii_json_with_persona_and_pending_rule():
+    path = PLUGIN / "hooks" / "session-start.json"
+    raw = path.read_bytes()
+    raw.decode("ascii")
+    data = json.loads(raw)
+    output = data["hookSpecificOutput"]
+    assert output["hookEventName"] == "SessionStart"
+    context = output["additionalContext"]
+    assert "assistente de investimentos" in context
+    assert "get_session_context" in context
+    assert "configurar-carteira" in context
+    assert not (PLUGIN / "hooks" / "session-start-persona.sh").exists()
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only: executable bit")
 def test_hook_scripts_are_executable():
-    for script in ("session-start-persona.sh", "stop-memory-reminder.sh"):
-        path = PLUGIN / "hooks" / script
-        assert path.stat().st_mode & stat.S_IXUSR
+    path = PLUGIN / "hooks" / "stop-memory-reminder.sh"
+    assert path.stat().st_mode & stat.S_IXUSR
 
 
 def test_no_asset_touches_memory_file():
@@ -116,27 +152,51 @@ def _bash():
     pytest.skip("Git Bash not found; the bash on PATH is the WSL launcher")
 
 
-def test_hooks_scripts_fail_open_on_empty_input():
-    import subprocess
+def test_stop_hook_fails_open_on_empty_input():
+    path = PLUGIN / "hooks" / "stop-memory-reminder.sh"
+    proc = subprocess.run(
+        [_bash(), path.as_posix()],
+        check=False,
+        input="{}",
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert proc.returncode == 0, f"saiu com {proc.returncode}: {proc.stderr}"
+    assert proc.stdout == ""
 
-    bash = _bash()
-    for script in ("session-start-persona.sh", "stop-memory-reminder.sh"):
-        path = PLUGIN / "hooks" / script
-        proc = subprocess.run(
-            [bash, path.as_posix()],
-            check=False,
-            input="{}",
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        assert proc.returncode == 0, (
-            f"{script} saiu com {proc.returncode}: {proc.stderr}"
-        )
-        if script == "session-start-persona.sh":
-            assert "additionalContext" in proc.stdout
-        else:
-            assert proc.stdout == ""
+
+def test_configure_skill_follows_the_contract_steps():
+    skill = (PLUGIN / "skills" / "configurar-carteira" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert skill.startswith("---")
+    assert "name: configurar-carteira" in skill
+    assert "description:" in skill
+    for needle in (
+        "open_wallet_setup",
+        "get_session_context",
+        "configuration",
+        "mcp-investidor10-wallet configure",
+        "nunca na conversa",
+        "docs/INSTALACAO-DESKTOP.md",
+    ):
+        assert needle in skill, needle
+
+
+def test_guardian_inherits_the_session_tools():
+    agent = (PLUGIN / "agents" / "guardiao-de-disciplina.md").read_text(
+        encoding="utf-8"
+    )
+    frontmatter = agent.split("---")[1]
+    assert "tools:" not in frontmatter
+    assert "model: inherit" in frontmatter
+
+
+def test_marketplace_description_names_the_whole_product():
+    plugin = _load(MARKETPLACE)["plugins"][0]
+    assert plugin["source"] == "./plugin"
+    assert "servidor" in plugin["description"]
 
 
 def test_dividends_skill_and_its_mirror_handle_privacy_mode():

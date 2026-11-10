@@ -1,5 +1,17 @@
 {
   "name": "investidor10-carteira",
-  "version": "0.1.1",
-  "description": "Comportamento do agente investidor: skills, guardião de disciplina, persona e lembrete de memória"
+  "displayName": "Carteira Investidor10",
+  "version": "0.4.0rc3",
+  "description": "Assistente da sua carteira do Investidor10: tools da carteira, memória do investidor, skills, guardião de disciplina e persona",
+  "license": "MIT",
+  "mcpServers": {
+    "carteira": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mcp-investidor10-wallet==0.4.0rc3",
+        "mcp-investidor10-wallet"
+      ]
+    }
+  }
 }

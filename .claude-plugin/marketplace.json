@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "investidor10-carteira",
-      "description": "Comportamento do agente investidor: prompts, guardião de disciplina e lembrete de memória",
+      "description": "Carteira Investidor10 completa: servidor da carteira, memória do investidor, skills, guardião de disciplina e persona",
       "source": "./plugin"
     }
   ]
