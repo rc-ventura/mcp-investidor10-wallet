@@ -84,8 +84,8 @@ def test_success_registers_all_detected_and_installs_plugin_by_default(
     respx.get(PROBE).mock(return_value=httpx.Response(200))
     assert cli.run(["--wallet-id", "1234567", "--no-mask"]) == 0
     log = (fake_bin_dir / "calls.log").read_text()
-    for client in ("claude", "codex"):
-        assert f"{client} mcp add carteira" in log
+    assert "codex mcp add carteira" in log
+    assert "claude mcp add" not in log
     assert "devin mcp add -s user carteira --" in log
     assert "gemini mcp add -s user carteira uvx" in log
     assert "claude plugin marketplace add rc-ventura/mcp-investidor10-wallet" in log
@@ -553,3 +553,95 @@ def test_configure_replaces_a_corrupted_configuration(isolated_home):
     assert cli.run_configure(["--link", PUBLIC_LINK, "--no-mask"]) == 0
 
     assert saved_config(isolated_home)["wallet_id"] == "1234567"
+
+
+def _claude_log(fake_bin_dir):
+    log = fake_bin_dir / "calls.log"
+    if not log.exists():
+        return []
+    return [line for line in log.read_text().splitlines() if line.startswith("claude ")]
+
+
+@respx.mock
+def test_claude_default_installs_the_plugin_pinned_and_does_not_register(
+    fake_bin_dir, capsys
+):
+    from investidor10_wallet import __version__
+
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert cli.run(["--wallet-id", "1234567", "--no-mask", "--clients", "claude"]) == 0
+    log = "\n".join(_claude_log(fake_bin_dir))
+    assert (
+        f"claude plugin marketplace add rc-ventura/mcp-investidor10-wallet#v{__version__}"
+        in log
+    )
+    assert "claude plugin install investidor10-carteira@investidor10" in log
+    assert "claude mcp add" not in log
+    assert "vem com o plugin" in capsys.readouterr().out
+
+
+@respx.mock
+def test_claude_with_synced_plugin_explains_why_it_does_not_install(
+    fake_bin_dir, capsys
+):
+    (fake_bin_dir / "plugin-list.out").write_text("investidor10-carteira@synced\n")
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert cli.run(["--wallet-id", "1234567", "--no-mask", "--clients", "claude"]) == 0
+    log = "\n".join(_claude_log(fake_bin_dir))
+    assert "plugin install" not in log
+    assert "Claude Desktop" in capsys.readouterr().out
+
+
+@respx.mock
+def test_claude_old_registration_asks_once_and_removes_only_on_yes(
+    fake_bin_dir, monkeypatch, isolated_home
+):
+    (fake_bin_dir / "mcp-list.out").write_text("carteira: uvx x\n")
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    asked = answers(monkeypatch, "s")
+    args = ["--wallet-id", "1234567", "--no-mask", "--clients", "claude"]
+    assert cli.run(args) == 0
+    assert len([a for a in asked if "instalação anterior" in a]) == 1
+    assert "claude mcp remove carteira -s user" in _claude_log(fake_bin_dir)
+
+
+@respx.mock
+def test_claude_old_registration_refused_installs_plugin_and_reports_duplication(
+    fake_bin_dir, monkeypatch, isolated_home, capsys
+):
+    (fake_bin_dir / "mcp-list.out").write_text("carteira: uvx x\n")
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    answers(monkeypatch, "")
+    args = ["--wallet-id", "1234567", "--no-mask", "--clients", "claude"]
+    assert cli.run(args) == 0
+    log = "\n".join(_claude_log(fake_bin_dir))
+    assert "mcp remove" not in log
+    assert "plugin install" in log
+    assert "duplic" in capsys.readouterr().out
+
+
+@respx.mock
+def test_mcp_only_in_claude_registers_the_server_and_warns_about_the_plugin(
+    fake_bin_dir, capsys
+):
+    (fake_bin_dir / "plugin-list.out").write_text(
+        "investidor10-carteira@investidor10\n"
+    )
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    args = ["--wallet-id", "1234567", "--no-mask", "--clients", "claude", "--mcp-only"]
+    assert cli.run(args) == 0
+    log = "\n".join(_claude_log(fake_bin_dir))
+    assert "claude mcp add carteira" in log
+    assert "plugin install" not in log
+    assert "duplic" in capsys.readouterr().out
+
+
+@respx.mock
+def test_dry_run_in_claude_announces_the_plugin_and_runs_nothing(
+    fake_bin_dir, isolated_home, capsys
+):
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    args = ["--wallet-id", "1234567", "--no-mask", "--clients", "claude", "--dry-run"]
+    assert cli.run(args) == 0
+    assert "instalaria o plugin" in capsys.readouterr().out
+    assert not any("plugin install" in line for line in _claude_log(fake_bin_dir))

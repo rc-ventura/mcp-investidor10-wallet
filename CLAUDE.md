@@ -23,6 +23,7 @@
 | [0015](./docs/adrs/0015-modo-privacidade-wallet-mask-values.md) | Modo privacidade `WALLET_MASK_VALUES` — allowlist fail-closed, tools monetárias indisponíveis | Accepted | 2026-10-28 |
 | [0016](./docs/adrs/0016-validacao-de-payloads-em-tools-novas.md) | Regra de validação de payloads para tools novas — pydantic validate-then-passthrough | Accepted | 2026-10-28 |
 | [0017](./docs/adrs/0017-cotacao-em-cache-vencido-nao-dispara-alerta.md) | Cotação em cache vencido não dispara alerta — `stale_quote` em `pending_check` | Accepted | 2026-10-28 |
+| [0018](./docs/adrs/0018-plugin-unico-com-servidor-empacotado.md) | Plugin único com servidor via `uvx` — fonte única da conexão no Claude Desktop e no Claude Code | Accepted | 2026-11-08 |
 | [0019](./docs/adrs/0019-configuracao-local-e-pagina-local.md) | Configuração local única, carteira restrita, servidor sem configuração e página local | Accepted | 2026-11-03 |
 | [0020](./docs/adrs/0020-fluxo-de-branches-e-release.md) | Fluxo de branches e release — `main` só contém versões publicadas no índice, `develop`, portão de promoção | Accepted | 2026-11-02 |
 

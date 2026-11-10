@@ -42,6 +42,12 @@ def fake_bin_dir(tmp_path, monkeypatch):
             'if [ "$1" = "mcp" ] && [ "$2" = "list" ]; then\n'
             f'  [ -f "{bin_dir}/mcp-list.out" ] && cat "{bin_dir}/mcp-list.out"\n'
             "fi\n"
+            'if [ "$1" = "plugin" ] && [ "$2" = "list" ]; then\n'
+            f'  [ -f "{bin_dir}/plugin-list.out" ] && cat "{bin_dir}/plugin-list.out"\n'
+            "fi\n"
+            'if [ "$1" = "plugin" ] && [ "$2" = "marketplace" ] && [ "$3" = "list" ]; then\n'
+            f'  [ -f "{bin_dir}/marketplace-list.out" ] && cat "{bin_dir}/marketplace-list.out"\n'
+            "fi\n"
             f'if [ -f "{bin_dir}/fail-plugin" ]; then\n'
             '  case "$*" in *plugin*|*plugins*|*extensions*) exit 1;; esac\n'
             "fi\n"
