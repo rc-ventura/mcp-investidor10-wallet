@@ -68,6 +68,8 @@
 - [Publicação de pacotes e promoção de artefatos](./docs/research/fichamentos/publicacao-de-pacotes-e-promocao-de-artefatos.md) — 2026-11-01
 - [Skills e subagentes de projeto no Claude Code](./docs/research/fichamentos/skills-e-subagentes-do-claude-code.md) — 2026-11-01
 - [Como Anthropic e terceiros empacotam servidores MCP locais, plugins e extensões](./docs/research/fichamentos/distribuicao-de-servidores-mcp-em-plugins-e-extensoes.md) — 2026-11-06
+- [Requisitos dos diretórios de plugins e dos registries de servidores MCP](./docs/research/fichamentos/diretorios-de-plugins-e-registries-requisitos.md) — 2026-11-10
+- [Serviços de cotação de ações da B3: atraso, licença e redistribuição](./docs/research/fichamentos/servicos-de-cotacao-b3.md) — 2026-11-10
 
 ### Pesquisas anteriores
 

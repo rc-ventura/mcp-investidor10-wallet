@@ -724,7 +724,7 @@ async def open_wallet_setup() -> dict:
 
 
 def main() -> None:
-    """Run the server, or a subcommand: 'install' or 'configure'."""
+    """Run the server, or a subcommand: 'install', 'configure' or 'doctor'."""
     if len(sys.argv) > 1 and sys.argv[1] == "install":
         from .installer import cli
 
@@ -733,6 +733,10 @@ def main() -> None:
         from .installer import cli
 
         raise SystemExit(cli.run_configure(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "doctor":
+        from .installer import doctor
+
+        raise SystemExit(doctor.run(sys.argv[2:]))
     global memory
     config = bootstrap.load_config()
     wallet_client.configure(config)

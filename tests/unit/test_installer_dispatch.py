@@ -1,7 +1,7 @@
 import pytest
 
 from investidor10_wallet import server
-from investidor10_wallet.installer import cli
+from investidor10_wallet.installer import cli, doctor
 
 
 def test_main_dispatches_install_subcommand_without_starting_server(monkeypatch):
@@ -63,3 +63,15 @@ def test_main_does_not_send_configure_to_the_install_assistant(monkeypatch):
         server.main()
 
     assert calls == []
+
+
+def test_main_dispatches_doctor_subcommand_without_starting_server(monkeypatch):
+    calls = []
+    monkeypatch.setattr(doctor, "run", lambda argv: calls.append(argv) or 1)
+    monkeypatch.setattr(server.sys, "argv", ["mcp-investidor10-wallet", "doctor"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        server.main()
+
+    assert exc_info.value.code == 1
+    assert calls == [[]]
