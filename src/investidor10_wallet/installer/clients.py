@@ -1,6 +1,7 @@
 import re
 import shutil
 import subprocess
+from dataclasses import dataclass
 
 from .. import __version__
 from . import SERVER_ALIAS, ClientRegistration, RegisterOutcome
@@ -28,6 +29,28 @@ def _run(command: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(
         command, check=False, capture_output=True, text=True, timeout=120
     )
+
+
+@dataclass(frozen=True)
+class ClaudeInstall:
+    old_registration: bool
+    plugin_server: bool
+    synced: bool
+    local: bool
+    plugin_version: str | None
+
+
+def _plugin_version(listing: str) -> str | None:
+    lines = listing.splitlines()
+    for index, line in enumerate(lines):
+        if f"{PLUGIN_NAME}@" in line:
+            for follow in lines[index + 1 : index + 5]:
+                found = re.search(r"Version:\s*(\S+)", follow)
+                if found:
+                    return found.group(1)
+                if "@" in follow:
+                    break
+    return None
 
 
 def _ask_yes(prompt: str) -> bool:
@@ -100,6 +123,20 @@ class ClaudeAdapter(ClientAdapter):
             if line.split(":", 1)[0].strip() == SERVER_ALIAS:
                 return True
         return False
+
+    def inspect(self) -> ClaudeInstall:
+        servers = self._capture("mcp", "list")
+        plugins = self._capture("plugin", "list")
+        return ClaudeInstall(
+            old_registration=self.list_existing(),
+            plugin_server=any(
+                line.strip().startswith(f"plugin:{PLUGIN_NAME}:")
+                for line in servers.splitlines()
+            ),
+            synced=SYNCED_ID in plugins,
+            local=PLUGIN_ID in plugins,
+            plugin_version=_plugin_version(plugins),
+        )
 
     def _marketplace_present(self) -> bool:
         pattern = re.compile(rf"(?<![\w/-]){MARKETPLACE_NAME}(?![\w-])")
