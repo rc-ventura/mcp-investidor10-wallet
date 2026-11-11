@@ -8,10 +8,14 @@ minor; correções incrementam o patch.
 
 ## [0.4.0] - não lançado
 
-Pré-lançamento `0.4.0rc3`. Distribuição para o Claude Desktop: o servidor passa a
+Pré-lançamento `0.4.0rc4`. Distribuição para o Claude Desktop: o servidor passa a
 subir sem carteira configurada e a carteira se configura por uma página local ou
-pelo terminal, inclusive a carteira restrita. O plugin único e o `doctor` entram nas
-próximas pré-versões; esta seção será completada na versão final.
+pelo terminal, inclusive a carteira restrita, e o plugin passa a levar o servidor. O
+`doctor` entra nas próximas pré-versões; esta seção será completada na versão final.
+
+A `0.4.0rc4` é a primeira pré-versão cujo tag carrega o **plugin único** (o plugin
+declara o servidor `carteira` com `uvx` e a versão fixada); nas anteriores o plugin
+ainda era só de comportamento. O servidor não muda em relação à `0.4.0rc1`.
 
 A `0.4.0rc2` e a `0.4.0rc3` não mudam o servidor em relação à `0.4.0rc1`: repetem a
 publicação para o `verify` do release passar nos três sistemas. A `0.4.0rc1` e a
@@ -21,6 +25,11 @@ pacote; a `0.4.0rc3` sai com o `verify` corrigido.
 
 ### Adicionado
 
+- **Plugin único com servidor** (ADR-0018): `plugin/.claude-plugin/plugin.json` declara
+  o servidor `carteira` (`uvx --from mcp-investidor10-wallet==<versão>`), então o Claude
+  Desktop e o Claude Code instalam um plugin só. O `uv` é pré-requisito do Desktop
+  (`docs/INSTALACAO-DESKTOP.md`). Skill nova `configurar-carteira`; o hook de início de
+  sessão virou um JSON estático; o guardião de disciplina herda as tools da sessão.
 - **Configuração local única** (`~/.investidor10/config.json`, arquivo 0600): ID da
   carteira, credencial do link de compartilhamento, modo (pública ou restrita) e
   mascaramento de valores. Todos os clientes leem o mesmo arquivo, e uma mudança vale
@@ -59,6 +68,11 @@ pacote; a `0.4.0rc3` sai com o `verify` corrigido.
   abortando.
 - Os clientes (Claude Code, Devin, Codex e Gemini) são registrados sem a variável
   `WALLET_ID`.
+- No Claude Code, o assistente de instalação instala o plugin (marketplace fixado em
+  `#v<versão>`) e não roda mais `claude mcp add`; `--mcp-only` segue como escape. Ele
+  pergunta antes de remover o registro antigo `carteira`, o marketplace da 0.3.x ou uma
+  cópia local, e não instala cópia local quando o plugin chega sincronizado pelo
+  Claude Desktop.
 - `docs/PRIVACY.md` recomenda a carteira restrita e explica onde fica a credencial.
 
 ## [0.3.0] - 2026-10-28
