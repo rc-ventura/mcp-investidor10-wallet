@@ -50,8 +50,10 @@ def _collect(home, **kwargs):
 def _uv_present(tmp_path, monkeypatch):
     bin_dir = tmp_path / "uv-bin"
     bin_dir.mkdir()
+    # Windows: shutil.which only finds names with a PATHEXT extension
+    suffix = ".exe" if sys.platform == "win32" else ""
     for name in ("uv", "uvx"):
-        path = bin_dir / name
+        path = bin_dir / f"{name}{suffix}"
         path.write_text("#!/bin/sh\nexit 0\n")
         path.chmod(0o755)
     monkeypatch.setenv("PATH", str(bin_dir))
