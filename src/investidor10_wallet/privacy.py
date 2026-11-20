@@ -118,7 +118,7 @@ def unavailable_error(tool: str) -> dict:
         "error": {
             "code": "privacy_mode_unavailable",
             "message": (
-                f"{tool} is unavailable: the operator enabled privacy mode, which "
+                f"{tool} is unavailable: privacy mode is on, which "
                 "withholds monetary amounts. Use get_wallet_allocation or "
                 "get_wallet_positions for percentage-based analysis; do not estimate "
                 "the withheld amounts."

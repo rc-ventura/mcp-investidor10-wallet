@@ -18,12 +18,14 @@ from .memory_store import (
 )
 
 INSTRUCTIONS = (
-    "Read-only access to one public Investidor10 wallet plus a persistent investor "
-    "memory (theses, rules, decisions, price alerts). Start every session with "
-    "get_session_context. Wallet tools return a data envelope "
-    "{cached, fetched_at, data}; errors return {error: {code, message}} with isError "
-    "set. B3 quotes carry ~15 minutes of delay. When privacy.masked is true, the "
-    "operator withheld monetary amounts."
+    "Read-only access to one Investidor10 wallet (public or restricted, configured "
+    "by the user on a local setup page) plus a persistent investor memory (theses, "
+    "rules, decisions, price alerts). Start every session with get_session_context; "
+    "if it reports pending configuration, call open_wallet_setup before any wallet "
+    "analysis. Wallet tools return a data envelope {cached, fetched_at, data}; "
+    "errors return {error: {code, message}} with isError set. B3 quotes carry ~15 "
+    "minutes of delay. When privacy.masked is true, privacy mode is on and "
+    "monetary amounts were withheld."
 )
 
 mcp = FastMCP("investidor10-wallet", instructions=INSTRUCTIONS, mask_error_details=True)
@@ -207,7 +209,7 @@ async def get_wallet_summary() -> dict:
     (`cached=true`). On failure this returns {"error": {"code", "message"}} —
     never invent values.
 
-    When the envelope has `privacy.masked` true, the operator withheld monetary
+    When the envelope has `privacy.masked` true, privacy mode withheld monetary
     amounts and quantities: work with the percentages and ratios provided and
     never estimate or reconstruct the withheld values.
     """
@@ -234,7 +236,7 @@ async def get_wallet_allocation() -> dict:
     envelope — always mention `fetched_at` and `cached` when presenting the
     numbers.
 
-    When the envelope has `privacy.masked` true, the operator withheld monetary
+    When the envelope has `privacy.masked` true, privacy mode withheld monetary
     amounts and quantities: work with the percentages and ratios provided and
     never estimate or reconstruct the withheld values.
     """
@@ -251,7 +253,7 @@ async def get_wallet_allocation() -> dict:
 async def get_wallet_positions(asset_type: str) -> dict:
     """Detailed positions of one asset class of the wallet.
 
-    When the envelope has `privacy.masked` true, the operator withheld monetary
+    When the envelope has `privacy.masked` true, privacy mode withheld monetary
     amounts and quantities: work with the percentages and ratios provided and
     never estimate or reconstruct the withheld values.
 
@@ -325,7 +327,7 @@ async def get_earnings(
 ) -> dict:
     """Earnings (dividends, interest, income) received by the wallet in a period.
 
-    When the operator enabled privacy mode this tool returns a
+    When privacy mode is on this tool returns a
     privacy_mode_unavailable error: say so and do not estimate earnings.
 
     Presentation rules: present the total (data.sum) for exactly the requested
@@ -354,7 +356,7 @@ async def get_patrimony_history(months: int) -> dict:
     """Monthly patrimony evolution over a horizon, separating contributions
     from capital gains.
 
-    When the operator enabled privacy mode this tool returns a
+    When privacy mode is on this tool returns a
     privacy_mode_unavailable error: say so and do not estimate the series.
 
     Presentation rules: show the monthly series splitting what was contributed
