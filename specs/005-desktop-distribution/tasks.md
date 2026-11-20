@@ -296,8 +296,8 @@ fictícia (quickstart S9).
 **Independent Test**: numa máquina com Devin Desktop, rodar o assistente e
 verificar tools, skills, guardião e hooks.
 
-- [ ] T083 [US3] Verificar numa instalação real do Devin Desktop (mantenedor) se o registro feito pelo assistente para o Devin CLI e o plugin de comportamento carregam no app (as 20 tools, skills, guardião, persona); registrar em `docs/learning-lessons/devin_desktop_harness_compartilhado.md` com fonte, versão e data, e a linha no índice de `CLAUDE.md`
-- [ ] T084 [US3] Adicionar a `tests/unit/test_installer_cli.py` (escrever primeiro) e implementar em `src/investidor10_wallet/installer/cli.py`/`clients.py` a linha do relatório que diz se o Devin Desktop foi coberto, conforme o resultado de T083: coberto pelo registro compartilhado, coberto por caminho próprio (mecanismo nativo do app, com fonte) ou não suportado; nunca registrar por adivinhação
+- [ ] T083 [US3] *(Registrada como débito em 20/11/2026: o mantenedor não tem o Devin Desktop, só o Devin web. Ver [DT-001](../../docs/technical-debt/DT-001-verificar-devin-desktop-real.md); a task segue aberta até alguém com o app executá-la.)* Verificar numa instalação real do Devin Desktop (mantenedor) se o registro feito pelo assistente para o Devin CLI e o plugin de comportamento carregam no app (as 20 tools, skills, guardião, persona); registrar em `docs/learning-lessons/devin_desktop_harness_compartilhado.md` com fonte, versão e data, e a linha no índice de `CLAUDE.md`
+- [ ] T084 [US3] *(Bloqueada pela T083; registrada como [DT-002](../../docs/technical-debt/DT-002-linha-do-relatorio-devin-desktop.md) em 20/11/2026.)* Adicionar a `tests/unit/test_installer_cli.py` (escrever primeiro) e implementar em `src/investidor10_wallet/installer/cli.py`/`clients.py` a linha do relatório que diz se o Devin Desktop foi coberto, conforme o resultado de T083: coberto pelo registro compartilhado, coberto por caminho próprio (mecanismo nativo do app, com fonte) ou não suportado; nunca registrar por adivinhação
 
 **Checkpoint**: learning lesson escrita; relatório do assistente coerente com ela.
 
