@@ -81,9 +81,10 @@ memória e a configuração ficam intactas (estão em `~/.investidor10/`).
 
 **Limitações**
 
-- As tools só carregam numa sessão **Cowork** no computador. Numa conversa **Chat**
-  comum o assistente não tem acesso à carteira nem à memória e deve dizer isso, sem
-  inventar valores.
+- As tools só carregam numa sessão **Cowork**, que roda no seu computador. No Claude
+  Desktop atual a tela inicial abre o Cowork; num computador que não consegue rodar o
+  Cowork a conversa abre como **Chat**, e aí o assistente não tem acesso à carteira
+  nem à memória e deve dizer isso, sem inventar valores.
 - Um plugin adicionado na sua conta é sincronizado para o Claude Code. Nesse caso o
   assistente de instalação dos CLIs não instala uma cópia local, para não duplicar
   o servidor.
