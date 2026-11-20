@@ -55,6 +55,12 @@ números na tela, mas a API continua devolvendo tudo (verificado em 17/10/2026).
   e vai ao provedor do modelo; o assistente é instruído a não repeti-lo nem
   reutilizá-lo, mas o histórico já o tem. Use a página local ou o `configure`.
 - Não publique o ID, o link nem a credencial em issues, prints ou repositórios.
+- **Evite a flag `--link` em computador compartilhado.** Com
+  `install --link <link>` ou `configure --link <link>`, o link inteiro, com a
+  credencial, fica na linha de comando: aparece na lista de processos para o seu
+  usuário e no histórico do terminal. A pergunta interativa e a página local não
+  fazem isso, mas a pergunta mostra o link na tela enquanto você o digita. Se
+  usou `--link`, apague a linha do histórico do terminal.
 - Se o link vazar, deixe a carteira privada nas configurações do site: sem
   acesso, o servidor passa a mostrar "acesso recusado". **Não confirmamos** que
   gerar um link novo no site cancela o antigo; só a carteira privada garante

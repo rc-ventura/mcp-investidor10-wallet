@@ -52,6 +52,7 @@
 - [Teste que troca o `HOME` muda o Python do `uvx`: o `verify` do release só falhava no Ubuntu](./docs/learning-lessons/smoke_troca_home_e_uvx_perde_o_python_gerenciado.md) — 2026-11-07
 - [O `.mcpb` tipo `uv` não dispensa o `uv` no Claude Desktop: o plugin leva `uvx` e o `uv` vira pré-requisito](./docs/learning-lessons/mcpb_uv_dentro_de_plugin_no_desktop.md) — 2026-11-08
 - [Workflows de evento só valem na branch padrão: `promote.yml` e `live.yml` não rodam antes da primeira promoção da 0.4.0](./docs/learning-lessons/workflows_de_evento_so_valem_na_branch_padrao.md) — 2026-11-14
+- [`str.isdigit()` e `\d` aceitam dígitos que não são ASCII: validar número de entrada com `[0-9]`](./docs/learning-lessons/digitos_unicode_isdigit_e_d_aceitam_alem_de_ascii.md) — 2026-11-20
 
 ## Research
 
@@ -93,3 +94,6 @@
 | [DT-003](./docs/technical-debt/DT-003-validar-o-produto-no-windows.md) | Validar o produto no Windows | Open | Medium | 2026-11-20 |
 | [DT-004](./docs/technical-debt/DT-004-validar-claude-code-no-macos-e-linux.md) | Validar o Claude Code pelo assistente de instalação (macOS e Linux) | Open | Medium | 2026-11-20 |
 | [DT-005](./docs/technical-debt/DT-005-validar-devin-cli-codex-e-gemini.md) | Validar o Devin CLI, o Codex, o Gemini CLI e o assistente real | Open | Medium | 2026-11-20 |
+| [DT-006](./docs/technical-debt/DT-006-falhas-de-subprocesso-no-instalador-e-flag-yes.md) | Tratar falhas de subprocesso no instalador e no doctor, e a flag `--yes` | Open | Medium | 2026-11-20 |
+| [DT-007](./docs/technical-debt/DT-007-endurecer-a-pagina-local-de-configuracao.md) | Endurecer a página local de configuração | Open | Low | 2026-11-20 |
+| [DT-008](./docs/technical-debt/DT-008-higiene-de-scripts-e-workflows-de-release.md) | Higiene dos scripts e workflows de release | Open | Low | 2026-11-20 |
