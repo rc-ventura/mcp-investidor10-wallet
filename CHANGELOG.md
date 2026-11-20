@@ -8,10 +8,11 @@ minor; correções incrementam o patch.
 
 ## [0.4.0] - não lançado
 
-Pré-lançamento `0.4.0rc4`. Distribuição para o Claude Desktop: o servidor passa a
-subir sem carteira configurada e a carteira se configura por uma página local ou
-pelo terminal, inclusive a carteira restrita, e o plugin passa a levar o servidor. O
-`doctor` entra nas próximas pré-versões; esta seção será completada na versão final.
+Distribuição para o Claude Desktop: o servidor passa a subir sem carteira configurada
+e a carteira se configura por uma página local ou pelo terminal, inclusive a carteira
+restrita, e o plugin passa a levar o servidor. O passo a passo de instalação está no
+README e em `docs/INSTALACAO-DESKTOP.md`, e quem atualiza da 0.3.x encontra a
+migração no fim desta seção.
 
 A `0.4.0rc4` é a primeira pré-versão cujo tag carrega o **plugin único** (o plugin
 declara o servidor `carteira` com `uvx` e a versão fixada); nas anteriores o plugin
@@ -53,6 +54,24 @@ pacote; a `0.4.0rc3` sai com o `verify` corrigido.
   Novos scripts `scripts/check_release_tag.py` e `scripts/smoke_mcp.py`.
 - `scripts/check-no-wallet-id` também procura a credencial (`WALLET_HASH`) em
   arquivos versionados e dentro de pacotes `.mcpb`.
+- **`mcp-investidor10-wallet doctor`**: confere a instalação (configuração, servidor,
+  clientes e a entrada manual duplicada no Claude Desktop) e imprime um resumo com
+  causa e ação para cada problema, sem ID, credencial, valores nem o nome do usuário,
+  pronto para colar numa issue.
+- **Marketplace próprio** (`.claude-plugin/marketplace.json`): o Claude Desktop e o
+  Claude Code adicionam o repositório como marketplace e instalam o plugin por ele.
+  `main` só contém versões já publicadas no PyPI, então é o que o marketplace entrega.
+- **Fluxo de branches e promoção** (ADR-0020): o trabalho entra por `develop`; a tag
+  `vX.Y.Z` sai de `develop`, é publicada e verificada; o `promote.yml` cria
+  `promote/vX.Y.Z` e abre o pedido para `main`, onde o `main-gate` só aceita origem
+  `promote/v*` com o commit da tag, versões iguais nos manifestos e a versão já no
+  índice. O passo a passo do mantenedor está em `docs/RELEASING.md`, e o fluxo
+  desenhado em `docs/CI-VERSIONAMENTO.md`.
+- **Alarme semanal contra a API real** (`live.yml`): roda os testes `live` toda
+  segunda-feira, com uma carteira fictícia, e mostra só o código do erro nos logs.
+- **Dependabot** para o `uv` e para as actions, contra `develop`, com intervalo semanal
+  e carência de 7 dias para versões novas. A CI também valida o plugin e o marketplace
+  com `claude plugin validate`.
 
 ### Alterado
 
@@ -74,6 +93,27 @@ pacote; a `0.4.0rc3` sai com o `verify` corrigido.
   cópia local, e não instala cópia local quando o plugin chega sincronizado pelo
   Claude Desktop.
 - `docs/PRIVACY.md` recomenda a carteira restrita e explica onde fica a credencial.
+- No Codex e no Gemini CLI, o assistente instala o plugin fixado na tag da versão
+  (`--ref vX.Y.Z`). O Devin CLI não aceita referência, então o relatório avisa que o
+  plugin dele segue a branch padrão do repositório.
+- As instruções do servidor e as descrições das tools falam em carteira pública ou
+  restrita e apontam `open_wallet_setup` quando a configuração está pendente. O modo
+  privacidade deixa de ser descrito como ligado por um "operador": o usuário também o
+  liga pela página local, e a mensagem `privacy_mode_unavailable` acompanha isso.
+
+### Migração desde a 0.3.x
+
+- **Claude Code:** rode `uvx mcp-investidor10-wallet@latest install`. O assistente
+  instala o plugin, que já traz o servidor, e pergunta uma vez se deve remover o
+  registro antigo `carteira` (`claude mcp add`), o marketplace da 0.3.x e uma cópia
+  local do plugin, para as tools não aparecerem em duplicidade.
+- **Claude Desktop:** se você tinha uma entrada manual do servidor `carteira` em
+  `claude_desktop_config.json` (`~/Library/Application Support/Claude/` no Mac), remova
+  essa entrada: o plugin já traz o servidor, e as duas juntas duplicam as tools. O
+  `doctor` avisa quando encontra essa entrada.
+- **Carteira:** `WALLET_ID` e `WALLET_MASK_VALUES` continuam valendo. Sem eles, a
+  configuração vem do arquivo `~/.investidor10/config.json`, criado pelo assistente
+  ou pela página local.
 
 ## [0.3.0] - 2026-10-28
 
