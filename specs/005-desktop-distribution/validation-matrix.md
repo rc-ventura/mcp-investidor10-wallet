@@ -13,3 +13,13 @@ Preencher em T061 (Lote 5) e completar em T085 (Lote 8). Resultado: `ok`, `falho
 | S5, S6 | Claude Desktop | Windows | **pendente, carregado para T085 (Lote 8)** | | | |
 | S5 troca de carteira e segurança da página | Claude Desktop | macOS | ok | | 2026-11-10 | Informado pelo mantenedor; sem registro por caso |
 | S7 `install --clients claude` | Claude Code CLI | macOS e Windows | **pendente: depende da `0.4.0rc4`** | | | O tag `v0.4.0rc3` carrega o plugin antigo (0.1.1, sem `mcpServers`); rodar o instalador agora trocaria o plugin que funciona por ele |
+| Conversa Chat comum (sem tools): o assistente diz que não tem acesso e não inventa valores | Claude Desktop | macOS | **pendente, T085** | | | Conferir o que o README promete na limitação Cowork × Chat |
+| Conversa Chat comum | Claude Desktop | Windows | **pendente, T085** | | | Idem |
+| Hooks sem Git instalado (persona e lembrete de memória) | Claude Desktop | Windows | **pendente, T085** | | | Máquina Windows sem Git for Windows |
+| Plugin e `install --clients claude` | Claude Code CLI | Windows | **pendente, T085** | | | Junto com o S7 acima |
+| Plugin e `install --clients claude` | Claude Code CLI | Linux | **pendente, T085** | | | Único cliente cuja célula Linux está no roteiro S10 |
+| Instalação em máquina limpa: servidor, plugin, skills, guardião, persona | Devin CLI | macOS | **pendente, T085** | | | Observação de 2026-11-20 (só leitura): nesta máquina o Devin CLI (`devin 3000.14.30821`) já lista o plugin `investidor10-carteira v0.4.0rc4` e um servidor `carteira` de desenvolvimento em `.devin/mcp_config.local.json` do repositório. Não é máquina limpa |
+| Verificação no app real | Devin Desktop | macOS | **pendente (sem acesso ao app), [DT-001](../../docs/technical-debt/DT-001-verificar-devin-desktop-real.md)** | | | O mantenedor não tem o Devin Desktop |
+| Instalação pela interface interativa | Codex | macOS | **pendente, T085** | | | Plugin fixado na tag (`--ref`) |
+| Instalação em máquina limpa | Gemini CLI | macOS | **pendente, T085** | | | Extensão fixada na tag (`--ref`) |
+| Assistente real (roteiros V2.2 e V2.4 da spec 003) | `install` | macOS | **pendente, T085** | | | |

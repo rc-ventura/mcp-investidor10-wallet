@@ -29,6 +29,8 @@ O que as fontes dizem (`docs/research/fichamentos/devin-desktop.md`, pesquisado 
 - Hooks não rodam em Restricted Mode, o que afeta a persona e o lembrete de memória do plugin.
 - Uma chave de servidor que o cliente não reconhece é ignorada em silêncio.
 
+Observação local de 20/11/2026, só leitura, com `devin 3000.14.30821`: o `devin mcp list` mostra servidores vindos de `~/.codeium/windsurf/mcp_config.json` (o caminho do Windsurf, antes do renome), de `~/.claude.json` e do `.devin/mcp_config.local.json` do projeto. É indício de que o harness do CLI herda a configuração do Windsurf, de onde o Devin Desktop veio, mas não prova o que o app lê.
+
 ## Interim handling
 
 Proposta, a confirmar com o mantenedor:
