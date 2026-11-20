@@ -51,6 +51,7 @@
 - [`Referrer-Policy: no-referrer` faz o navegador mandar `Origin: null`: a página local recusava todo envio real](./docs/learning-lessons/referrer_policy_no_referrer_manda_origin_null.md) — 2026-11-06
 - [Teste que troca o `HOME` muda o Python do `uvx`: o `verify` do release só falhava no Ubuntu](./docs/learning-lessons/smoke_troca_home_e_uvx_perde_o_python_gerenciado.md) — 2026-11-07
 - [O `.mcpb` tipo `uv` não dispensa o `uv` no Claude Desktop: o plugin leva `uvx` e o `uv` vira pré-requisito](./docs/learning-lessons/mcpb_uv_dentro_de_plugin_no_desktop.md) — 2026-11-08
+- [Workflows de evento só valem na branch padrão: `promote.yml` e `live.yml` não rodam antes da primeira promoção da 0.4.0](./docs/learning-lessons/workflows_de_evento_so_valem_na_branch_padrao.md) — 2026-11-14
 
 ## Research
 

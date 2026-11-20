@@ -645,3 +645,45 @@ def test_dry_run_in_claude_announces_the_plugin_and_runs_nothing(
     assert cli.run(args) == 0
     assert "instalaria o plugin" in capsys.readouterr().out
     assert not any("plugin install" in line for line in _claude_log(fake_bin_dir))
+
+
+@respx.mock
+def test_each_report_line_matches_its_own_client_when_one_requested_is_absent(
+    fake_bin_dir, monkeypatch, capsys
+):
+    (fake_bin_dir / "gemini").unlink()
+    monkeypatch.setenv("PATH", str(fake_bin_dir))
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert (
+        cli.run(["--wallet-id", "1234567", "--no-mask", "--clients", "gemini,devin"])
+        == 0
+    )
+    lines = [
+        line for line in capsys.readouterr().out.splitlines() if line.startswith("- ")
+    ]
+    gemini = [line for line in lines if "Gemini CLI" in line]
+    devin = [line for line in lines if "Devin CLI" in line]
+    assert gemini == ["- Gemini CLI: não encontrado na máquina — pulado."]
+    assert any("servidor 'carteira' registrado" in line for line in devin)
+    assert any("plugin instalado" in line for line in devin)
+    log = (fake_bin_dir / "calls.log").read_text()
+    assert "devin plugins install" in log
+    assert "gemini" not in log
+
+
+@respx.mock
+def test_report_says_the_devin_plugin_follows_the_default_branch(fake_bin_dir, capsys):
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert cli.run(["--wallet-id", "1234567", "--no-mask", "--clients", "devin"]) == 0
+    out = capsys.readouterr().out
+    assert "Devin CLI: plugin instalado" in out
+    assert "segue a branch padrão" in out
+
+
+@respx.mock
+def test_report_does_not_say_default_branch_for_clients_pinned_to_the_version(
+    fake_bin_dir, capsys
+):
+    respx.get(PROBE).mock(return_value=httpx.Response(200))
+    assert cli.run(["--wallet-id", "1234567", "--no-mask", "--clients", "gemini"]) == 0
+    assert "segue a branch padrão" not in capsys.readouterr().out

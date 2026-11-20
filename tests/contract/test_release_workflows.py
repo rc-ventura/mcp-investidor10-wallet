@@ -68,3 +68,56 @@ def test_every_action_is_pinned_by_sha(path):
         uses = step.get("uses")
         if uses and not uses.startswith("./"):
             assert SHA_PIN.match(uses), f"{path.name}: {uses}"
+
+
+def _promote():
+    return _load("promote.yml")
+
+
+def test_promote_runs_after_a_successful_release_or_by_hand_with_dry_run():
+    triggers = _triggers(_promote())
+    assert set(triggers) == {"workflow_run", "workflow_dispatch"}
+    assert triggers["workflow_run"]["workflows"] == ["Release"]
+    assert triggers["workflow_run"]["types"] == ["completed"]
+    inputs = triggers["workflow_dispatch"]["inputs"]
+    assert set(inputs) == {"tag", "dry-run"}
+    assert inputs["dry-run"]["type"] == "boolean"
+    assert inputs["dry-run"]["default"] is True
+
+
+def test_promote_job_requires_a_successful_release_and_a_final_tag():
+    job = next(iter(_promote()["jobs"].values()))
+    condition = job["if"]
+    assert "github.event.workflow_run.conclusion == 'success'" in condition
+    assert "github.event_name == 'workflow_dispatch'" in condition
+    assert "rc" in condition
+
+
+def test_promote_writes_only_contents_and_pull_requests():
+    workflow = _promote()
+    assert workflow["permissions"] == {"contents": "read"}
+    job = next(iter(workflow["jobs"].values()))
+    assert job["permissions"] == {"contents": "write", "pull-requests": "write"}
+
+
+def test_promote_calls_the_plan_script_with_full_history_and_no_inline_inputs():
+    workflow = _promote()
+    steps = _steps(workflow)
+    checkout = next(
+        s for s in steps if str(s.get("uses", "")).startswith("actions/checkout@")
+    )
+    assert checkout["with"]["fetch-depth"] == 0
+    runs = "\n".join(step.get("run", "") for step in steps)
+    assert "scripts/plan_promotion.py" in runs
+    assert "--apply" in runs
+    assert "${{" not in runs
+
+
+def test_ci_validates_the_plugin_and_the_marketplace_with_a_pinned_cli():
+    runs = "\n".join(step.get("run", "") for step in _steps(_load("ci.yml")))
+    assert re.search(
+        r"@anthropic-ai/claude-code@\d+\.\d+\.\d+ plugin validate \./plugin", runs
+    )
+    assert re.search(
+        r"@anthropic-ai/claude-code@\d+\.\d+\.\d+ plugin validate \.(\s|$)", runs
+    )

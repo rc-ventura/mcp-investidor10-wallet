@@ -75,6 +75,10 @@ MASK_PROMPT = (
 SAVE_FAILED_MESSAGE = "Não foi possível gravar a configuração local ({cause})."
 UNCHANGED_MESSAGE = "Configuração local inalterada: as respostas são as mesmas."
 CONFIG_LOCATION = "~/.investidor10/config.json"
+UNPINNED_PLUGIN_NOTE = (
+    " O plugin segue a branch padrão do repositório: este cliente não fixa a "
+    "versão na instalação."
+)
 
 
 def _add_wallet_arguments(parser: argparse.ArgumentParser) -> None:
@@ -346,12 +350,13 @@ def run(argv: list[str]) -> int:
         for command in commands:
             proc = _run(command)
             if proc.returncode == 0:
+                message = (
+                    f"{adapter.label}: plugin instalado (reinicie a sessão do cliente)."
+                )
+                if not adapter.pins_plugin_version:
+                    message += UNPINNED_PLUGIN_NOTE
                 session.plugin_outcomes.append(
-                    RegisterOutcome(
-                        adapter.client_id,
-                        "registered",
-                        f"{adapter.label}: plugin instalado (reinicie a sessão do cliente).",
-                    )
+                    RegisterOutcome(adapter.client_id, "registered", message)
                 )
             else:
                 detail = proc.stderr.strip() or f"código {proc.returncode}"

@@ -37,7 +37,9 @@ Fluxo:
      desinstalar a cópia local.
    - **Devin, Codex, Gemini**: registra o servidor sem variável da carteira
      (o servidor lê a configuração local) e instala o plugin, pinado na
-     versão quando o comando do cliente aceitar referência.
+     versão quando o comando do cliente aceitar referência (Codex e Gemini,
+     `--ref vX.Y.Z`). O Devin CLI não aceita: o relatório diz que ali o plugin
+     segue a branch padrão do repositório.
 7. Relatório: uma linha por cliente pedido, pareada com o resultado,
    inclusive cliente citado e ausente.
 

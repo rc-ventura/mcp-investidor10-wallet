@@ -13,7 +13,9 @@ PLUGIN_NAME = "investidor10-carteira"
 PLUGIN_ID = f"{PLUGIN_NAME}@investidor10"
 SYNCED_ID = f"{PLUGIN_NAME}@synced"
 MARKETPLACE_NAME = "investidor10"
-MARKETPLACE_SOURCE = f"rc-ventura/mcp-investidor10-wallet#v{__version__}"
+REPOSITORY = "rc-ventura/mcp-investidor10-wallet"
+VERSION_REF = f"v{__version__}"
+MARKETPLACE_SOURCE = f"{REPOSITORY}#{VERSION_REF}"
 YES_ANSWERS = ("s", "sim", "y", "yes", "atualizar")
 DUPLICATION_WARNING = (
     "Atenção: o servidor da carteira ficou duplicado (registro separado mais o "
@@ -64,6 +66,7 @@ class ClientAdapter:
     client_id = ""
     binary = ""
     label = ""
+    pins_plugin_version = True
 
     def detect(self) -> bool:
         return shutil.which(self.binary) is not None
@@ -257,6 +260,7 @@ class DevinAdapter(ClientAdapter):
     client_id = "devin"
     binary = "devin"
     label = "Devin CLI"
+    pins_plugin_version = False
 
     def plugin_install_commands(self) -> list[list[str]]:
         return [
@@ -264,7 +268,7 @@ class DevinAdapter(ClientAdapter):
                 self.binary,
                 "plugins",
                 "install",
-                "rc-ventura/mcp-investidor10-wallet#plugin",
+                f"{REPOSITORY}#plugin",
                 "-y",
             ]
         ]
@@ -300,9 +304,11 @@ class CodexAdapter(ClientAdapter):
                 "plugin",
                 "marketplace",
                 "add",
-                "rc-ventura/mcp-investidor10-wallet",
+                REPOSITORY,
+                "--ref",
+                VERSION_REF,
             ],
-            [self.binary, "plugin", "add", "investidor10-carteira@investidor10"],
+            [self.binary, "plugin", "add", PLUGIN_ID],
         ]
 
     def add_command(self, reg: ClientRegistration) -> list[str]:
@@ -328,7 +334,9 @@ class GeminiAdapter(ClientAdapter):
                 self.binary,
                 "extensions",
                 "install",
-                "https://github.com/rc-ventura/mcp-investidor10-wallet",
+                f"https://github.com/{REPOSITORY}",
+                "--ref",
+                VERSION_REF,
             ]
         ]
 

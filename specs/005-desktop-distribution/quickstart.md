@@ -140,8 +140,9 @@ credencial, valores nem o nome do usuário local.
 4. Hotfix: na primeira correção urgente, `hotfix/*` sai de `main`, recebe tag,
    é publicada, promovida e volta para `develop`; registrar o resultado em
    `docs/RELEASING.md`.
-5. `uv run pytest -k consistency`: versões iguais. No `build`,
-   `scripts/build_mcpb.py --check`: tools iguais e MCPB commitado = gerado.
+5. `uv run pytest -k consistency`: versões iguais e `--expected-tools` do
+   `release.yml` igual ao número de tools servidas *(revisado em 12/11/2026:
+   não há MCPB desde a D1 revisada)*.
 6. Disparar `live.yml` manualmente: roda com a carteira fictícia; falha
    imprime só o código.
 

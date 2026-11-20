@@ -47,6 +47,7 @@ externo; reavaliar depois.
 | **Must** | ✅ Doc de privacidade — entregue na 0.3.0 | 1 | Pré-requisito de divulgar: o ID da carteira é a credencial e o mascaramento do site é cosmético |
 | **Must** | ✅ File lock no `memory.json` — entregue na 0.3.0 | 1 | Com Desktop + CLIs, mais processos escrevem no mesmo arquivo; last-write-wins perde dado |
 | **Must** | Listagem em MCP registries e diretórios de plugins (Smithery, PulseMCP, diretório Anthropic) | 3 | É distribuição; **fora da spec 005** (FR-030), com critérios de reabertura abaixo. A spec 005 só faz o pré-teste de requisitos (T064a), sem submeter. **Antes de submeter, decidir o risco do ToS** da API não-documentada (ADR-0005) |
+| **Must** | Persona e lembrete de memória só em sessão de carteira (hooks `SessionStart` e `Stop` com `matcher: "*"`) | 4 | Achado de 20/11/2026: o plugin instalado injeta o assessor de investimentos e força `get_session_context` em qualquer sessão, de qualquer projeto, no Claude Code e no Desktop. Quem instalou o plugin e foi pedir outra coisa recebe o assessor do mesmo jeito. Precisa ser resolvido antes de divulgar o plugin |
 | **Should** | Spec 006 — verificação determinística de cálculos | 4 | Maior lacuna de confiança; fica depois da distribuição por ordem de decisão, não por importância |
 | **Should** | ✅ Modo privacidade `WALLET_MASK_VALUES` — entregue na 0.3.0 | 1 | Passa a fazer sentido ao distribuir; env var, nunca parâmetro de tool |
 | **Should** | Action semanal de live tests | 1 | Aviso antecipado de drift para o mantenedor; o usuário já é protegido pela validação em tempo de execução. Fora da spec 004 — entra quando houver usuários além do mantenedor (após a 005) |
@@ -794,6 +795,63 @@ entram na matriz.
   `.codex-plugin/plugin.json` sobre as mesmas skills) e Gemini
   (`gemini-extension.json` + `commands/*.toml` espelhando as skills);
   skills SKILL.md são o denominador comum verificado nos 4.
+- [ ] **Ajuste: a persona e o lembrete de memória não podem valer para toda
+  sessão** (achado de 20/11/2026, relato do mantenedor; prioridade Must, ver
+  matriz). Hoje `plugin/hooks/hooks.json` registra dois hooks com
+  `matcher: "*"`:
+  - **`SessionStart`** faz `cat` de `hooks/session-start.json`, que injeta
+    como `additionalContext` o papel de "assistente de investimentos do
+    usuário" e a regra (1) "no início de toda sessão, chame
+    `get_session_context`". Não há condição nenhuma: vale em qualquer
+    projeto, terminal ou sessão do Desktop onde o plugin esteja instalado.
+  - **`Stop`** roda `stop-memory-reminder.sh`, que procura no transcript
+    palavras como "comprar", "decisão", "aportar" e, se não achar
+    `log_decision`/`log_insight`, imprime o lembrete da memória do
+    investidor. Numa sessão de código que fale em "decisão" o lembrete
+    aparece do mesmo jeito.
+  - **Caso que originou o item:** o mantenedor testou o hook da carteira,
+    depois abriu outra sessão para fazer uma lição de casa e o contexto de
+    assessor de investimentos veio injetado de novo, sem relação com o
+    pedido.
+  - **Por que é problema de produto:** o hook não distingue projeto nem
+    assunto, então em qualquer lugar onde o plugin esteja ativo (quem usa o
+    Desktop e o Code para várias coisas) a persona vem em tudo; gasta contexto, força chamada
+    de tool sem pedido e passa a impressão de que o produto "invade" a
+    sessão. Isso reabre a decisão da "Persona via hook SessionStart"
+    acima (spec 003), que presumiu sessão dedicada à carteira.
+  - **Critério de aceite:** uma sessão sem relação com a carteira não recebe
+    a persona, não chama `get_session_context` por conta própria e não
+    recebe o lembrete do `Stop`; uma sessão sobre a carteira continua
+    recebendo tudo; os dois casos cobertos por teste de contrato do plugin.
+  - **Caminhos a avaliar (decidir com o mantenedor, não está decidido):**
+    1. *Persona sob demanda:* tirar a persona do `SessionStart` e deixá-la
+       nas skills e no subagente (que já embutem o bootstrap e só carregam
+       quando a descrição casa com o pedido). Menor intrusão; a persona deixa
+       de valer para conversa livre sobre carteira que não acione skill.
+    2. *Hook condicional:* trocar o `cat` por um script que só injeta se o
+       diretório de trabalho tiver um marcador, ou depois de um gatilho
+       (por exemplo `UserPromptSubmit` com termos do domínio: carteira,
+       ativo, FII, dividendo, provento, tese). Mantém a persona nas
+       conversas de carteira; exige lista de termos e custa um pouco de
+       falso negativo.
+    3. *Ativação explícita:* um comando ou skill (`/carteira`) que liga o
+       modo assessor na sessão; o hook some. Mais previsível, mais atrito
+       para o usuário leigo do Desktop.
+    4. *`Stop` só quando a sessão usou a carteira:* condicionar o lembrete a
+       o transcript conter chamada às tools do servidor (por exemplo
+       `get_session_context`), em qualquer dos caminhos acima. É a
+       mudança menor e vale mesmo se o resto ficar para depois.
+  - **Verificar antes de escolher:** como os outros três clientes do bundle
+    (Codex, Devin CLI, Gemini CLI) injetam a persona hoje e se o mesmo
+    comportamento acontece neles; se o Desktop executa `SessionStart` por
+    sessão Cowork e por conversa Chat; e o efeito sobre as skills, que
+    dependem da persona para o bootstrap.
+  - **Documentação a mexer quando decidir:** emenda ao ADR-0012 e ao
+    ADR-0018 (o que o plugin entrega e quando) e uma learning lesson com o
+    caso; revisar o texto de `session-start.json`, o README e
+    `docs/INSTALACAO-DESKTOP.md`, que hoje descrevem a persona como
+    sempre ativa; e a regra (7) da persona (configuração pendente), que
+    hoje só chega via essa injeção.
 - [ ] **Spec 006 — Verificação determinística de cálculos** — o agente
   hoje calcula números financeiros na LLM, sem verificação. Desenho em 3
   camadas aprovado:

@@ -513,6 +513,14 @@ um artigo sobre o anúncio de 23/10/2026) dizem que o suporte existe no
 Claude Code CLI e chega aos outros produtos depois. Tarefa de reverificar
 nas release notes antes do fechamento da spec.
 
+**Reverificação (T082, 12/11/2026)**: as release notes oficiais
+(`support.claude.com/en/articles/12138966-release-notes`, cobrindo de
+01/08/2025 a 06/11/2026) não têm nenhuma entrada sobre elicitation (form mode
+ou URL mode) nem sobre servidores MCP pedindo dados ao usuário. As entradas
+mais próximas falam de acesso a MCP no Cowork (12/01/2026) e de pedidos de
+permissão do Claude in Chrome (29/09/2025), que não são elicitation. A decisão
+fica como está e nenhum item é aberto no roadmap para a FR-008a.
+
 ## D16 — Revogação do link da carteira
 
 **Decision**: testar no Lote 1, com a carteira fictícia em modo restrito, se

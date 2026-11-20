@@ -84,7 +84,15 @@ def test_plugin_install_commands_use_canonical_sources(fake_bin_dir):
         ]
     ]
     assert clients.CodexAdapter().plugin_install_commands() == [
-        ["codex", "plugin", "marketplace", "add", "rc-ventura/mcp-investidor10-wallet"],
+        [
+            "codex",
+            "plugin",
+            "marketplace",
+            "add",
+            "rc-ventura/mcp-investidor10-wallet",
+            "--ref",
+            f"v{__version__}",
+        ],
         ["codex", "plugin", "add", "investidor10-carteira@investidor10"],
     ]
     assert clients.GeminiAdapter().plugin_install_commands() == [
@@ -93,8 +101,17 @@ def test_plugin_install_commands_use_canonical_sources(fake_bin_dir):
             "extensions",
             "install",
             "https://github.com/rc-ventura/mcp-investidor10-wallet",
+            "--ref",
+            f"v{__version__}",
         ]
     ]
+
+
+def test_only_the_devin_plugin_is_not_pinned_to_the_package_version():
+    pinned = {
+        adapter.client_id: adapter.pins_plugin_version for adapter in clients.ADAPTERS
+    }
+    assert pinned == {"claude": True, "devin": False, "codex": True, "gemini": True}
 
 
 def test_failed_registration_reports_pt_br(fake_bin_dir):

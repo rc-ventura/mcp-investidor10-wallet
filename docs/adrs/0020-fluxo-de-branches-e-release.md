@@ -171,3 +171,37 @@ This decision should be **revisited** if:
 - `specs/005-desktop-distribution/research.md` D18
 - `docs/research/fichamentos/modelos-de-branching.md`
 - `docs/research/fichamentos/publicacao-de-pacotes-e-promocao-de-artefatos.md`
+
+---
+
+## Emenda 2026-11-14 (spec 005, Lote 7: promoção automática, Dependabot e primeira versão final)
+
+O Lote 7 implementou a promoção do passo 4 (`.github/workflows/promote.yml` e
+`scripts/plan_promotion.py`) e acrescentou o `dependabot.yml`. Duas decisões
+ficaram de fora do texto original:
+
+1. **A primeira versão final é promovida à mão.** O GitHub só dispara
+   `workflow_run`, `schedule` e `workflow_dispatch` a partir de workflows que
+   existem na branch padrão (`main`), e o Dependabot lê a configuração dela.
+   Enquanto `promote.yml` só existir em `develop`, a criação de
+   `promote/vX.Y.Z` e do pedido para `main` é feita com
+   `python3 scripts/plan_promotion.py --tag vX.Y.Z --apply`
+   (`docs/RELEASING.md`, "Promoção à mão"). Essa primeira promoção, a da
+   0.4.0, é a que leva os workflows para `main`. Daí em diante vale o passo 4
+   como escrito. O `dry-run` do `promote.yml` e o primeiro disparo do
+   `live.yml` passam para depois dela (tasks T091/T092). A automação continua
+   só criando branches e abrindo pedidos, nunca fazendo merge (passo 8).
+   Lição: [`workflows_de_evento_so_valem_na_branch_padrao`](../learning-lessons/workflows_de_evento_so_valem_na_branch_padrao.md).
+2. **O Dependabot abre pedidos contra `develop`, não contra `main`.** O
+   `dependabot.yml` usa `target-branch: develop` nos ecossistemas `uv` e
+   `github-actions`, com intervalo semanal e `cooldown` de 7 dias, para que
+   atualização de dependência siga o mesmo caminho de qualquer outra mudança e
+   nenhum pedido de origem diferente de `promote/v*` chegue a `main` (o
+   `main-gate` o recusaria). O `cooldown` mantém a postura de dependências
+   fixadas do ADR-0001: uma versão recém-publicada não vira pedido no mesmo dia.
+
+Além disso, o `plan_promotion.py` aceita `--sha` e acha a tag final no commit
+do release, porque a documentação do GitHub não define o `head_branch` de um
+`workflow_run` disparado por tag. Quando o commit da tag não é ancestral de
+`origin/develop` (hotfix), ele devolve também a ação de abrir o pedido da tag
+para `develop`, que é o passo 5 deste ADR.

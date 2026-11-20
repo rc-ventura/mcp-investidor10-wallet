@@ -80,3 +80,21 @@ auto-descobertas pelo agente a partir da pasta `skills/` — o mesmo padrão
   manifesto `.codex-plugin/plugin.json` apontando para as mesmas
   `plugin/skills/` + `.mcp.json` — custo baixo, candidato a spec futura
   (mesmo envelope da pergunta do Gemini).
+
+## Fixação de versão na instalação (verificado 2026-11-12)
+
+- `codex plugin marketplace add` aceita `SOURCE` ("a local path,
+  owner/repo[@ref], HTTPS Git URL, or SSH Git URL") e a opção
+  `--ref REF` ("Git ref to fetch for Git marketplace sources"), além de
+  `--sparse PATH` e `--json`. Exemplo do próprio CLI:
+  `codex plugin marketplace add owner/repo --ref main`. Fonte: código do CLI,
+  `codex-rs/cli/src/marketplace_cmd.rs` (struct `AddMarketplaceArgs`) no
+  repositório `openai/codex`, branch padrão, lido em 12/11/2026. A página
+  pública de plugins (`learn.chatgpt.com/docs/plugins`) só descreve o
+  navegador `/plugins` da TUI e não lista a sintaxe; o CLI instalado na
+  máquina do mantenedor (0.39.0) é anterior aos plugins.
+- Consequência no produto (spec 005, T069/T074): o assistente adiciona o
+  marketplace com `--ref vX.Y.Z`, a tag da versão do pacote.
+- Limitação conhecida: se o marketplace já tiver sido adicionado antes sem
+  referência, o CLI responde que ele já existe e mantém a origem antiga; o
+  assistente não remove marketplaces do Codex.

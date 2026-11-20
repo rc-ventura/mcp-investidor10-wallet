@@ -16,6 +16,11 @@ from investidor10_wallet import bootstrap, wallet_client
 from investidor10_wallet.server import mcp
 
 
+def _code(payload):
+    error = payload.get("error") if isinstance(payload, dict) else None
+    return error.get("code") if isinstance(error, dict) else None
+
+
 class Client(_Client):
     async def call_tool(self, name, arguments=None, **kwargs):
         kwargs.setdefault("raise_on_error", False)
@@ -38,7 +43,7 @@ async def test_live_wallet_summary_returns_data():
     async with Client(mcp) as client:
         result = await client.call_tool("get_wallet_summary", {})
     payload = result.data
-    assert "error" not in payload, payload
+    assert "error" not in payload, _code(payload)
     assert payload["data"], "summary payload should not be empty"
 
 
@@ -49,14 +54,14 @@ async def test_live_all_asset_classes_respond_without_error():
                 "get_wallet_positions", {"asset_type": asset_type}
             )
             payload = result.data
-            assert "error" not in payload, f"{asset_type}: {payload}"
+            assert "error" not in payload, f"{asset_type}: {_code(payload)}"
 
 
 async def test_live_asset_quote_returns_positive_price():
     async with Client(mcp) as client:
         result = await client.call_tool("get_asset_quote", {"ticker": "PETR4"})
     payload = result.data
-    assert "error" not in payload, payload
+    assert "error" not in payload, _code(payload)
     last = float(payload["data"]["variation_day"]["last_quotation"])
     assert last > 0
 
