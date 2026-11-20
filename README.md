@@ -28,6 +28,25 @@ As 20 tools estão implementadas (6 de dados da carteira/mercado, 13 de
 memória/alertas e 1 de configuração) — contratos completos em
 [specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/specs/001-mcp-investidor10-wallet/contracts/mcp-tools.md).
 
+### Validação por plataforma
+
+Os testes automatizados rodam em Linux, macOS e Windows, com Python 3.11 a 3.13, e cada
+versão publicada é instalada do PyPI nos três sistemas antes de ser promovida. A
+experiência dentro de cada cliente foi validada à mão só em parte:
+
+| Cliente | macOS | Windows | Linux |
+|---|---|---|---|
+| Claude Desktop | validado | não validado | não existe |
+| Claude Code, plugin | parcial | não validado | não validado |
+| Claude Code, assistente de instalação | não validado | não validado | não validado |
+| Devin CLI, Codex e Gemini CLI | não validado | não validado | não validado |
+| Devin Desktop | não verificado, sem suporte declarado | | |
+
+"Não validado" quer dizer que o fluxo passa nos testes automatizados, mas ninguém rodou
+o roteiro completo numa máquina real. Relatos são bem-vindos. O detalhe de cada célula
+está na [matriz de validação](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/specs/005-desktop-distribution/validation-matrix.md)
+e nos [débitos técnicos](https://github.com/rc-ventura/mcp-investidor10-wallet/tree/main/docs/technical-debt).
+
 ## Instalação no Claude Desktop
 
 Para quem não usa terminal no dia a dia. Você abre o terminal **uma única vez**,
@@ -37,6 +56,8 @@ fazer se algo não funcionar: [docs/INSTALACAO-DESKTOP.md](docs/INSTALACAO-DESKT
 **Requisitos**
 
 - Conta paga do Claude (plano pago) com o Claude Desktop instalado.
+- Validado à mão no macOS. No Windows os passos são os mesmos, mas ainda não foram
+  validados (ver [Status](#validação-por-plataforma)).
 - O [`uv`](https://docs.astral.sh/uv/), um programa gratuito que baixa e executa o
   servidor. O Claude Desktop não o traz.
 - Não existe Claude Desktop para Linux; no Linux use um dos CLIs (seção seguinte).
@@ -81,9 +102,10 @@ memória e a configuração ficam intactas (estão em `~/.investidor10/`).
 
 **Limitações**
 
-- As tools só carregam numa sessão **Cowork** no computador. Numa conversa **Chat**
-  comum o assistente não tem acesso à carteira nem à memória e deve dizer isso, sem
-  inventar valores.
+- As tools só carregam numa sessão **Cowork**, que roda no seu computador. No Claude
+  Desktop atual a tela inicial abre o Cowork; num computador que não consegue rodar o
+  Cowork a conversa abre como **Chat**, e aí o assistente não tem acesso à carteira
+  nem à memória e deve dizer isso, sem inventar valores.
 - Um plugin adicionado na sua conta é sincronizado para o Claude Code. Nesse caso o
   assistente de instalação dos CLIs não instala uma cópia local, para não duplicar
   o servidor.
@@ -95,6 +117,9 @@ memória e a configuração ficam intactas (estão em `~/.investidor10/`).
 ## Instalação nos CLIs de agente (assistente)
 
 Pré-requisito: [uv](https://docs.astral.sh/uv/) (que traz Python 3.11+).
+
+> Estes clientes ainda não foram validados à mão numa instalação real (ver a tabela em
+> [Status](#validação-por-plataforma)); o assistente é coberto por testes automatizados.
 
 Um comando configura a carteira e instala o **produto completo** nos CLIs de agente
 presentes na máquina (Claude Code, Devin CLI, Codex, Gemini CLI):

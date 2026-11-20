@@ -79,3 +79,21 @@ async def test_usage_rules_reach_the_model_in_the_served_descriptions():
     for name, phrases in SERVED_RULES.items():
         for phrase in phrases:
             assert phrase in descriptions[name], (name, phrase)
+
+
+def test_instructions_name_public_or_restricted_wallet_and_the_setup_tool():
+    instructions = mcp.instructions
+    assert instructions == server.INSTRUCTIONS
+    assert "public or restricted" in instructions
+    assert "open_wallet_setup" in instructions
+    assert "get_session_context" in instructions
+    assert "operator" not in instructions
+
+
+async def test_privacy_wording_does_not_attribute_the_mode_to_an_operator():
+    from investidor10_wallet.privacy import unavailable_error
+
+    async with Client(mcp) as client:
+        descriptions = [t.description for t in await client.list_tools()]
+    assert not [d for d in descriptions if "operator" in d]
+    assert "operator" not in unavailable_error("get_earnings")["error"]["message"]

@@ -80,3 +80,16 @@
 - [Plugins no Codex CLI](./docs/research/plugins-codex-cli.md) — 2026-10-24
 - [Plugins no Devin CLI e compatibilidade com o formato Claude](./docs/research/plugins-devin-cli.md) — 2026-10-24
 - [Extensões no Gemini CLI](./docs/research/plugins-gemini-cli.md) — 2026-10-24
+
+## Technical Debt
+
+> Folder: `./docs/technical-debt/` — o que foi adiado ou feito por atalho de propósito, com custo conhecido e caminho para pagar. Novos registros com `/tech-debt <título>`; `/tech-debt list` mostra os abertos e `/tech-debt resolve DT-NNN` fecha um.
+> Regra: ao executar `/adr`, `/learning-lesson` ou `/research`, verifique se o trabalho cria, toca ou paga algum dos débitos abaixo e proponha `/tech-debt`.
+
+| DT | Title | Status | Priority | Date |
+|----|-------|--------|----------|------|
+| [DT-001](./docs/technical-debt/DT-001-verificar-devin-desktop-real.md) | Verificar o produto no Devin Desktop real (T083) | Open | Medium | 2026-11-20 |
+| [DT-002](./docs/technical-debt/DT-002-linha-do-relatorio-devin-desktop.md) | Linha do relatório do assistente sobre o Devin Desktop (T084) | Open | Medium | 2026-11-20 |
+| [DT-003](./docs/technical-debt/DT-003-validar-o-produto-no-windows.md) | Validar o produto no Windows | Open | Medium | 2026-11-20 |
+| [DT-004](./docs/technical-debt/DT-004-validar-claude-code-no-macos-e-linux.md) | Validar o Claude Code pelo assistente de instalação (macOS e Linux) | Open | Medium | 2026-11-20 |
+| [DT-005](./docs/technical-debt/DT-005-validar-devin-cli-codex-e-gemini.md) | Validar o Devin CLI, o Codex, o Gemini CLI e o assistente real | Open | Medium | 2026-11-20 |
