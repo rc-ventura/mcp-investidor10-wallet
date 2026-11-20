@@ -6,7 +6,7 @@ e o projeto adota [versionamento semântico](https://semver.org/lang/pt-BR/).
 Enquanto a versão for 0.x: mudanças de comportamento (features) incrementam o
 minor; correções incrementam o patch.
 
-## [0.4.0] - não lançado
+## [0.4.0] - 2026-11-20
 
 Distribuição para o Claude Desktop: o servidor passa a subir sem carteira configurada
 e a carteira se configura por uma página local ou pelo terminal, inclusive a carteira
