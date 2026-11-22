@@ -49,7 +49,14 @@ async def test_live_wallet_summary_returns_data():
 
 async def test_live_all_asset_classes_respond_without_error():
     async with Client(mcp) as client:
-        for asset_type in ("Ticker", "Fii", "EtfInternational", "Treasure", "Crypto"):
+        for asset_type in (
+            "Ticker",
+            "Fii",
+            "Etf",
+            "EtfInternational",
+            "Treasure",
+            "Crypto",
+        ):
             result = await client.call_tool(
                 "get_wallet_positions", {"asset_type": asset_type}
             )

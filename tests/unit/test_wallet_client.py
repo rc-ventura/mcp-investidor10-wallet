@@ -447,6 +447,16 @@ async def test_positions_paginates_until_source_total():
 
 
 @respx.mock
+async def test_positions_fetch_national_etf_class():
+    respx.get(f"{BASE}/summary/actives/1234567/Etf", params={"start": "0"}).respond(
+        json={"total": 1, "data": [{"ticker": "XPTF", "quantity": 1}], "draw": 0}
+    )
+    envelope = await make_client().get_positions("etf")
+    assert envelope["data"]["data"][0]["ticker"] == "XPTF"
+    assert envelope["data"]["truncated"] is False
+
+
+@respx.mock
 async def test_positions_dedupe_when_source_ignores_start():
     """A source that ignores `start` must not double-count holdings (SC-002):
     the same 50 rows on both pages yield 50 unique rows, not 100."""
