@@ -35,7 +35,7 @@ include = ["/src", "/CHANGELOG.md"]
 
 [dependency-groups]
 dev = [
-    "pre-commit==4.6.0",
+    "pre-commit==4.7.0",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
     "pyyaml==6.0.3",
