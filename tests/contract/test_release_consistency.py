@@ -57,6 +57,15 @@ def test_consistency_live_workflow_only_runs_on_schedule_and_by_hand():
     assert "pytest -m live" in runs
 
 
+def test_consistency_live_workflow_runs_on_a_weekday_after_the_b3_open():
+    cron = _triggers(_yaml(WORKFLOWS / "live.yml"))["schedule"][0]["cron"]
+    _minute, hour, _day, _month, weekday = cron.split()
+    # B3 opens at 10:00 in Brasília (UTC-3), that is 13:00 UTC: the quote test
+    # needs a day price, so a run before the open always fails.
+    assert 13 <= int(hour) <= 20, cron
+    assert weekday in {"1", "2", "3", "4", "5"}, cron
+
+
 def test_consistency_live_workflow_reads_the_wallet_only_from_secrets():
     text = (WORKFLOWS / "live.yml").read_text(encoding="utf-8")
     env = {}
