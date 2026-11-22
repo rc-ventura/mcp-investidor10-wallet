@@ -19,10 +19,13 @@
 | [0011](./docs/adrs/0011-estrategia-de-distribuicao-e-release.md) | Estratégia de distribuição e release — PyPI via `uvx`, src layout, versionamento 0.x e pipeline OIDC | Accepted | 2026-10-18 |
 | [0012](./docs/adrs/0012-integracao-automatica-de-clientes.md) | Integração automática de clientes — assistente de instalação e plugin de comportamento (bundle em 4 CLIs) | Accepted | 2026-10-26 |
 | [0013](./docs/adrs/0013-concorrencia-da-memoria-multiprocesso.md) | Concorrência da memória multiprocesso — trava `filelock` fail-closed, reload sob trava e modo somente-leitura | Accepted | 2026-10-28 |
-| [0014](./docs/adrs/0014-sinal-duplo-de-erro.md) | Sinal duplo de erro — `isError` do protocolo mais o envelope estruturado (12 códigos) | Accepted | 2026-10-28 |
+| [0014](./docs/adrs/0014-sinal-duplo-de-erro.md) | Sinal duplo de erro — `isError` do protocolo mais o envelope estruturado (15 códigos) | Accepted | 2026-10-28 |
 | [0015](./docs/adrs/0015-modo-privacidade-wallet-mask-values.md) | Modo privacidade `WALLET_MASK_VALUES` — allowlist fail-closed, tools monetárias indisponíveis | Accepted | 2026-10-28 |
 | [0016](./docs/adrs/0016-validacao-de-payloads-em-tools-novas.md) | Regra de validação de payloads para tools novas — pydantic validate-then-passthrough | Accepted | 2026-10-28 |
 | [0017](./docs/adrs/0017-cotacao-em-cache-vencido-nao-dispara-alerta.md) | Cotação em cache vencido não dispara alerta — `stale_quote` em `pending_check` | Accepted | 2026-10-28 |
+| [0018](./docs/adrs/0018-plugin-unico-com-servidor-empacotado.md) | Plugin único com servidor via `uvx` — fonte única da conexão no Claude Desktop e no Claude Code | Accepted | 2026-11-08 |
+| [0019](./docs/adrs/0019-configuracao-local-e-pagina-local.md) | Configuração local única, carteira restrita, servidor sem configuração e página local | Accepted | 2026-11-03 |
+| [0020](./docs/adrs/0020-fluxo-de-branches-e-release.md) | Fluxo de branches e release — `main` só contém versões publicadas no índice, `develop`, portão de promoção | Accepted | 2026-11-02 |
 
 ## Learning Lessons
 
@@ -43,3 +46,50 @@
 - [`RecursionError` não é `ValueError`: profundidade de aninhamento é uma falha à parte do JSON malformado](./docs/learning-lessons/recursionerror_nao_e_valueerror.md) — 2026-10-29
 - [Contador declarado pela fonte não é limite de laço: validar `total` antes de parar a paginação por ele](./docs/learning-lessons/contador_declarado_pela_fonte_nao_e_limite.md) — 2026-10-29
 - [Um relatório que prova a ausência de um segredo não pode citá-lo: use `<id>` e uma checagem que lê o valor do ambiente](./docs/learning-lessons/relatorio_que_prova_ausencia_de_segredo_nao_o_cita.md) — 2026-10-31
+- [Cotação do dia zerada sem pregão não é formato inesperado: `variation_day.last_quotation` vem `0` com a B3 fechada](./docs/learning-lessons/cotacao_zerada_sem_pregao_nao_e_formato_inesperado.md) — 2026-11-02
+- [Proxy da carteira responde 301 sem `Location` para acesso recusado — 3xx, 401 e 403 são `access_denied`, não `unexpected_format`](./docs/learning-lessons/proxy_301_acesso_recusado_sem_location.md) — 2026-11-04
+- [`Referrer-Policy: no-referrer` faz o navegador mandar `Origin: null`: a página local recusava todo envio real](./docs/learning-lessons/referrer_policy_no_referrer_manda_origin_null.md) — 2026-11-06
+- [Teste que troca o `HOME` muda o Python do `uvx`: o `verify` do release só falhava no Ubuntu](./docs/learning-lessons/smoke_troca_home_e_uvx_perde_o_python_gerenciado.md) — 2026-11-07
+- [O `.mcpb` tipo `uv` não dispensa o `uv` no Claude Desktop: o plugin leva `uvx` e o `uv` vira pré-requisito](./docs/learning-lessons/mcpb_uv_dentro_de_plugin_no_desktop.md) — 2026-11-08
+- [Workflows de evento só valem na branch padrão: `promote.yml` e `live.yml` não rodam antes da primeira promoção da 0.4.0](./docs/learning-lessons/workflows_de_evento_so_valem_na_branch_padrao.md) — 2026-11-14
+
+## Research
+
+> Folder: `./docs/research/` — o que as fontes dizem, sem reflexão nem recomendação. Decisões ficam nos ADRs, e aprendizados da prática, nas Learning Lessons. Novos fichamentos com `/research <tema> [-- motivo]`, em `./docs/research/fichamentos/`.
+
+### Fichamentos
+
+- [Superfícies do Claude Desktop e diferença entre desktop e web](./docs/research/fichamentos/claude-desktop-superficies.md) — 2026-11-01
+- [Componentes de plugin por superfície, instalação e hooks](./docs/research/fichamentos/plugins-claude-componentes-e-instalacao.md) — 2026-11-01
+- [Marketplace, versões e canais de plugin](./docs/research/fichamentos/marketplace-e-versoes-de-plugin.md) — 2026-11-01
+- [Formato MCPB e runtime de servidor local](./docs/research/fichamentos/mcpb-e-runtime-do-servidor-local.md) — 2026-11-01
+- [Como o usuário entrega dados a um servidor MCP](./docs/research/fichamentos/entrada-de-dados-do-usuario-em-mcp.md) — 2026-11-01
+- [Devin Desktop](./docs/research/fichamentos/devin-desktop.md) — 2026-11-01
+- [Modelos de branching](./docs/research/fichamentos/modelos-de-branching.md) — 2026-11-01
+- [Publicação de pacotes e promoção de artefatos](./docs/research/fichamentos/publicacao-de-pacotes-e-promocao-de-artefatos.md) — 2026-11-01
+- [Skills e subagentes de projeto no Claude Code](./docs/research/fichamentos/skills-e-subagentes-do-claude-code.md) — 2026-11-01
+- [Como Anthropic e terceiros empacotam servidores MCP locais, plugins e extensões](./docs/research/fichamentos/distribuicao-de-servidores-mcp-em-plugins-e-extensoes.md) — 2026-11-06
+- [Requisitos dos diretórios de plugins e dos registries de servidores MCP](./docs/research/fichamentos/diretorios-de-plugins-e-registries-requisitos.md) — 2026-11-10
+- [Serviços de cotação de ações da B3: atraso, licença e redistribuição](./docs/research/fichamentos/servicos-de-cotacao-b3.md) — 2026-11-10
+
+### Pesquisas anteriores
+
+- [Comportamento do agente e clientes MCP](./docs/research/agent-behavior.md) — 2026-10-17
+- [Canais de erro de tool e envelope estruturado](./docs/research/tool-error-channels.md) — 2026-10-17
+- [Como criar plugins no Claude Code](./docs/research/plugins-claude-code.md) — 2026-10-24
+- [Plugins no Codex CLI](./docs/research/plugins-codex-cli.md) — 2026-10-24
+- [Plugins no Devin CLI e compatibilidade com o formato Claude](./docs/research/plugins-devin-cli.md) — 2026-10-24
+- [Extensões no Gemini CLI](./docs/research/plugins-gemini-cli.md) — 2026-10-24
+
+## Technical Debt
+
+> Folder: `./docs/technical-debt/` — o que foi adiado ou feito por atalho de propósito, com custo conhecido e caminho para pagar. Novos registros com `/tech-debt <título>`; `/tech-debt list` mostra os abertos e `/tech-debt resolve DT-NNN` fecha um.
+> Regra: ao executar `/adr`, `/learning-lesson` ou `/research`, verifique se o trabalho cria, toca ou paga algum dos débitos abaixo e proponha `/tech-debt`.
+
+| DT | Title | Status | Priority | Date |
+|----|-------|--------|----------|------|
+| [DT-001](./docs/technical-debt/DT-001-verificar-devin-desktop-real.md) | Verificar o produto no Devin Desktop real (T083) | Open | Medium | 2026-11-20 |
+| [DT-002](./docs/technical-debt/DT-002-linha-do-relatorio-devin-desktop.md) | Linha do relatório do assistente sobre o Devin Desktop (T084) | Open | Medium | 2026-11-20 |
+| [DT-003](./docs/technical-debt/DT-003-validar-o-produto-no-windows.md) | Validar o produto no Windows | Open | Medium | 2026-11-20 |
+| [DT-004](./docs/technical-debt/DT-004-validar-claude-code-no-macos-e-linux.md) | Validar o Claude Code pelo assistente de instalação (macOS e Linux) | Open | Medium | 2026-11-20 |
+| [DT-005](./docs/technical-debt/DT-005-validar-devin-cli-codex-e-gemini.md) | Validar o Devin CLI, o Codex, o Gemini CLI e o assistente real | Open | Medium | 2026-11-20 |

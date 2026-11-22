@@ -1,0 +1,7 @@
+{
+  "status_code": 301,
+  "headers": {
+    "content-type": "text/html; charset=UTF-8"
+  },
+  "body": "Acesso não autorizado"
+}

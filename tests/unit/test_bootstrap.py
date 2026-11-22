@@ -12,23 +12,33 @@ from investidor10_wallet import bootstrap, server, wallet_client
 from investidor10_wallet.memory_store import MemoryStore
 
 
-def test_missing_wallet_id_aborts_with_pt_br_message():
-    with pytest.raises(SystemExit) as exc:
-        bootstrap.load_config({})
-    assert "WALLET_ID" in str(exc.value)
-    assert "investidor10.com.br/carteira" in str(exc.value)
+def test_missing_wallet_id_no_longer_aborts_and_returns_no_wallet():
+    config = bootstrap.load_config({})
+    assert config["wallet_id"] == ""
+    assert config["mask_values"] is False
 
 
-def test_blank_wallet_id_aborts_with_pt_br_message():
+def test_blank_wallet_id_is_treated_as_missing():
+    assert bootstrap.load_config({"WALLET_ID": "   "})["wallet_id"] == ""
+
+
+def test_missing_wallet_id_message_is_gone():
+    assert not hasattr(bootstrap, "MISSING_WALLET_ID_MESSAGE")
+
+
+def test_missing_wallet_id_still_validates_the_other_variables():
     with pytest.raises(SystemExit) as exc:
-        bootstrap.load_config({"WALLET_ID": "   "})
-    assert "WALLET_ID" in str(exc.value)
+        bootstrap.load_config({"WALLET_CACHE_TTL_SECONDS": "abc"})
+    assert "WALLET_CACHE_TTL_SECONDS" in str(exc.value)
+    with pytest.raises(SystemExit) as exc:
+        bootstrap.load_config({"WALLET_MASK_VALUES": "talvez"})
+    assert "WALLET_MASK_VALUES" in str(exc.value)
 
 
 def test_non_numeric_wallet_id_aborts():
     with pytest.raises(SystemExit) as exc:
         bootstrap.load_config({"WALLET_ID": "abc123"})
-    assert "WALLET_ID" in str(exc.value)
+    assert str(exc.value) == bootstrap.INVALID_WALLET_ID_MESSAGE.format(value="abc123")
 
 
 def test_unicode_digits_wallet_id_aborts():
@@ -211,19 +221,30 @@ async def test_probe_404_aborts_with_not_found_or_private_pt_br():
     )
 
 
-@pytest.mark.parametrize("status_code", [401, 403])
+@pytest.mark.parametrize("status_code", [301, 401, 403])
 @respx.mock
-async def test_probe_401_and_403_abort_with_private_pt_br(status_code):
+async def test_probe_access_denied_warns_and_never_aborts(status_code, capsys):
     respx.get(f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/1234567").mock(
         return_value=httpx.Response(status_code)
     )
 
-    with pytest.raises(SystemExit) as exc:
-        await wallet_client.validate_wallet("1234567")
+    await wallet_client.validate_wallet("1234567")
 
-    assert str(exc.value) == bootstrap.WALLET_PRIVATE_MESSAGE.format(
-        wallet_id="1234567"
-    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert bootstrap.ACCESS_DENIED_MESSAGE in captured.err
+    assert "1234567" not in captured.err
+
+
+@respx.mock
+async def test_probe_sends_the_credential_as_hash():
+    route = respx.get(
+        f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/1234567"
+    ).mock(return_value=httpx.Response(200, json={"applied": 1, "equity": 1}))
+
+    await wallet_client.validate_wallet("1234567", "abc_DEF-1")
+
+    assert route.calls.last.request.url.params["hash"] == "abc_DEF-1"
 
 
 @pytest.mark.parametrize("status_code", [500, 502, 503, 429])
@@ -291,6 +312,7 @@ def test_import_server_has_no_side_effects_without_env(tmp_path):
 
 def test_main_runs_deterministic_pipeline_and_serves(tmp_path, monkeypatch):
     events: list[str] = []
+    monkeypatch.setenv("WALLET_ID", "12345")
     mem_file = tmp_path / "memory.json"
     monkeypatch.setattr(wallet_client, "WALLET_ID", wallet_client.WALLET_ID)
     monkeypatch.setattr(
@@ -329,3 +351,88 @@ def test_main_runs_deterministic_pipeline_and_serves(tmp_path, monkeypatch):
     assert events == ["config", "memory_path", "probe:12345", "serve"]
     assert server.memory is not None
     assert server.memory.path == str(mem_file)
+
+
+def test_main_without_a_wallet_skips_the_probe_and_still_serves(tmp_path, monkeypatch):
+    events: list[str] = []
+    monkeypatch.delenv("WALLET_ID", raising=False)
+    monkeypatch.setattr(wallet_client, "WALLET_ID", wallet_client.WALLET_ID)
+    monkeypatch.setattr(
+        wallet_client.wallet_client, "wallet_id", wallet_client.wallet_client.wallet_id
+    )
+    monkeypatch.setattr(
+        wallet_client.rest_client, "wallet_id", wallet_client.rest_client.wallet_id
+    )
+    monkeypatch.setattr(server, "memory", server.memory)
+    monkeypatch.setattr(
+        bootstrap,
+        "load_config",
+        lambda environ=None: {
+            "wallet_id": "",
+            "ttl_seconds": 300.0,
+            "max_stale_seconds": 7200.0,
+            "mask_values": False,
+        },
+    )
+    monkeypatch.setattr(
+        bootstrap, "resolve_memory_path", lambda *a, **k: str(tmp_path / "memory.json")
+    )
+
+    async def fake_validate_wallet(wallet_id: str, **_kwargs):
+        events.append("probe")
+
+    monkeypatch.setattr(wallet_client, "validate_wallet", fake_validate_wallet)
+    monkeypatch.setattr(server.mcp, "run", lambda *a, **k: events.append("serve"))
+
+    server.main()
+
+    assert events == ["serve"]
+
+
+def test_main_probes_the_local_configuration_without_aborting(
+    tmp_path, monkeypatch, isolated_home
+):
+    from investidor10_wallet import wallet_config
+
+    probes = []
+    monkeypatch.delenv("WALLET_ID", raising=False)
+    monkeypatch.setattr(server, "memory", server.memory)
+    monkeypatch.setattr(wallet_client, "WALLET_ID", wallet_client.WALLET_ID)
+    wallet_config.write_config(
+        isolated_home,
+        wallet_config.LocalConfig(
+            wallet_id="7654321",
+            share_hash="abc_DEF-1",
+            mode="restricted",
+            mask_values=False,
+            validated_at="2026-11-06T10:00:00-03:00",
+            source="setup_page",
+        ),
+    )
+    monkeypatch.setattr(
+        bootstrap, "resolve_memory_path", lambda *a, **k: str(tmp_path / "memory.json")
+    )
+
+    async def fake_validate_wallet(wallet_id, **kwargs):
+        probes.append((wallet_id, kwargs))
+
+    monkeypatch.setattr(wallet_client, "validate_wallet", fake_validate_wallet)
+    monkeypatch.setattr(server.mcp, "run", lambda *a, **k: None)
+
+    server.main()
+
+    assert probes == [("7654321", {"share_hash": "abc_DEF-1", "strict": False})]
+    assert wallet_client.wallet_client.share_hash == "abc_DEF-1"
+
+
+@respx.mock
+async def test_probe_of_a_local_configuration_warns_on_a_missing_wallet(capsys):
+    respx.get(f"{wallet_client.WALLET_PROXY_BASE_URL}/summary/metrics/99999").mock(
+        return_value=httpx.Response(404)
+    )
+
+    await wallet_client.validate_wallet("99999", strict=False)
+
+    err = capsys.readouterr().err
+    assert bootstrap.CONFIGURED_WALLET_NOT_FOUND_MESSAGE in err
+    assert "99999" not in err

@@ -59,3 +59,17 @@ específico do Gemini e **não** é lido pelo Devin.
   dentro de `plugin/`) é o adaptador mínimo; os assets são únicos.
 - A spec aberta Agent Plugins 1.0.0 é a convergência futura a observar —
   o Devin já a lê como formato de plugin raiz.
+## Fixação de versão na instalação (verificado 2026-11-12)
+
+- `devin plugins install <SOURCE>` aceita `owner/repo`, URL git ou caminho
+  local, com `#caminho/do/plugin` para subpasta. Opções: só `-y/--yes` e
+  `--local`. **Não há opção de referência (tag, branch ou commit).** Fonte:
+  `devin plugins install --help` e
+  `share/devin/docs/extensibility/plugins/overview.mdx` ("Installing a
+  plugin") do Devin CLI 3000.12.43.
+- A doc local cita fixar em `sha` só no contexto de marketplaces de
+  plugins ("pin to a `sha` when you want to control updates",
+  `quickstart.mdx`), não no `install` por repositório.
+- Consequência no produto (spec 005, T069/T074): o assistente instala o plugin
+  pela branch padrão e o relatório diz que, neste cliente, o plugin segue a
+  branch padrão do repositório.

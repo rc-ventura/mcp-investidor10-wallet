@@ -1,11 +1,38 @@
 #!/bin/sh
+status=0
+
+if ! command -v unzip >/dev/null 2>&1 && [ -n "$(git ls-files '*.mcpb')" ]; then
+  echo "check-no-wallet-id: unzip is not installed, skipping the check inside .mcpb packages" >&2
+fi
+
+scan() {
+  label=$1
+  value=$2
+  files=$(git grep -l -F -e "$value" -- . 2>/dev/null)
+  for package in $(git ls-files '*.mcpb'); do
+    if unzip -p "$package" 2>/dev/null | grep -q -F -e "$value"; then
+      files="$files
+$package"
+    fi
+  done
+  files=$(printf '%s\n' "$files" | sed '/^$/d')
+  if [ -n "$files" ]; then
+    echo "check-no-wallet-id: the $label is in tracked files; replace it with the placeholder:" >&2
+    echo "$files" >&2
+    status=1
+  fi
+}
+
 if [ -z "${WALLET_ID:-}" ]; then
   echo "check-no-wallet-id: WALLET_ID is not set, skipping the check" >&2
-  exit 0
+else
+  scan "wallet ID" "$WALLET_ID"
 fi
-files=$(git grep -l -F -e "$WALLET_ID" -- . 2>/dev/null)
-if [ -n "$files" ]; then
-  echo "check-no-wallet-id: the wallet ID is in tracked files; replace it with <id>:" >&2
-  echo "$files" >&2
-  exit 1
+
+if [ -z "${WALLET_HASH:-}" ]; then
+  echo "check-no-wallet-id: WALLET_HASH is not set, skipping the credential check" >&2
+else
+  scan "share credential" "$WALLET_HASH"
 fi
+
+exit $status

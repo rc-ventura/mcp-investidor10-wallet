@@ -16,7 +16,11 @@ Princípios que orientam este roadmap (decisões já tomadas, não reabrir):
   reconciliação read-only, não um segundo MCP de escrita.
 - **memory.json é a decisão certa para este escopo** — usuário único,
   escrita humana-escala. O degrau seguinte, se algum dia houver, é SQLite
-  (ainda local, sem servidor), não Postgres.
+  (ainda local, sem servidor), não Postgres. **Gatilhos de reavaliação**
+  (spec 005, registrar em ADR quando algum ocorrer): coleções de crescimento
+  contínuo entrarem no produto (snapshot de posições, coleção `trades`,
+  lançamentos em cache), contenção da trava observada no `doctor` ou em
+  relatos, ou consultas que exijam filtro e agregação sobre a memória.
 
 ---
 
@@ -36,17 +40,19 @@ externo; reavaliar depois.
 
 | Prioridade | Item | Fase | Por quê |
 |---|---|---|---|
-| **Must** | Claude Desktop — extensão `.mcpb` como asset de release | 3 | Principal canal de quem não usa CLI; assistente de instalação não alcança apps GUI (research.md D3, spec 003) |
+| **Must** | Claude Desktop — plugin único com servidor `uvx` pelo marketplace próprio (spec 005, ADR-0018) | 3 | Principal canal de quem não usa CLI; assistente de instalação não alcança apps GUI. A extensão `.mcpb` avulsa foi descartada no spike do Lote 1 (o Desktop não traz `uv`; o Claude Code rejeita o tipo `uv`) |
 | **Must** | Devin Desktop — testar registro do MCP e carga do plugin | 3 | Mesmo upgrade de alcance; formato ainda não verificado |
 | **Must** | Validação de distribuição em máquina limpa (V2 real, Codex via TUI, Gemini) | 3 | Pendências aceitas da spec 003; hoje só há dry-run e contrato |
 | **Must** | Carteira restrita (`hash`) + configuração interativa (link → pública/restrita, mascaramento) | 3 | Verificado em 31/10/2026: carteira restrita ou privada recebe HTTP 301 "Acesso não autorizado" e hoje todas as tools de carteira falham com um `unexpected_format` enganoso; leigo não escolhe modo por env var |
 | **Must** | ✅ Doc de privacidade — entregue na 0.3.0 | 1 | Pré-requisito de divulgar: o ID da carteira é a credencial e o mascaramento do site é cosmético |
 | **Must** | ✅ File lock no `memory.json` — entregue na 0.3.0 | 1 | Com Desktop + CLIs, mais processos escrevem no mesmo arquivo; last-write-wins perde dado |
-| **Must** | Listagem em MCP registries (Smithery, PulseMCP, diretório Anthropic) | 3 | É distribuição; **antes de submeter, decidir o risco do ToS** da API não-documentada (ADR-0005) |
+| **Must** | Listagem em MCP registries e diretórios de plugins (Smithery, PulseMCP, diretório Anthropic) | 3 | É distribuição; **fora da spec 005** (FR-030), com critérios de reabertura abaixo. A spec 005 só faz o pré-teste de requisitos (T064a), sem submeter. **Antes de submeter, decidir o risco do ToS** da API não-documentada (ADR-0005) |
+| **Must** | Persona e lembrete de memória só em sessão de carteira (hooks `SessionStart` e `Stop` com `matcher: "*"`) | 4 | Achado de 20/11/2026: o plugin instalado injeta o assessor de investimentos e força `get_session_context` em qualquer sessão, de qualquer projeto, no Claude Code e no Desktop. Quem instalou o plugin e foi pedir outra coisa recebe o assessor do mesmo jeito. Precisa ser resolvido antes de divulgar o plugin |
 | **Should** | Spec 006 — verificação determinística de cálculos | 4 | Maior lacuna de confiança; fica depois da distribuição por ordem de decisão, não por importância |
 | **Should** | ✅ Modo privacidade `WALLET_MASK_VALUES` — entregue na 0.3.0 | 1 | Passa a fazer sentido ao distribuir; env var, nunca parâmetro de tool |
 | **Should** | Action semanal de live tests | 1 | Aviso antecipado de drift para o mantenedor; o usuário já é protegido pela validação em tempo de execução. Fora da spec 004 — entra quando houver usuários além do mantenedor (após a 005) |
 | **Should** | Dependabot — updates revisáveis das actions pinadas por SHA e das deps | 1 | Complemento do pin por SHA entregue na 0.3.0: sem ele os hashes congelam e correções de segurança nunca chegam; com ele, cada update vira PR com diff revisável |
+| **Should** | Hardening do pipeline CI (auditoria de 07/11/2026) | 1 | Gate rodando o script da árvore do PR, environment `pypi` sem proteção documentada e scan de wallet ID só local são o elo fraco de uma cadeia que já tem SHA pinning e OIDC; relatório em `reports/003-ci-pipeline-audit.md` |
 | **Should** | ✅ Changelog append-only da memória (`memory.json.log`) — entregue na 0.3.0 | 1 | Escrita válida porém errada do modelo hoje é invisível; ~25 linhas |
 | **Should** | ✅ Sinal duplo de erro (`is_error` + envelope) — entregue na 0.3.0 | 1 | No protocolo, o erro aparece como sucesso |
 | **Should** | `get_entries` — log de lançamentos | 2 | Endpoint já validado; responde "o que comprei e quando" |
@@ -60,6 +66,7 @@ externo; reavaliar depois.
 | **Could** | Alertas compostos e gatilhos por indicador | 2 | Depende de baseline real e de fonte de cotação |
 | **Could** | Snapshot de posições para diff entre sessões | 2 | `get_entries` cobre parte do caso |
 | **Could** | Coleção `trades` na memória | 2 | Caso de uso do mantenedor; `decisions` serve de contorno |
+| **Could** | Métricas de portfólio — beta, alfa, volatilidade e correlação vs índices | 2 | Motivação real de 31/10/2026: hoje o cálculo é feito na LLM com benchmark via web search — caso de uso direto da spec 006; v2 depende de fonte externa de séries de índices |
 | **Could** | Métricas locais + subcomando `doctor` | 3 | Diagnóstico de suporte sem telemetria: o usuário cola o resumo sanitizado numa issue |
 | **Won't (agora)** | Avaliação Ollama local + nota na doc | 1/3 | Depende do mask e de privacidade total como requisito |
 | **Won't (agora)** | Reconciliação corretora↔carteira | 2 | Grande; reavaliar após `get_entries` |
@@ -80,11 +87,12 @@ entram na matriz.
    7 ciclos (`reports/sdd-final-review/004/`). A T048 e a T055 foram aprovadas pelo
    mantenedor em 31/10/2026 e a T054 fechou com o CI verde em `main`; falta
    criar a tag. A sequência está em `specs/004-hardening/fechamento.md`.
-2. **Spec 005 — Distribuição Desktop**: `.mcpb` do Claude Desktop, teste do
-   Devin Desktop e validação em máquina limpa (V2 real, Codex, Gemini);
-   suporte à carteira restrita com configuração interativa (link →
-   pública/restrita + mascaramento, decisão de 31/10/2026); depois, a
-   submissão aos registries.
+2. **Spec 005 — Distribuição Desktop**: plugin único com servidor `uvx` pelo
+   marketplace próprio (ADR-0018), teste do Devin Desktop e validação em máquina
+   limpa (V2 real, Codex, Gemini); suporte à carteira restrita com configuração
+   interativa (link → pública/restrita + mascaramento, decisão de 31/10/2026) e
+   `doctor`; depois, a submissão aos registries, só com os critérios de reabertura
+   atendidos (Fase 3).
 3. **Spec 006 — Verificação determinística de cálculos** (desenho em 3
    camadas já aprovado); os demais Should da Fase 2 por ordem de risco.
 
@@ -369,6 +377,57 @@ entram na matriz.
   tag, mesma exposição) — pinar por SHA também ou cobrir com
   `pre-commit autoupdate`.
 
+### Pendência da spec 005 (Lote 4, 06/11/2026)
+
+- [ ] **Checagem de carteira configurada num único ponto** — hoje cinco tools de
+  carteira (`get_wallet_summary`, `get_wallet_allocation`, `get_wallet_positions`,
+  `get_patrimony_history`, `get_earnings`) repetem a mesma checagem e devolvem
+  `wallet_not_configured`. Troca proposta: metadata `requires_wallet=True` nas
+  tools que dependem da carteira, e um middleware (no `ErrorSignalMiddleware`, que
+  já existe) que faz a checagem antes da chamada. Um teste confere que as tools
+  marcadas são exatamente as cinco, e que memória e cotação nunca são marcadas. A
+  checagem continua por chamada, porque a configuração pode mudar com o servidor
+  rodando. Antes de implementar: confirmar se o middleware do FastMCP 4.1.2 recebe a
+  chamada antes da validação de argumentos, porque o teste atual exige que
+  argumento inválido com carteira ausente continue devolvendo
+  `wallet_not_configured`.
+
+### Pendências da auditoria do pipeline CI (07/11/2026)
+
+> Auditoria dos 3 workflows contra a documentação oficial de security
+> hardening do GitHub Actions. Relatório completo:
+> [`reports/003-ci-pipeline-audit.md`](../reports/003-ci-pipeline-audit.md).
+> Ordem sugerida: S1 → S2 → eficiência → S3/S4 → Dependabot (item próprio
+> acima). S1, eficiência e S4 somam ~30 linhas de mudança.
+
+- [ ] **Gate script a partir da ref base (S1, médio)** — `main-gate` roda
+  `scripts/check_promotion.py` do checkout do merge commit (base+head), então
+  o próprio PR `promote/v*` pode adulterar o gate. Executar via
+  `git show "origin/$GITHUB_BASE_REF:scripts/check_promotion.py"`.
+- [ ] **Proteção do caminho tag→PyPI (S2, médio, settings do repo)** —
+  verificar e documentar: environment `pypi` com required reviewers ou
+  restrição de deploy a tags `v*`; ruleset restringindo criação de tag `v*`;
+  trusted publisher escopado a repo+workflow+environment.
+- [ ] **Scan de wallet ID no CI (S3, baixo)** — `check-no-wallet-id` só roda
+  no pre-commit local (`--no-verify`/web UI pulam); job no `ci.yml` com
+  `secrets.WALLET_ID`/`secrets.WALLET_HASH` no env.
+- [ ] **`persist-credentials: false` (S4, baixo)** — em todos os
+  `actions/checkout`; nenhum job precisa de auth git após o clone.
+- [ ] **`timeout-minutes` (E3)** — 15 (test), 10 (audit e main-gate),
+  25 (verify, que tem loops de retry de até ~10 min).
+- [ ] **Cache do uv (E1)** — `enable-cache: true` +
+  `cache-dependency-glob: uv.lock` no `setup-uv`; maior ganho de eficiência
+  (9 jobs de matrix baixam as deps a cada run).
+- [ ] **`concurrency` no `ci.yml` (E2)** — `group: ${{ github.workflow
+  }}-${{ github.ref }}` com `cancel-in-progress` em PR.
+- [ ] **`retention-days: 1` (E4)** — no artifact `dist` do `release.yml`
+  (só precisa viver até o job `publish`).
+- [ ] **Verificação extra (não auditada)** — CodeQL/OpenSSF Scorecard e
+  CODEOWNERS de `.github/workflows` ficam para quando houver colaboradores;
+  sem ação imediata.
+
+---
+
 ## Fase 2 — Valor de produto (oriundo das learning lessons)
 
 - [ ] **`get_earnings_detailed`** — ver
@@ -419,6 +478,24 @@ entram na matriz.
   pergunta "o que eu comprei/vendi e quando", que hoje só se infere por
   aproximação. Payload inclui HTML em `ticker_img` — passthrough ou
   strip no cliente, decidir.
+- [ ] **Fonte de taxas de juros (Tesouro/DI) — `get_treasury_rates`** —
+  motivação real de 10/11/2026 (sessão aluguel×compra): as regras #3/#4
+  da memória exigem comparar DI jan/2031 e juro real >2040 **toda
+  sessão**, e hoje isso é manual (web search da LLM, sem dado
+  estruturado); o monitor de PU do Renda+ 2065 (regra #10) também lê
+  taxa. Fonte: CSV oficial do Tesouro Transparente
+  (`PrecoTaxaTesouroDireto.csv`, diário, gratuito, documentado) —
+  primeiro upstream que **não é** o Investidor10, o que exige replicar o
+  padrão já isolado no `wallet_client` (envelope + `SourceError` + TTL
+  próprio) e um ADR de "segunda fonte". Saída: `{título, vencimento,
+  taxa, pu, updated_at}` para os títulos de referência das regras
+  (IPCA+ 2050 sem juros, IPCA+ 2040, Renda+ 2065). **Limite declarado**:
+  DI de contratos futuros não está no CSV — para DI jan/2031 o caminho
+  honesto é ANBIMA/B3 ou manter a consulta manual declarando a fonte.
+  Efeitos: transforma a skill "monitor de juro longo" (Fase 4) de fluxo
+  manual em wrapper fino sobre a tool, e é pré-requisito real dos
+  "Alertas compostos/gatilhos por indicador" (item abaixo), que hoje
+  dependem de baseline real.
 - [ ] **Alertas compostos e gatilhos por indicador (juro longo)** — motivação
   real de 26/10/2026: o usuário quis alertar sobre "juro longo subindo" e
   não conseguiu — alertas são só ticker+preço e não há cotação de Tesouro.
@@ -461,6 +538,35 @@ entram na matriz.
   Sinergia direta com a regra de monitor de juro longo (baseline DI) e
   com `get_entries` para conferir se o lançamento registrado no
   Investidor10 bate com o tranche declarado.
+- [ ] **Métricas de portfólio — beta, alfa, volatilidade e correlação vs
+  índices** — motivação real de 31/10/2026: o usuário pediu "alfa e beta
+  da carteira" e o cálculo foi feito na LLM — retornos mensais derivados
+  de `get_patrimony_history` (equity − fluxo, aporte assumido no fim do
+  mês), série do Ibov trazida por web search, e uma divergência detectada
+  na própria fonte (~+3,4% acumulado no histórico vs `profit_twr_12m`
+  +13,36% do summary). É o caso de uso exato da spec 006: número
+  financeiro calculado na LLM, com duas fontes de incerteza (série de
+  retornos da carteira e série do benchmark).
+  - **Retornos mensais determinísticos**: derivar a série TWR mensal de
+    `get_patrimony_history` — documentar a convenção de fluxo (fim vs.
+    meio do mês) e a divergência já observada contra `profit_twr_12m`;
+    validar o encadeamento contra o `profitability` do próprio endpoint.
+  - **Benchmarks múltiplos e composto**: Ibov, IFIX, CDI/Selic, S&P 500
+    em BRL e BTC — incluindo benchmark composto parametrizável alinhado
+    à alocação-alvo da memória (ex.: 35/20/20/20/5). **Dependência
+    externa**: nenhuma dessas séries existe na API do Investidor10 —
+    mesma dependência do item "Roteamento de cotação por tipo de ativo"
+    (brapi.dev / Yahoo Finance / B3); fonte só de índices, nunca de
+    dados da carteira.
+  - **Saída**: `{window_months, benchmark(s), returns, volatility, beta,
+    alpha_jensen, correlation, r_squared, notes}` — com a advertência de
+    resolução (mensal, ~12 observações) e o `fetched_at`/`cached` do
+    envelope.
+  - **Caminho honesto de escopo**: a v1 pode ser a tool determinística
+    recebendo as séries (carteira da API + benchmark injetado pelo
+    agente via web search) e computando as métricas — elimina erro de
+    aritmética sem depender de fonte nova; v2 faz o fetch do benchmark
+    externo quando o roteamento de cotação abrir o caminho.
 - [ ] **Tool de reconciliação corretora↔carteira** — responde à maior
   fricção do fluxo real (compra na corretora → Investidor10 fica stale → MCP
   lê carteira desatualizada). Read-only: usuário cola posições da corretora
@@ -495,14 +601,69 @@ entram na matriz.
     resolve o caso real de hoje sem multi-carteira. O spike decide se
     multi-carteira é over-engineering frente a essa opção.
 
+> **Novas entradas de 10/11/2026** (sessão de estratégia de produto —
+  prioridade a definir na próxima revisão da matriz MoSCoW):
+
+- [ ] **`get_screener` — screening de mercado pelas regras do usuário** —
+  motivação real: a decisão pendente #1 (lista de ações "vaca leiteira"
+  fora da carteira) foi montada pela LLM via web search, sem dado
+  estruturado. A regra #1 da memória (≥5 anos de dividendos e lucro
+  consecutivos) pede screening determinístico. Fonte: os endpoints
+  internos que alimentam o screener do site — **investigar primeiro**
+  quais existem e se respondem sem auth. Entrada: filtros (dy_min,
+  roe_min, setor, anos de lucro); saída: lista de tickers com
+  indicadores. Complementa o `get_asset_quote` (que lê 1 ticker; o
+  screener descobre tickers).
+- [ ] **Scheduler de alertas (avaliação fora de sessão)** — motivação
+  real: hoje alertas só são avaliados no bootstrap
+  (`get_session_context`); o gatilho de venda do monitor de PU (regra
+  #10, Renda+ 2065 ≥ R$209,43) pode disparar numa terça e só ser visto
+  na sexta. Proposta: processo `uvx` disparado por cron/launchd (macOS)
+  ou Task Scheduler (Windows) que avalia os alertas ativos — e, quando
+  `get_treasury_rates` existir, o monitor de juro — e **notifica** só
+  quando algo dispara (osascript/terminal-notifier no macOS;
+  ntfy/Telegram como opção). Sem daemon, sem UI, sem LLM no loop: só o
+  avaliador determinístico + notificação. Exige ADR (novo ciclo de vida
+  de processo: quem instala a tarefa agendada — o `install`?) e o mesmo
+  cuidado de frescor do `pending_check` (stale_quote não dispara).
+- [ ] **Sync de lançamentos corretora→carteira (dentro do bundle,
+  desenho em discussão desde 10/11/2026)** — motivação real: lançamento
+  manual é a maior fricção do Investidor10 em conta gratuita — a
+  integração B3 nativa é **feature paga**, então regra de escopo:
+  **nunca chamar o endpoint de sync deles nem burlar o paywall**
+  (precedente de mercado: g10-sync). Componente dentro do bundle, mas
+  **fora do servidor MCP**: a escrita nunca é uma tool que o modelo
+  chama (mesmo princípio do gate da Fase 5). Forma preliminar em 3
+  passos: (1) ler lançamentos — nota de corretagem em PDF como primeira
+  fonte (zero credencial); B3 Área do Investidor e APIs de corretora
+  como fontes futuras (custódia de credenciais exige ADR/threat model
+  próprio); (2) diff determinístico contra `get_entries`/posições;
+  (3) listar o que falta lançar e, **após confirmação humana
+  explícita**, escrever nos endpoints internos de lançamento manual com
+  a sessão autenticada do usuário. Blast radius mitigado: a carteira é
+  rastreio, não custódia — erro suja o tracker, não move dinheiro. O
+  agente pode *propor* ("achei 3 lançamentos novos"), a execução é
+  humana. Em aberto: parser por layout de corretora, custódia de
+  cookies/sessão, undo de lançamento.
+- [ ] **`export_wallet_csv` (Could)** — exportar posições da carteira em
+  CSV (formato Yahoo Finance / genérico). Valor real: backup
+  independente do Investidor10 — se a API interna morrer (risco do
+  ADR-0005), o CSV preserva posições e PMs e pode virar fonte de
+  contingência read-only do próprio MCP. Esforço baixo; **não** é
+  integração com o Yahoo — Yahoo/brapi entram como *fonte* no item
+  "Roteamento de cotação".
+
 ## Fase 3 — Distribuição
 
 > Claude Desktop, Devin Desktop e validação em máquina limpa são a **spec 005**.
 
-- [ ] **Claude Desktop — extensão `.mcpb`** — pacote distribuído como asset
-  de release (pesquisa em `specs/003-client-integration/research.md` D3);
-  é a spec 005. O assistente de instalação não alcança
-  apps GUI.
+- [ ] **Claude Desktop — plugin único com servidor `uvx`** — o plugin do
+  marketplace próprio declara o servidor (ADR-0018) e o `uv` é pré-requisito do
+  Desktop; é a spec 005. O assistente de instalação não alcança apps GUI.
+  *Alternativa descartada*: a extensão `.mcpb` avulsa (pesquisa em
+  `specs/003-client-integration/research.md` D3). O spike do Lote 1 mediu que o
+  Desktop usa o `uv` do usuário e o Claude Code rejeita o tipo `uv`; reabrir só se
+  o app passar a embutir o `uv` (condição do ADR-0018).
 - [ ] **Devin Desktop — teste de registro do MCP e do plugin** — verificar
   o formato antes de prometer suporte; registrar divergências em
   `docs/learning-lessons/`.
@@ -551,21 +712,30 @@ entram na matriz.
     para quando o usuário troca a carteira de pública para restrita, gera
     um link novo ou liga/desliga o mascaramento. As flags não-interativas
     (`--wallet-url`, `--mask-values`) continuam para scripts e CI.
-  - **Claude Desktop (`.mcpb`):** o equivalente gráfico é o formulário de
-    configuração da extensão. Verificar na doc oficial do `.mcpb` se o
+  - **Claude Desktop (`.mcpb`), superado pela página local (ADR-0019):** o
+    equivalente gráfico seria o formulário de configuração da extensão. Verificar na doc oficial do `.mcpb` se o
     `user_config` aceita campo sensível (link) e booleano (mascaramento)
     antes de fechar o desenho.
   - Um ADR próprio (modo restrito e configuração interativa) e o
     `PRIVACY.md` atualizado: a restrita passa a ser a recomendação
     padrão, já que a pública é indexável por buscadores.
-- [ ] **Listagem em MCP registries** (Smithery, PulseMCP, diretório
-  Anthropic) — após Fase 0. Posicionar como ferramenta comunitária/pessoal:
-  o gating real não é técnico, é o ToS da API não-documentada.
+- [ ] **Listagem em MCP registries e diretórios de plugins** (Smithery,
+  PulseMCP, diretório Anthropic) — após Fase 0. Posicionar como ferramenta
+  comunitária/pessoal: o gating real não é técnico, é o ToS da API
+  não-documentada. **Fora da spec 005** (FR-030): lá o produto vai pelo
+  marketplace próprio e a spec só faz o pré-teste de requisitos (T064a), sem
+  submeter nada. **Critérios de reabertura**, todos exigidos: (1) matriz de
+  máquinas limpas aprovada (FR-023), sem célula "não testado"; (2) testes semanais
+  contra a API real rodando por 4 semanas sem detectar mudança (FR-028); (3)
+  decisão sobre os termos de uso do Investidor10 registrada em ADR. O resultado
+  do pré-teste (`specs/005-desktop-distribution/directory-preflight.md`) lista os
+  artefatos e ajustes por diretório.
 - [ ] **Nota Ollama na doc** — depende do resultado da avaliação (Fase 1):
   se o modelo local passar nos critérios, documentar o "modo privacidade
   total" (mask + Ollama); se não passar, documentar honestamente as
   limitações de tool-calling observadas.
-- [ ] **Métricas locais + subcomando `doctor`** — observabilidade sem dado
+- [ ] **Métricas locais** (o subcomando `doctor` de diagnóstico da instalação foi
+  entregue na spec 005, sem métricas; esta parte fica) — observabilidade sem dado
   saindo da máquina. Um evento JSONL por chamada de tool em arquivo irmão
   da memória (`{ts, tool, duration_ms, error_code, cached, version}`,
   nunca argumentos, payload, ticker, valor nem ID da carteira; mesmas
@@ -625,6 +795,63 @@ entram na matriz.
   `.codex-plugin/plugin.json` sobre as mesmas skills) e Gemini
   (`gemini-extension.json` + `commands/*.toml` espelhando as skills);
   skills SKILL.md são o denominador comum verificado nos 4.
+- [ ] **Ajuste: a persona e o lembrete de memória não podem valer para toda
+  sessão** (achado de 20/11/2026, relato do mantenedor; prioridade Must, ver
+  matriz). Hoje `plugin/hooks/hooks.json` registra dois hooks com
+  `matcher: "*"`:
+  - **`SessionStart`** faz `cat` de `hooks/session-start.json`, que injeta
+    como `additionalContext` o papel de "assistente de investimentos do
+    usuário" e a regra (1) "no início de toda sessão, chame
+    `get_session_context`". Não há condição nenhuma: vale em qualquer
+    projeto, terminal ou sessão do Desktop onde o plugin esteja instalado.
+  - **`Stop`** roda `stop-memory-reminder.sh`, que procura no transcript
+    palavras como "comprar", "decisão", "aportar" e, se não achar
+    `log_decision`/`log_insight`, imprime o lembrete da memória do
+    investidor. Numa sessão de código que fale em "decisão" o lembrete
+    aparece do mesmo jeito.
+  - **Caso que originou o item:** o mantenedor testou o hook da carteira,
+    depois abriu outra sessão para fazer uma lição de casa e o contexto de
+    assessor de investimentos veio injetado de novo, sem relação com o
+    pedido.
+  - **Por que é problema de produto:** o hook não distingue projeto nem
+    assunto, então em qualquer lugar onde o plugin esteja ativo (quem usa o
+    Desktop e o Code para várias coisas) a persona vem em tudo; gasta contexto, força chamada
+    de tool sem pedido e passa a impressão de que o produto "invade" a
+    sessão. Isso reabre a decisão da "Persona via hook SessionStart"
+    acima (spec 003), que presumiu sessão dedicada à carteira.
+  - **Critério de aceite:** uma sessão sem relação com a carteira não recebe
+    a persona, não chama `get_session_context` por conta própria e não
+    recebe o lembrete do `Stop`; uma sessão sobre a carteira continua
+    recebendo tudo; os dois casos cobertos por teste de contrato do plugin.
+  - **Caminhos a avaliar (decidir com o mantenedor, não está decidido):**
+    1. *Persona sob demanda:* tirar a persona do `SessionStart` e deixá-la
+       nas skills e no subagente (que já embutem o bootstrap e só carregam
+       quando a descrição casa com o pedido). Menor intrusão; a persona deixa
+       de valer para conversa livre sobre carteira que não acione skill.
+    2. *Hook condicional:* trocar o `cat` por um script que só injeta se o
+       diretório de trabalho tiver um marcador, ou depois de um gatilho
+       (por exemplo `UserPromptSubmit` com termos do domínio: carteira,
+       ativo, FII, dividendo, provento, tese). Mantém a persona nas
+       conversas de carteira; exige lista de termos e custa um pouco de
+       falso negativo.
+    3. *Ativação explícita:* um comando ou skill (`/carteira`) que liga o
+       modo assessor na sessão; o hook some. Mais previsível, mais atrito
+       para o usuário leigo do Desktop.
+    4. *`Stop` só quando a sessão usou a carteira:* condicionar o lembrete a
+       o transcript conter chamada às tools do servidor (por exemplo
+       `get_session_context`), em qualquer dos caminhos acima. É a
+       mudança menor e vale mesmo se o resto ficar para depois.
+  - **Verificar antes de escolher:** como os outros três clientes do bundle
+    (Codex, Devin CLI, Gemini CLI) injetam a persona hoje e se o mesmo
+    comportamento acontece neles; se o Desktop executa `SessionStart` por
+    sessão Cowork e por conversa Chat; e o efeito sobre as skills, que
+    dependem da persona para o bootstrap.
+  - **Documentação a mexer quando decidir:** emenda ao ADR-0012 e ao
+    ADR-0018 (o que o plugin entrega e quando) e uma learning lesson com o
+    caso; revisar o texto de `session-start.json`, o README e
+    `docs/INSTALACAO-DESKTOP.md`, que hoje descrevem a persona como
+    sempre ativa; e a regra (7) da persona (configuração pendente), que
+    hoje só chega via essa injeção.
 - [ ] **Spec 006 — Verificação determinística de cálculos** — o agente
   hoje calcula números financeiros na LLM, sem verificação. Desenho em 3
   camadas aprovado:
@@ -657,6 +884,102 @@ entram na matriz.
      máxima ~24a), IPCA+ 2040, Renda+ 2065 — explicar que acima de 2040
      não existe DI, é juro real de NTN-B.
   Vale para os 4 clientes do bundle (SKILL.md é o denominador comum).
+
+---
+
+## Fase 5 — Gestão da memória (proposta de 06/11/2026, prioridade a definir)
+
+> Pedido do mantenedor: gerir a memória de forma auditável, com um gate de
+> atualização, um agente que reflete sobre as memórias e um sistema de
+> decaimento. Nada aqui está decidido: cada item precisa de ADR antes de
+> virar spec.
+
+**Ponto de partida (0.3.0 e spec 005):**
+- toda mutação já vai para `memory.json.log` (JSONL append-only, com
+  `before` e `after`), mas a linha não diz quem pediu nem por quê, e não há
+  como detectar um log truncado ou editado;
+- o "gate" de hoje é só instrução: a persona e o ADR-0002 mandam propor e
+  pedir confirmação, mas o servidor grava assim que o modelo chama `save_*`
+  e `log_*`;
+- nada envelhece: teses, regras e insights antigos voltam inteiros em todo
+  `get_session_context`, e o contexto cresce sem limite;
+- ninguém revisa a memória: tese contraditória com regra, decisão sem
+  `outcome` há meses e insight duplicado com fingerprint diferente ficam lá.
+
+**Ordem proposta:** auditoria → gate → decaimento → agente de reflexão. A
+reflexão depende das três anteriores: ela só propõe, e o que ela propõe
+passa pelo gate, entra no log e respeita o decaimento.
+
+- [ ] **1. Memória auditável** — base para os demais.
+  - Cada linha do log ganha `tool`, `client` (do `clientInfo` do
+    `initialize`, quando houver), `reason` (texto curto informado pelo
+    modelo, opcional) e o hash da linha anterior: uma cadeia de hashes torna
+    truncamento e edição detectáveis, sem prometer que impede.
+  - Tool de leitura `get_memory_history(collection, id)` para responder
+    "quando e por que esta regra mudou?".
+  - Verificação da cadeia no `doctor` (spec 005, US5) e política de rotação
+    do log (hoje adiada).
+  - Pergunta aberta: o protocolo é sem estado (ADR-0008), então não há id de
+    sessão confiável para agrupar mudanças.
+- [ ] **2. Gate de atualização** — tornar a confirmação um mecanismo, não só
+  uma instrução.
+  - Gravação em duas fases: `propose_memory_change` devolve um id e o diff,
+    nada é aplicado; a mudança só vale depois de aprovada.
+  - A aprovação **não pode ser uma tool que o próprio modelo chama** (ele se
+    aprovaria). Caminhos possíveis: a página local da spec 005 (mesmo
+    padrão de `open_wallet_setup`, com token de uso único) como tela de
+    revisão de mudanças pendentes; ou elicitation, quando o Claude Desktop
+    suportar (research D15).
+  - Política por risco: `log_insight` e `record_decision_outcome` podem
+    seguir diretos; sobrescrever regra, apagar ou trocar tese e mudar o
+    objetivo passam pelo gate. Recusa também vai para o log.
+  - Custo: mais tools e um passo a mais na conversa; medir a fricção antes
+    de estender o gate para tudo.
+  - **Extensão de escopo (10/11/2026): a página local vira UI completa de
+    gestão da memória.** Motivação real do mantenedor: o Claude Desktop
+    tem memória nativa que **compete** com o `memory.json` — fatos de
+    investimento às vezes são gravados na memória do Claude (fechada,
+    server-side, inacessível via MCP; unificação literal é impossível).
+    Não observado no Devin; não testado no Claude Code. Resposta: em vez
+    de unificar, tornar o `memory.json` a memória *gerenciável* — a página
+    local deixa de ser só tela de aprovação do gate e passa a
+    navegar/editar teses, regras, decisões e propostas pendentes, em
+    qualquer cliente. Complemento defensivo: reforçar na persona/hook que
+    fatos de investimento vão sempre para as tools de memória; a memória
+    nativa do cliente vira cache irrelevante.
+- [ ] **3. Decaimento** — relevância que cai com o tempo, sem apagar nada.
+  - Cada item ganha `last_confirmed_at` e uma meia-vida por tipo (ponto de
+    partida para discutir: insight ~30 dias, tese ~180 dias com pedido de
+    reconfirmação, regra sem decaimento mas com revisão periódica, decisão
+    pendente cobrada depois do horizonte dela).
+  - Abaixo do limiar, o item vai para `archived`: sai do
+    `get_session_context`, continua no arquivo e no log, e volta com uma
+    reconfirmação. Decair nunca é apagar.
+  - `get_session_context` passa a trazer só os itens ativos e uma lista
+    curta "a revisar", o que também segura o crescimento do contexto.
+  - Exige memória v2 com migração (ADR-0010) e reabre a pergunta do SQLite
+    se o arquivo crescer além da escala humana.
+- [ ] **4. Agente de reflexão** — subagente do plugin, só leitura mais
+  propostas, no mesmo modelo do guardião de disciplina.
+  - Procura: tese que contradiz regra, tese cuja premissa não bate com os
+    dados atuais da carteira, itens duplicados, decisões sem `outcome`
+    vencidas, regras nunca usadas.
+  - Sai com propostas (consolidar, arquivar, reconfirmar, registrar
+    outcome) que passam pelo gate; nunca grava direto ("agente sugere,
+    nunca muta").
+  - Gatilho: skill "revisar memória" sob demanda e, opcionalmente, um
+    lembrete no início de sessão quando a última revisão passar de N dias
+    (o lembrete fica no hook, não no servidor).
+  - Registrar no log quais propostas vieram da reflexão, para medir se ela
+    ajuda ou só gera ruído.
+
+**Riscos e perguntas para o ADR:**
+- O número de tools cresce (hoje 20); cada tool nova pesa na descrição que
+  vai ao modelo em toda sessão.
+- O gate pela página local traz de volta a superfície da porta local
+  (ADR-0019) para outro uso; o mesmo modelo de ameaças precisa cobrir.
+- Meia-vida errada esconde uma regra que o usuário ainda segue; por isso
+  regra não decai por padrão e todo arquivamento é reversível.
 
 ---
 

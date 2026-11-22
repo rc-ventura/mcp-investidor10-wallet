@@ -1,0 +1,9 @@
+[project]
+name = "spike-ping"
+version = "0.0.1"
+description = "Spike server for the packaged-server experiment"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp[apps]==4.1.2",
+    "prefab-ui==0.20.2",
+]

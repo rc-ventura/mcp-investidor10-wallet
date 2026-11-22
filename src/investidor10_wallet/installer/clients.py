@@ -1,11 +1,30 @@
+import re
 import shutil
 import subprocess
+from dataclasses import dataclass
 
 from .. import __version__
 from . import SERVER_ALIAS, ClientRegistration, RegisterOutcome
 
 RUNNER_COMMAND = "uvx"
 RUNNER_ARGS = [f"mcp-investidor10-wallet@{__version__}"]
+
+PLUGIN_NAME = "investidor10-carteira"
+PLUGIN_ID = f"{PLUGIN_NAME}@investidor10"
+SYNCED_ID = f"{PLUGIN_NAME}@synced"
+MARKETPLACE_NAME = "investidor10"
+REPOSITORY = "rc-ventura/mcp-investidor10-wallet"
+VERSION_REF = f"v{__version__}"
+MARKETPLACE_SOURCE = f"{REPOSITORY}#{VERSION_REF}"
+YES_ANSWERS = ("s", "sim", "y", "yes", "atualizar")
+DUPLICATION_WARNING = (
+    "Atenção: o servidor da carteira ficou duplicado (registro separado mais o "
+    "plugin); remova um dos dois para não ter tools em dobro."
+)
+LEGACY_PROMPT = (
+    "Claude Code: foi encontrada uma instalação anterior ({found}). O plugin já "
+    "traz o servidor. Remover e instalar o plugin na versão certa [s/N]? "
+)
 
 
 def _run(command: list[str]) -> subprocess.CompletedProcess:
@@ -14,10 +33,40 @@ def _run(command: list[str]) -> subprocess.CompletedProcess:
     )
 
 
+@dataclass(frozen=True)
+class ClaudeInstall:
+    old_registration: bool
+    plugin_server: bool
+    synced: bool
+    local: bool
+    plugin_version: str | None
+
+
+def _plugin_version(listing: str) -> str | None:
+    lines = listing.splitlines()
+    for index, line in enumerate(lines):
+        if f"{PLUGIN_NAME}@" in line:
+            for follow in lines[index + 1 : index + 5]:
+                found = re.search(r"Version:\s*(\S+)", follow)
+                if found:
+                    return found.group(1)
+                if "@" in follow:
+                    break
+    return None
+
+
+def _ask_yes(prompt: str) -> bool:
+    try:
+        return input(prompt).strip().lower() in YES_ANSWERS
+    except (EOFError, OSError):
+        return False
+
+
 class ClientAdapter:
     client_id = ""
     binary = ""
     label = ""
+    pins_plugin_version = True
 
     def detect(self) -> bool:
         return shutil.which(self.binary) is not None
@@ -69,6 +118,33 @@ class ClaudeAdapter(ClientAdapter):
     binary = "claude"
     label = "Claude Code"
 
+    def _capture(self, *args: str) -> str:
+        return _run([self.binary, *args]).stdout
+
+    def list_existing(self) -> bool:
+        for line in self._capture("mcp", "list").splitlines():
+            if line.split(":", 1)[0].strip() == SERVER_ALIAS:
+                return True
+        return False
+
+    def inspect(self) -> ClaudeInstall:
+        servers = self._capture("mcp", "list")
+        plugins = self._capture("plugin", "list")
+        return ClaudeInstall(
+            old_registration=self.list_existing(),
+            plugin_server=any(
+                line.strip().startswith(f"plugin:{PLUGIN_NAME}:")
+                for line in servers.splitlines()
+            ),
+            synced=SYNCED_ID in plugins,
+            local=PLUGIN_ID in plugins,
+            plugin_version=_plugin_version(plugins),
+        )
+
+    def _marketplace_present(self) -> bool:
+        pattern = re.compile(rf"(?<![\w/-]){MARKETPLACE_NAME}(?![\w-])")
+        return bool(pattern.search(self._capture("plugin", "marketplace", "list")))
+
     def plugin_install_commands(self) -> list[list[str]]:
         return [
             [
@@ -76,9 +152,9 @@ class ClaudeAdapter(ClientAdapter):
                 "plugin",
                 "marketplace",
                 "add",
-                "rc-ventura/mcp-investidor10-wallet",
+                MARKETPLACE_SOURCE,
             ],
-            [self.binary, "plugin", "install", "investidor10-carteira@investidor10"],
+            [self.binary, "plugin", "install", PLUGIN_ID],
         ]
 
     def add_command(self, reg: ClientRegistration) -> list[str]:
@@ -90,17 +166,101 @@ class ClaudeAdapter(ClientAdapter):
             "--scope",
             "user",
             "--",
-            "env",
-            f"WALLET_ID={reg.env['WALLET_ID']}",
             reg.command,
             *reg.args,
         ]
+
+    def register(self, reg: ClientRegistration) -> RegisterOutcome:
+        outcome = super().register(reg)
+        if outcome.status in ("registered", "updated") and (
+            f"{PLUGIN_NAME}@" in self._capture("plugin", "list")
+        ):
+            outcome.message += " " + DUPLICATION_WARNING
+        return outcome
+
+    def install_plugin(self) -> tuple[RegisterOutcome, list[RegisterOutcome]]:
+        installed = self._capture("plugin", "list")
+        synced = SYNCED_ID in installed
+        local = PLUGIN_ID in installed
+        old_registration = self.list_existing()
+        marketplace = self._marketplace_present()
+        found = []
+        if old_registration:
+            found.append(f"registro '{SERVER_ALIAS}' em escopo de usuário")
+        if local:
+            found.append("cópia local do plugin")
+        if marketplace and not synced:
+            found.append(f"marketplace '{MARKETPLACE_NAME}'")
+        remove = bool(found) and _ask_yes(LEGACY_PROMPT.format(found=", ".join(found)))
+        warnings = []
+        if remove:
+            if old_registration:
+                proc = _run([self.binary, "mcp", "remove", SERVER_ALIAS, "-s", "user"])
+                if proc.returncode != 0:
+                    warnings.append(DUPLICATION_WARNING)
+            if local:
+                _run([self.binary, "plugin", "uninstall", PLUGIN_ID])
+            if marketplace and not synced:
+                _run([self.binary, "plugin", "marketplace", "remove", MARKETPLACE_NAME])
+        elif old_registration or (synced and local):
+            warnings.append(DUPLICATION_WARNING)
+        suffix = "".join(f" {w}" for w in warnings)
+        if synced:
+            return (
+                RegisterOutcome(
+                    self.client_id,
+                    "skipped_present",
+                    f"{self.label}: o plugin já chega pela sincronização do Claude "
+                    f"Desktop ({SYNCED_ID}); não instalo uma cópia local.{suffix}",
+                ),
+                [],
+            )
+        if local and not remove:
+            return (
+                RegisterOutcome(
+                    self.client_id,
+                    "skipped_present",
+                    f"{self.label}: o plugin já está instalado — mantido.{suffix}",
+                ),
+                [],
+            )
+        commands = self.plugin_install_commands()
+        if marketplace and not remove:
+            commands = commands[1:]
+        for command in commands:
+            proc = _run(command)
+            if proc.returncode != 0:
+                detail = proc.stderr.strip() or f"código {proc.returncode}"
+                return (
+                    RegisterOutcome(
+                        self.client_id,
+                        "failed",
+                        f"{self.label}: falha ao instalar o plugin — {detail}",
+                    ),
+                    [],
+                )
+        return (
+            RegisterOutcome(
+                self.client_id,
+                "registered",
+                f"{self.label}: o servidor '{SERVER_ALIAS}' vem com o plugin, sem "
+                f"registro separado.{suffix}",
+            ),
+            [
+                RegisterOutcome(
+                    self.client_id,
+                    "registered",
+                    f"{self.label}: plugin instalado (reinicie a sessão do cliente).",
+                )
+            ],
+        )
 
 
 class DevinAdapter(ClientAdapter):
     client_id = "devin"
     binary = "devin"
     label = "Devin CLI"
+    pins_plugin_version = False
 
     def plugin_install_commands(self) -> list[list[str]]:
         return [
@@ -108,7 +268,7 @@ class DevinAdapter(ClientAdapter):
                 self.binary,
                 "plugins",
                 "install",
-                "rc-ventura/mcp-investidor10-wallet#plugin",
+                f"{REPOSITORY}#plugin",
                 "-y",
             ]
         ]
@@ -121,8 +281,6 @@ class DevinAdapter(ClientAdapter):
             "-s",
             "user",
             reg.name,
-            "-e",
-            f"WALLET_ID={reg.env['WALLET_ID']}",
             "--",
             reg.command,
             *reg.args,
@@ -146,9 +304,11 @@ class CodexAdapter(ClientAdapter):
                 "plugin",
                 "marketplace",
                 "add",
-                "rc-ventura/mcp-investidor10-wallet",
+                REPOSITORY,
+                "--ref",
+                VERSION_REF,
             ],
-            [self.binary, "plugin", "add", "investidor10-carteira@investidor10"],
+            [self.binary, "plugin", "add", PLUGIN_ID],
         ]
 
     def add_command(self, reg: ClientRegistration) -> list[str]:
@@ -157,8 +317,6 @@ class CodexAdapter(ClientAdapter):
             "mcp",
             "add",
             reg.name,
-            "--env",
-            f"WALLET_ID={reg.env['WALLET_ID']}",
             "--",
             reg.command,
             *reg.args,
@@ -176,7 +334,9 @@ class GeminiAdapter(ClientAdapter):
                 self.binary,
                 "extensions",
                 "install",
-                "https://github.com/rc-ventura/mcp-investidor10-wallet",
+                f"https://github.com/{REPOSITORY}",
+                "--ref",
+                VERSION_REF,
             ]
         ]
 
@@ -187,8 +347,6 @@ class GeminiAdapter(ClientAdapter):
             "add",
             "-s",
             "user",
-            "-e",
-            f"WALLET_ID={reg.env['WALLET_ID']}",
             reg.name,
             reg.command,
             *reg.args,

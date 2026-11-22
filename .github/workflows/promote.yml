@@ -1,0 +1,54 @@
+name: Promote
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag final já publicada (vX.Y.Z)"
+        required: true
+        type: string
+      dry-run:
+        description: "Só imprime as ações, sem criar branch nem pedido"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && !contains(inputs.tag, 'rc')) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EVENT: ${{ github.event_name }}
+      TAG: ${{ inputs.tag }}
+      DRY_RUN: ${{ inputs.dry-run }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Plan and run the promotion
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              python3 scripts/plan_promotion.py --tag "$TAG"
+            else
+              python3 scripts/plan_promotion.py --tag "$TAG" --apply
+            fi
+          else
+            python3 scripts/plan_promotion.py --sha "$HEAD_SHA" --apply
+          fi

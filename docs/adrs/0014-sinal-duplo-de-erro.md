@@ -124,3 +124,25 @@ This decision should be **revisited** if:
    do pydantic e acrescenta os nomes dos argumentos inválidos à mensagem
    (por exemplo, `Invalid parameters for get_patrimony_history (months): ...`).
    Só nomes com forma de identificador são ecoados, nunca os valores recebidos.
+
+## Emenda 2026-11-01 (spec 005)
+
+1. **O conjunto fechado passa de 12 para 15 códigos.** Entram três, todos com
+   `isError` e envelope no mesmo ponto único de emissão; nada muda na forma:
+
+   | Código | Quando | Próxima ação nomeada |
+   |---|---|---|
+   | `wallet_not_configured` | tool de carteira em estado pendente (sem configuração local) | chamar `open_wallet_setup` |
+   | `access_denied` | a fonte respondeu 3xx, 401 ou 403 para a carteira | chamar `open_wallet_setup` para informar o link restrito atual, ou deixar a carteira pública; tentar de novo não adianta |
+   | `setup_unavailable` | `open_wallet_setup` não conseguiu abrir a porta local | rodar `mcp-investidor10-wallet configure` no terminal; nunca pedir o link na conversa |
+
+   A tabela completa e as mensagens-alvo estão em
+   `specs/005-desktop-distribution/contracts/error-envelope.md`. Nenhuma
+   mensagem carrega o ID por extenso, a credencial ou a URL com query.
+2. **Códigos existentes.** `source_unavailable` deixa de cobrir 401 e 403 do
+   proxy da carteira, e a dica para 4xx deixa de citar `WALLET_ID` e passa a
+   citar `open_wallet_setup`. `unexpected_format` deixa de ser emitido para
+   resposta 3xx (learning lesson `proxy_301_acesso_recusado_sem_location`).
+3. **Estado do código.** `access_denied` está emitido desde o Lote 3 da spec
+   005. `wallet_not_configured` e `setup_unavailable` entram com o servidor sem
+   configuração e a tool `open_wallet_setup` (Lote 4).

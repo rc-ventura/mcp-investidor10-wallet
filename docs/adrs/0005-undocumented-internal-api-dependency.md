@@ -68,3 +68,24 @@ decision that reviews and future work can lean on.
   personal/educational use (which would demand a licensed data source).
 - Related: ADR-0003 (validation semantics), ADR-0007 (passthrough contract),
   research D3.
+
+## Emenda 2026-11-14 (spec 005, Lote 7: alarme semanal contra a API real)
+
+A deriva da fonte passou a ter um alarme que não depende de alguém lembrar de
+rodar os testes: `.github/workflows/live.yml` executa `uv run pytest -m live`
+toda segunda-feira (`schedule`) e sob demanda (`workflow_dispatch`).
+
+- **Carteira:** o ID vem do segredo `LIVE_WALLET_ID`, o de uma carteira pública
+  fictícia, nunca a pessoal. Sem o segredo, o job falha dizendo qual cadastrar.
+- **Saída sem dado do usuário:** os asserts de `tests/integration/test_live_api.py`
+  imprimem só o código do erro estruturado, nunca o corpo da resposta, o ID ou a
+  credencial, porque o log da CI é visível a quem abrir o repositório.
+- **Escopo:** é um alarme, não um portão. O `live.yml` não bloqueia release; a
+  falha sinaliza que é hora de remapear os endpoints em `wallet_client.py`.
+- **Quando começa a valer:** o GitHub só dispara `schedule` e `workflow_dispatch`
+  com o workflow na branch padrão (`main`), então o primeiro disparo acontece
+  depois da promoção da 0.4.0 (ADR-0020, emenda de 2026-11-14; tasks T091/T092).
+- **Cobertura do alarme:** vigia o que `tests/integration/test_live_api.py`
+  cobre hoje. Não há teste contra uma carteira restrita, então comportamentos como
+  o 301 sem `Location` (lição `proxy_301_acesso_recusado_sem_location`) seguem
+  protegidos só pela fixture anonimizada.

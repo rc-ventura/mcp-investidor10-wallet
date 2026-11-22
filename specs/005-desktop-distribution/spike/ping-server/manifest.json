@@ -1,0 +1,30 @@
+{
+  "manifest_version": "0.4",
+  "name": "ping",
+  "display_name": "Spike Ping",
+  "version": "0.0.1",
+  "description": "Spike server: ping, local page and MCP App form",
+  "author": {
+    "name": "rc-ventura"
+  },
+  "server": {
+    "type": "uv",
+    "entry_point": "server/main.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "server/main.py"]
+    }
+  },
+  "tools": [
+    {"name": "ping", "description": "Returns pong"},
+    {"name": "abrir_pagina", "description": "Opens a local form page in the browser"},
+    {"name": "formulario_app", "description": "Opens the same form as an MCP App"}
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  },
+  "license": "MIT"
+}

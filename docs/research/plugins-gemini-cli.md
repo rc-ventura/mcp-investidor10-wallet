@@ -81,3 +81,15 @@ clientes as skills já entregam.
   manifesto `gemini-extension.json` próprio + converter os 3 prompts para
   `commands/*.toml` e o hook para o formato de hooks do Gemini — candidato a
   spec futura, junto com a mesma pergunta para o Codex.
+
+## Fixação de versão na instalação (verificado 2026-11-12)
+
+- `gemini extensions install <source> [--ref <ref>] [--auto-update]
+  [--pre-release] [--consent] [--skip-settings]`; `--ref` é "The git ref
+  (branch, tag, or commit) to install". Fonte:
+  `geminicli.com/docs/extensions/reference/`, lida em 12/11/2026.
+- Consequência no produto (spec 005, T069/T074): o assistente instala a
+  extensão com `--ref vX.Y.Z`, a tag da versão do pacote.
+- A mesma página registra que o Gemini CLI foi substituído pelo Antigravity
+  CLI em 18/06/2026 para usuários do plano gratuito e do Google One. Fato só
+  registrado aqui; não muda esta spec.

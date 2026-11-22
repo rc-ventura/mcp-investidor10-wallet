@@ -6,6 +6,115 @@ e o projeto adota [versionamento semântico](https://semver.org/lang/pt-BR/).
 Enquanto a versão for 0.x: mudanças de comportamento (features) incrementam o
 minor; correções incrementam o patch.
 
+## [0.4.0] - 2026-11-20
+
+Distribuição para o Claude Desktop: o servidor passa a subir sem carteira configurada
+e a carteira se configura por uma página local ou pelo terminal, inclusive a carteira
+restrita, e o plugin passa a levar o servidor. O passo a passo de instalação está no
+README e em `docs/INSTALACAO-DESKTOP.md`, e quem atualiza da 0.3.x encontra a
+migração no fim desta seção.
+
+A `0.4.0rc4` é a primeira pré-versão cujo tag carrega o **plugin único** (o plugin
+declara o servidor `carteira` com `uvx` e a versão fixada); nas anteriores o plugin
+ainda era só de comportamento. O servidor não muda em relação à `0.4.0rc1`.
+
+A `0.4.0rc2` e a `0.4.0rc3` não mudam o servidor em relação à `0.4.0rc1`: repetem a
+publicação para o `verify` do release passar nos três sistemas. A `0.4.0rc1` e a
+`0.4.0rc2` ficaram com o `verify (ubuntu-latest)` vermelho porque o teste de fumaça
+troca o `HOME` do processo e o `uvx` passava a usar outro Python, não por defeito do
+pacote; a `0.4.0rc3` sai com o `verify` corrigido.
+
+### Adicionado
+
+- **Plugin único com servidor** (ADR-0018): `plugin/.claude-plugin/plugin.json` declara
+  o servidor `carteira` (`uvx --from mcp-investidor10-wallet==<versão>`), então o Claude
+  Desktop e o Claude Code instalam um plugin só. O `uv` é pré-requisito do Desktop
+  (`docs/INSTALACAO-DESKTOP.md`). Skill nova `configurar-carteira`; o hook de início de
+  sessão virou um JSON estático; o guardião de disciplina herda as tools da sessão.
+- **Configuração local única** (`~/.investidor10/config.json`, arquivo 0600): ID da
+  carteira, credencial do link de compartilhamento, modo (pública ou restrita) e
+  mascaramento de valores. Todos os clientes leem o mesmo arquivo, e uma mudança vale
+  na chamada seguinte, sem reiniciar.
+- **Carteira restrita**: o link de compartilhamento (`.../wallet/public/<id>?h=...`)
+  é aceito, a credencial vai à fonte só nas requisições da carteira e nunca aparece
+  em mensagens de erro, logs ou arquivos versionados.
+- **Página local de configuração** e a tool `open_wallet_setup` (a 20ª tool, sem
+  parâmetros): o usuário cola o link numa página aberta no navegador, em
+  `127.0.0.1`, com token de uso único de 10 minutos e conferência de `Host` e
+  `Origin`; o link não passa pela conversa.
+- **Bloco `configuration` em `get_session_context`**, com o estado da configuração e
+  a carteira mascarada.
+- **`mcp-investidor10-wallet configure`**: refaz o link e o mascaramento pelo
+  terminal, sem registrar nem instalar nada. O assistente de instalação ganhou
+  `--link` e `--mask`/`--no-mask`.
+- Três novos códigos de erro: `wallet_not_configured`, `access_denied` e
+  `setup_unavailable` (15 no total).
+- **Pipeline de release em três jobs** (`build`, `publish`, `verify`): o `verify`
+  instala a versão exata publicada, por pip e por `uvx`, em Linux, macOS e Windows.
+  Novos scripts `scripts/check_release_tag.py` e `scripts/smoke_mcp.py`.
+- `scripts/check-no-wallet-id` também procura a credencial (`WALLET_HASH`) em
+  arquivos versionados e dentro de pacotes `.mcpb`.
+- **`mcp-investidor10-wallet doctor`**: confere a instalação (configuração, servidor,
+  clientes e a entrada manual duplicada no Claude Desktop) e imprime um resumo com
+  causa e ação para cada problema, sem ID, credencial, valores nem o nome do usuário,
+  pronto para colar numa issue.
+- **Marketplace próprio** (`.claude-plugin/marketplace.json`): o Claude Desktop e o
+  Claude Code adicionam o repositório como marketplace e instalam o plugin por ele.
+  `main` só contém versões já publicadas no PyPI, então é o que o marketplace entrega.
+- **Fluxo de branches e promoção** (ADR-0020): o trabalho entra por `develop`; a tag
+  `vX.Y.Z` sai de `develop`, é publicada e verificada; o `promote.yml` cria
+  `promote/vX.Y.Z` e abre o pedido para `main`, onde o `main-gate` só aceita origem
+  `promote/v*` com o commit da tag, versões iguais nos manifestos e a versão já no
+  índice. O passo a passo do mantenedor está em `docs/RELEASING.md`, e o fluxo
+  desenhado em `docs/CI-VERSIONAMENTO.md`.
+- **Alarme semanal contra a API real** (`live.yml`): roda os testes `live` toda
+  segunda-feira, com uma carteira fictícia, e mostra só o código do erro nos logs.
+- **Dependabot** para o `uv` e para as actions, contra `develop`, com intervalo semanal
+  e carência de 7 dias para versões novas. A CI também valida o plugin e o marketplace
+  com `claude plugin validate`.
+
+### Alterado
+
+- O servidor sobe sem `WALLET_ID`. Sem carteira, as tools de carteira devolvem
+  `wallet_not_configured`; a memória e as cotações continuam funcionando.
+- Resposta 3xx, 401 ou 403 do proxy da carteira (como o 301 sem `Location` que a
+  fonte devolve para carteira restrita sem credencial válida) vira `access_denied`,
+  e não mais `unexpected_format`.
+- O mascaramento de valores liga se o arquivo de configuração **ou** `WALLET_MASK_VALUES`
+  ligar.
+- A sonda de inicialização só avisa quando o acesso é recusado, e quando a carteira da
+  configuração local não existe; carteira inexistente vinda de `WALLET_ID` continua
+  abortando.
+- Os clientes (Claude Code, Devin, Codex e Gemini) são registrados sem a variável
+  `WALLET_ID`.
+- No Claude Code, o assistente de instalação instala o plugin (marketplace fixado em
+  `#v<versão>`) e não roda mais `claude mcp add`; `--mcp-only` segue como escape. Ele
+  pergunta antes de remover o registro antigo `carteira`, o marketplace da 0.3.x ou uma
+  cópia local, e não instala cópia local quando o plugin chega sincronizado pelo
+  Claude Desktop.
+- `docs/PRIVACY.md` recomenda a carteira restrita e explica onde fica a credencial.
+- No Codex e no Gemini CLI, o assistente instala o plugin fixado na tag da versão
+  (`--ref vX.Y.Z`). O Devin CLI não aceita referência, então o relatório avisa que o
+  plugin dele segue a branch padrão do repositório.
+- As instruções do servidor e as descrições das tools falam em carteira pública ou
+  restrita e apontam `open_wallet_setup` quando a configuração está pendente. O modo
+  privacidade deixa de ser descrito como ligado por um "operador": o usuário também o
+  liga pela página local, e a mensagem `privacy_mode_unavailable` acompanha isso.
+
+### Migração desde a 0.3.x
+
+- **Claude Code:** rode `uvx mcp-investidor10-wallet@latest install`. O assistente
+  instala o plugin, que já traz o servidor, e pergunta uma vez se deve remover o
+  registro antigo `carteira` (`claude mcp add`), o marketplace da 0.3.x e uma cópia
+  local do plugin, para as tools não aparecerem em duplicidade.
+- **Claude Desktop:** se você tinha uma entrada manual do servidor `carteira` em
+  `claude_desktop_config.json` (`~/Library/Application Support/Claude/` no Mac), remova
+  essa entrada: o plugin já traz o servidor, e as duas juntas duplicam as tools. O
+  `doctor` avisa quando encontra essa entrada.
+- **Carteira:** `WALLET_ID` e `WALLET_MASK_VALUES` continuam valendo. Sem eles, a
+  configuração vem do arquivo `~/.investidor10/config.json`, criado pelo assistente
+  ou pela página local.
+
 ## [0.3.0] - 2026-10-28
 
 Hardening antes da distribuição Desktop: memória segura com vários clientes,

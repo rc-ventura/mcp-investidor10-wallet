@@ -7,6 +7,11 @@
 - **Code**: `src/investidor10_wallet/installer/`, `plugin/`, `.claude-plugin/marketplace.json`, `src/investidor10_wallet/server.py`
 - **Research**: `docs/research/plugins-{claude-code,devin-cli,gemini-cli,codex-cli}.md`; `docs/learning-lessons/{devin_mcp_add_user_scope,claude_plugin_formato_verificado}.md`
 
+> **Emenda 2026-11-08 (spec 005):** para o Claude (Desktop e Code), o §2 e o §6 mudam: o plugin
+> passa a declarar o servidor `carteira` inline (`uvx`, versão fixada) e é a fonte única da conexão;
+> `install` instala o plugin sem rodar `claude mcp add`, e `--mcp-only` segue como escape. Os demais
+> clientes seguem como aqui. Ver [ADR-0018](./0018-plugin-unico-com-servidor-empacotado.md).
+
 ---
 
 ## Context

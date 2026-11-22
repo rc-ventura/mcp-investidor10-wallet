@@ -1,0 +1,26 @@
+name: Live API
+
+on:
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    env:
+      WALLET_ID: ${{ secrets.LIVE_WALLET_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - run: uv sync --locked
+      - name: Run the live tests against the real API
+        run: |
+          if [ -z "$WALLET_ID" ]; then
+            echo "Segredo LIVE_WALLET_ID ausente: cadastre o ID da carteira fictícia nos segredos do repositório."
+            exit 1
+          fi
+          uv run pytest -m live -q -p no:cacheprovider --tb=line

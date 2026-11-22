@@ -196,6 +196,25 @@ class TestGetAssetQuote:
         assert payload["error"]["code"] == "ticker_not_found"
         assert "spelling" in payload["error"]["message"].lower()
 
+    async def test_quote_without_trading_today_says_market_closed(self):
+        zeroed = {"variation_day": {"last_quotation": 0}, "currentQuotation": "52,71"}
+        with respx.mock:
+            respx.get(f"{wallet_client.REST_BASE_URL}/assets/tickers/PETR4").respond(
+                json=zeroed
+            )
+            wallet_client.rest_client._cache.clear()
+            async with Client(mcp) as client:
+                result = await client.call_tool(
+                    "get_asset_quote", {"ticker": "PETR4"}, raise_on_error=False
+                )
+        assert result.is_error is True
+        error = result.data["error"]
+        assert error["code"] == "source_unavailable"
+        message = error["message"].lower()
+        assert "no trading" in message
+        assert "changed its format" not in message
+        assert "52,71" not in error["message"]
+
 
 class TestEarningsAndHistory:
     """T030/US5 — contract of earnings and patrimony history tools."""
@@ -448,6 +467,11 @@ class TestPriceAlerts:
                 200,
                 {"variation_day": {"last_quotation": "unavailable"}},
                 "unexpected_format",
+            ),
+            (
+                200,
+                {"variation_day": {"last_quotation": 0}, "currentQuotation": "52,71"},
+                "market_closed",
             ),
         ],
     )
