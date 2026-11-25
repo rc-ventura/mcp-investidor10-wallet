@@ -205,3 +205,39 @@ do release, porque a documentação do GitHub não define o `head_branch` de um
 `workflow_run` disparado por tag. Quando o commit da tag não é ancestral de
 `origin/develop` (hotfix), ele devolve também a ação de abrir o pedido da tag
 para `develop`, que é o passo 5 deste ADR.
+
+---
+
+## Emenda 2026-11-20 (spec 005, revisão final: configurações reais e limites do `main-gate`)
+
+A revisão final da spec 005 (ciclo 1, `reports/sdd-final-review/005/cycle-1-20261120-1004.md`)
+comparou este ADR com o que está de fato configurado no GitHub e com o que o
+`main-gate` garante. Ficam registrados:
+
+1. **Configuração real, lida em 2026-11-20.**
+   - Rulesets `develop-protegida` e `main-protegida`: pedido de revisão
+     obrigatório com **0 aprovações** (há um só mantenedor, e aprovar o próprio
+     pedido não é possível), 11 verificações obrigatórias em `develop` (os 9
+     `test`, `plugin` e `audit`) e 12 em `main` (as mesmas, mais `main-gate`),
+     sem force push, sem exclusão e **lista de bypass vazia**.
+   - Ambiente `pypi`: um revisor obrigatório (o mantenedor),
+     `prevent_self_review: false`, porque o revisor é o único mantenedor, e
+     implantação **restrita a tags `v*`**. A restrição de tag foi acrescentada
+     em 2026-11-20: até então o ambiente não tinha política de implantação, em
+     divergência com o §8.
+   - **Pendente:** confirmar no PyPI que o publisher confiável aponta para este
+     repositório, para `release.yml` e para o ambiente `pypi`. O release da
+     0.4.0 funcionou por OIDC, então o vínculo existe; o nome exato só se vê no
+     PyPI.
+2. **O `main-gate` é guarda contra erro, não contra um escritor hostil.** Ele
+   roda `scripts/check_promotion.py` a partir do checkout do próprio pedido, então
+   um pedido que altere o script ou o workflow pode neutralizá-lo. Quem consegue
+   isso já tem escrita no repositório, e aqui é o mantenedor. O controle real são
+   os rulesets e a segurança da conta do mantenedor. `CODEOWNERS` não acrescenta
+   nada com 0 aprovações e um mantenedor; reavaliar junto com a condição 3 de
+   "Conditions that invalidate this decision" (mais de um mantenedor).
+3. **Qualquer tag `v*` que passe nas checagens chega ao clique de aprovação do
+   `pypi`.** O `check_release_tag.py` confere formato, `__version__` e changelog,
+   mas não confere que o commit da tag seja alcançável a partir de `develop` ou
+   `main`. O portão é a aprovação humana do ambiente, e isso é aceito.
+
