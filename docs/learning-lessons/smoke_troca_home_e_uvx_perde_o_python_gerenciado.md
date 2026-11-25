@@ -123,3 +123,19 @@ Um teste de contrato guarda a regra: `tests/contract/test_release_workflow.py::t
 - **Spec 005, research D18**, verificação (3): corrigida para a causa real.
 - O mesmo cuidado vale para o servidor empacotado do Lote 5: o MCPB `server.type: "uv"` faz o app iniciar o servidor via `uv`. Se o app também trocar ou isolar o `HOME`, o Python escolhido pode mudar. Isso deve entrar no spike S1.
 - Ao diagnosticar falha de CI que só aparece num sistema, imprimir a versão do interpretador em cada passo antes de mexer em flags da ferramenta.
+
+---
+
+## Segunda ocorrência: o cache do `uv` (0.5.0rc1, 25/11/2026)
+
+A mesma classe de falha voltou com outro recurso do filho. Com o `setup-uv` 5, o passo exportava `UV_CACHE_DIR` para uma pasta temporária do runner, e o `uvx` do teste de fumaça (com `HOME` falso e proxy morto) achava o pacote já em cache. O `setup-uv` 10 não exporta mais essa variável: o cache ficou no `HOME` real, o filho enxergou um `HOME` vazio, tentou buscar `https://pypi.org/simple/` pelo proxy morto e falhou com `Connection refused`.
+
+| Sistema | Resultado | Por quê |
+|---|---|---|
+| Ubuntu e macOS | falhou | o cache do `uv` fica sob `HOME` |
+| Windows | passou | o cache fica sob `LOCALAPPDATA`, que o teste não troca |
+
+A `0.5.0rc1` chegou ao PyPI (`build` e `publish` verdes) e só o `verify` falhou, então o número ficou queimado e a correção saiu na `0.5.0rc2`.
+
+**Regra:** todo recurso do `uv` que o filho precisa (Python gerenciado, cache) é fixado por variável de ambiente no passo, e um teste de contrato confere as duas (`UV_PYTHON_INSTALL_DIR` e `UV_CACHE_DIR`). Trocar a versão de uma action que prepara o ambiente é motivo para olhar o que ela exportava antes.
+

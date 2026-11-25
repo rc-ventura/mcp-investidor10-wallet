@@ -28,6 +28,10 @@ atualizadas e as correções do pipeline de release e do alarme semanal da API.
   da B3, e o teste live da cotação **pula** quando não há pregão (fim de semana, feriado ou
   antes da abertura) em vez de falhar. Como o agendamento só vale a partir da `main`, a
   correção chega lá com esta versão.
+- **`verify` do release** passa a exportar também `UV_CACHE_DIR`, junto de `UV_PYTHON_INSTALL_DIR`.
+  O `setup-uv` 10 deixou de exportar essa variável, e o teste de fumaça, que roda o servidor com
+  um `HOME` falso e um proxy morto, deixou de achar o pacote em cache no Ubuntu e no macOS. A
+  `0.5.0rc1` foi publicada e falhou só nesse passo; a pré-versão seguinte é a `0.5.0rc2`.
 - **Actions do GitHub** atualizadas, todas pinadas por SHA: `actions/checkout` 7.0.1,
   `astral-sh/setup-uv` 10.3.3, `actions/upload-artifact` 7.0.2 e `actions/download-artifact`
   8.0.2. O `release.yml` e o `promote.yml` as usam pela primeira vez nesta versão.

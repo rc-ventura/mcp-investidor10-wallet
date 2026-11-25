@@ -60,10 +60,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-      # smoke_mcp.py troca o HOME do filho; sem este diretório fixo o uvx do
-      # smoke não vê o Python gerenciado baixado abaixo e cai no Python do sistema.
-      - name: Share one uv Python install dir across the steps
-        run: echo "UV_PYTHON_INSTALL_DIR=$RUNNER_TEMP/uv-python" >> "$GITHUB_ENV"
+      # smoke_mcp.py troca o HOME do filho: o uvx do smoke precisa do mesmo Python e do mesmo cache.
+      - name: Share one uv Python install dir and cache across the steps
+        run: |
+          echo "UV_PYTHON_INSTALL_DIR=$RUNNER_TEMP/uv-python" >> "$GITHUB_ENV"
+          echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache" >> "$GITHUB_ENV"
       - name: Install the exact version from the index with pip
         run: |
           version="${TAG#v}"

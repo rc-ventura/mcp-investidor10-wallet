@@ -121,3 +121,14 @@ def test_ci_validates_the_plugin_and_the_marketplace_with_a_pinned_cli():
     assert re.search(
         r"@anthropic-ai/claude-code@\d+\.\d+\.\d+ plugin validate \.(\s|$)", runs
     )
+
+
+def test_release_verify_shares_the_uv_python_and_cache_dirs_with_the_smoke_child():
+    verify = _load("release.yml")["jobs"]["verify"]
+    exported = "\n".join(
+        step.get("run", "")
+        for step in verify["steps"]
+        if "GITHUB_ENV" in step.get("run", "")
+    )
+    assert "UV_PYTHON_INSTALL_DIR=" in exported
+    assert "UV_CACHE_DIR=" in exported
