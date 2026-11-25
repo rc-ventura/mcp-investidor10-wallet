@@ -277,9 +277,9 @@ async def get_wallet_positions(asset_type: str) -> dict:
 
     Args:
         asset_type: One of Ticker (Brazilian stocks), Fii (real estate funds),
-            EtfInternational (international ETFs), Treasure (Brazilian treasury
-            bonds), Crypto. Any case is accepted; other values return an
-            invalid_asset_type error listing the valid types.
+            Etf (Brazilian ETFs), EtfInternational (international ETFs), Treasure
+            (Brazilian treasury bonds), Crypto. Any case is accepted; other
+            values return an invalid_asset_type error listing the valid types.
     """
     if (pending := _wallet_not_configured()) is not None:
         return pending

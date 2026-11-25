@@ -6,6 +6,14 @@ e o projeto adota [versionamento semântico](https://semver.org/lang/pt-BR/).
 Enquanto a versão for 0.x: mudanças de comportamento (features) incrementam o
 minor; correções incrementam o patch.
 
+## [Unreleased]
+
+### Adicionado
+
+- **`get_wallet_positions` aceita `Etf`** (issue #38): ETFs nacionais da B3 passam a
+  ser carregados pelo endpoint `/summary/actives/{id}/Etf`. Antes só `EtfInternational`
+  era aceito. O tipo é case-insensitive como os demais (`etf`, `ETF`, `Etf`).
+
 ## [0.4.0] - 2026-11-20
 
 Distribuição para o Claude Desktop: o servidor passa a subir sem carteira configurada

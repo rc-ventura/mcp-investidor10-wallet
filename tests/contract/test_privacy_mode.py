@@ -14,7 +14,7 @@ PROXY = wallet_client.WALLET_PROXY_BASE_URL
 REST = wallet_client.REST_BASE_URL
 WALLET = wallet_client.WALLET_ID
 SENTINEL = "9988.77"
-CLASSES = ("Ticker", "Fii", "EtfInternational", "Treasure", "Crypto")
+CLASSES = ("Ticker", "Fii", "Etf", "EtfInternational", "Treasure", "Crypto")
 MASKED_TOOLS = ("get_wallet_summary", "get_wallet_allocation", "get_wallet_positions")
 BLOCKED_TOOLS = ("get_patrimony_history", "get_earnings")
 
