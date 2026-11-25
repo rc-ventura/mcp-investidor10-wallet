@@ -1,7 +1,7 @@
 {
   "name": "investidor10-carteira",
   "displayName": "Carteira Investidor10",
-  "version": "0.5.0rc2",
+  "version": "0.5.0",
   "description": "Assistente da sua carteira do Investidor10: tools da carteira, memória do investidor, skills, guardião de disciplina e persona",
   "license": "MIT",
   "mcpServers": {
@@ -9,7 +9,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "mcp-investidor10-wallet==0.5.0rc2",
+        "mcp-investidor10-wallet==0.5.0",
         "mcp-investidor10-wallet"
       ]
     }
