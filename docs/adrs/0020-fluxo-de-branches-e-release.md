@@ -225,10 +225,8 @@ comparou este ADR com o que está de fato configurado no GitHub e com o que o
      implantação **restrita a tags `v*`**. A restrição de tag foi acrescentada
      em 2026-11-20: até então o ambiente não tinha política de implantação, em
      divergência com o §8.
-   - **Pendente:** confirmar no PyPI que o publisher confiável aponta para este
-     repositório, para `release.yml` e para o ambiente `pypi`. O release da
-     0.4.0 funcionou por OIDC, então o vínculo existe; o nome exato só se vê no
-     PyPI.
+   - **Publisher no PyPI:** confirmado pelo mantenedor em 2026-11-25; aponta para
+     este repositório, para `release.yml` e para o ambiente `pypi`.
 2. **O `main-gate` é guarda contra erro, não contra um escritor hostil.** Ele
    roda `scripts/check_promotion.py` a partir do checkout do próprio pedido, então
    um pedido que altere o script ou o workflow pode neutralizá-lo. Quem consegue
