@@ -31,7 +31,7 @@ Corte deliberado de escopo (20/11/2026): validação manual só do macOS com o C
 ## Interim handling
 
 - Células como `pendente`, ligadas a este débito.
-- Proposta, a confirmar com o mantenedor: registrar a T086a como "mantido" (o assistente continua a registrar o servidor e instalar o plugin de comportamento, como no ADR-0012), com a causa "não validado em máquina limpa", sem anunciar unificação nem mudar o README sobre isso.
+- Decisão do mantenedor de 2026-11-25: registrar a T086a como "mantido" (o assistente continua a registrar o servidor e instalar o plugin de comportamento, como no ADR-0012), com a causa "não validado em máquina limpa", sem anunciar unificação nem mudar o README sobre isso.
 - Para o Devin CLI, só comandos de leitura (`devin mcp list`, `devin plugins list`) e `install --dry-run` com `HOME` temporário e a carteira fictícia.
 
 ## How to pay
