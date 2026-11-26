@@ -97,3 +97,4 @@
 | [DT-006](./docs/technical-debt/DT-006-falhas-de-subprocesso-no-instalador-e-flag-yes.md) | Tratar falhas de subprocesso no instalador e no doctor, e a flag `--yes` | Open | Medium | 2026-11-20 |
 | [DT-007](./docs/technical-debt/DT-007-endurecer-a-pagina-local-de-configuracao.md) | Endurecer a página local de configuração | Open | Low | 2026-11-20 |
 | [DT-008](./docs/technical-debt/DT-008-higiene-de-scripts-e-workflows-de-release.md) | Higiene dos scripts e workflows de release | Open | Low | 2026-11-20 |
+| [DT-009](./docs/technical-debt/DT-009-transitivas-flutuam-na-instalacao-do-usuario.md) | Dependências indiretas flutuam na instalação do usuário | Open | Medium | 2026-11-26 |
