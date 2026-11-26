@@ -6,7 +6,7 @@ e o projeto adota [versionamento semântico](https://semver.org/lang/pt-BR/).
 Enquanto a versão for 0.x: mudanças de comportamento (features) incrementam o
 minor; correções incrementam o patch.
 
-## [0.5.0] - não lançado
+## [0.5.0] - 2026-11-25
 
 Primeira versão depois do fechamento da spec 005: leitura de ETFs nacionais, dependências
 atualizadas e as correções do pipeline de release e do alarme semanal da API.
