@@ -227,3 +227,28 @@ usuário, "not in chat" (fichamento
 depender do servidor rodando no host, segue o mesmo limite: na conversa Chat não
 há servidor nem página.
 
+---
+
+## Emenda 2026-11-20 (spec 005, revisão final: token na resposta da tool e limites da página)
+
+A revisão final do ciclo 1 (`reports/sdd-final-review/005/cycle-1-20261120-1004.md`)
+acrescenta três pontos que este ADR não registrava:
+
+1. **O token vai na resposta da tool em `open_manually`.** O `setup_url` carrega o
+   token de uso único, então ele fica visível ao modelo e aos logs do cliente.
+   Aceito: o token vale só para o formulário, só em `127.0.0.1`, com conferência de
+   Host e Origin, vence em 10 minutos e é consumido ao salvar. Ele não é a
+   credencial da carteira.
+2. **A página não tem timeout de leitura e lê o corpo do POST antes de validar
+   Host e Origin.** Um cliente local que declare `Content-Length` e envie menos
+   bytes prende uma thread até o processo terminar, e um `Content-Length` com
+   dígito Unicode (`²`) passa em `isdigit()` e levanta `ValueError` sem a resposta
+   411. O impacto é só da página local, sem vazamento de dados. Aceito até a 0.4.1
+   ([DT-007](../technical-debt/DT-007-endurecer-a-pagina-local-de-configuracao.md));
+   ver a lição
+   [`digitos_unicode_isdigit_e_d_aceitam_alem_de_ascii`](../learning-lessons/digitos_unicode_isdigit_e_d_aceitam_alem_de_ascii.md).
+3. **Um link `/carteira/<id>?h=...` perde a credencial.** Esse caminho não é a
+   rota pública do site: a credencial é descartada e a carteira é tratada como
+   pública, com o aviso de carteira pública; a sonda seguinte pode devolver
+   `access_denied`. Confuso, mas não é vazamento.
+

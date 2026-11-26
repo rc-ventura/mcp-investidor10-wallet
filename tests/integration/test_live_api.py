@@ -21,6 +21,16 @@ def _code(payload):
     return error.get("code") if isinstance(error, dict) else None
 
 
+def _no_trading(payload):
+    """The source reports no day price: weekend, holiday or before the open."""
+    error = payload.get("error") if isinstance(payload, dict) else None
+    return (
+        isinstance(error, dict)
+        and error.get("code") == "source_unavailable"
+        and "no trading today" in str(error.get("message", ""))
+    )
+
+
 class Client(_Client):
     async def call_tool(self, name, arguments=None, **kwargs):
         kwargs.setdefault("raise_on_error", False)
@@ -49,7 +59,14 @@ async def test_live_wallet_summary_returns_data():
 
 async def test_live_all_asset_classes_respond_without_error():
     async with Client(mcp) as client:
-        for asset_type in ("Ticker", "Fii", "EtfInternational", "Treasure", "Crypto"):
+        for asset_type in (
+            "Ticker",
+            "Fii",
+            "Etf",
+            "EtfInternational",
+            "Treasure",
+            "Crypto",
+        ):
             result = await client.call_tool(
                 "get_wallet_positions", {"asset_type": asset_type}
             )
@@ -61,6 +78,8 @@ async def test_live_asset_quote_returns_positive_price():
     async with Client(mcp) as client:
         result = await client.call_tool("get_asset_quote", {"ticker": "PETR4"})
     payload = result.data
+    if _no_trading(payload):
+        pytest.skip("B3 sem pregão: fim de semana, feriado ou antes da abertura")
     assert "error" not in payload, _code(payload)
     last = float(payload["data"]["variation_day"]["last_quotation"])
     assert last > 0
