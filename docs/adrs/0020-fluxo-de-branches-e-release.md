@@ -239,3 +239,67 @@ comparou este ADR com o que está de fato configurado no GitHub e com o que o
    mas não confere que o commit da tag seja alcançável a partir de `develop` ou
    `main`. O portão é a aprovação humana do ambiente, e isso é aceito.
 
+---
+
+## Emenda 2026-11-26 (integração do Claude no GitHub Actions)
+
+O mantenedor instalou a integração com `/install-github-app` (PR #61). O modelo
+do instalador não conhece as regras deste repositório. Entra com os ajustes
+abaixo.
+
+1. **Escopo.** São dois workflows.
+   - `claude.yml`, sob demanda: `@claude` em comentários, em revisões e em issues
+     novas. Pela documentação, só quem tem escrita no repositório o aciona. O
+     gatilho `issues: assigned` foi removido, porque atribuir uma issue de
+     terceiro poderia fazer o texto dela valer como pedido.
+   - `claude-code-review.yml`, revisão automática de pedidos. Pula pedidos de
+     forks, do Dependabot e de `promote/*`.
+2. **O fluxo deste ADR não muda.** `claude.yml` usa `base_branch: develop`, porque
+   o padrão da action é criar branches a partir da branch padrão (`main`). O
+   trabalho do Claude entra por pedido para `develop`, como qualquer outro. **O
+   merge é sempre do mantenedor**; isto é regra de uso, não bloqueio técnico
+   (item 5). `claude-review` **não é verificação obrigatória**: pode ficar verde
+   sem ter revisado. Ele também não substitui a revisão final antes do release.
+3. **Ativação.** A action exige que o arquivo do workflow seja idêntico ao da
+   branch padrão, e os eventos `issue_comment` e `issues` só disparam a partir
+   dela. Os arquivos chegam a `main` pela próxima promoção; até lá, não se conta
+   com a integração. Pela mesma regra, um pedido que altere esses arquivos não é
+   revisado, e uma mudança neles volta a depender de promoção. Lição
+   relacionada:
+   [`workflows_de_evento_so_valem_na_branch_padrao`](../learning-lessons/workflows_de_evento_so_valem_na_branch_padrao.md).
+4. **Versões.** As actions são fixadas por SHA, como nos demais workflows:
+   `actions/checkout` no mesmo SHA do restante do repositório e
+   `anthropics/claude-code-action` na v1.0.283, publicada em 2026-11-19 e, na
+   data desta emenda, com mais de 7 dias (carência do ADR-0001). As atualizações
+   seguem o Dependabot (`github-actions`).
+   - **Exceção aceita:** o plugin `code-review` vem do repositório
+     `anthropics/claude-code` **sem versão fixa** e pode mudar sem commit aqui.
+     Aceito porque a origem é o fornecedor da própria action e a revisão é só
+     consultiva. Não foi verificado se o campo aceita uma referência fixa.
+5. **Acesso e riscos aceitos.**
+   - Há um secret novo no repositório, `CLAUDE_CODE_OAUTH_TOKEN`, ligado à
+     assinatura do mantenedor.
+   - O bloco `permissions:` limita o token do workflow, mas não o token do app do
+     Claude, que a action usa quando o app está instalado. Pela documentação, o
+     app pede escrita em conteúdo, issues e pedidos. As permissões concedidas na
+     instalação não foram conferidas.
+   - Os rulesets impedem push direto e force push em `develop` e `main`. Com
+     **0 aprovações**, porém, um token com escrita poderia fazer o merge de um
+     pedido com as verificações verdes. Para `main` ainda valeria o `main-gate`,
+     que é guarda contra erro, não contra um escritor hostil (emenda de
+     2026-11-20).
+   - Não há ruleset de tags, então um token com escrita poderia criar uma tag
+     `v*`. A publicação continua dependendo da aprovação no ambiente `pypi`.
+     **Não se aprova publicação que o mantenedor não iniciou.**
+   - Ao chamar `@claude` em um pedido ou issue de terceiro, o texto dessa pessoa
+     é lido pelo agente e pode conter instruções escondidas.
+6. **Revisão do que o Claude produzir.** Segue o mesmo caminho de qualquer
+   pedido, com atenção especial a mudanças em `.github/`, dependências e
+   tratamento da credencial ou do ID da carteira.
+
+**Revisitar** se o repositório ganhar outro colaborador com escrita, se o Claude
+passar a aprovar ou fazer merge, se houver incidente na action ou no plugin, ou
+se passar a ser possível fixar a versão do plugin.
+
+**Como desfazer:** apagar os dois workflows, apagar o secret e desinstalar o app.
+
