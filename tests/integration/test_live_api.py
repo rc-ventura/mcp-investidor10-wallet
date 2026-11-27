@@ -94,3 +94,12 @@ async def test_live_probe_classifies_missing_wallet_as_404():
 
 async def test_live_probe_accepts_configured_wallet():
     await wallet_client.validate_wallet(wallet_client.WALLET_ID)
+
+
+async def test_live_earnings_breakdown_keeps_the_expected_shape():
+    """Drift alarm for total-period and both earnings barcharts."""
+    async with Client(mcp) as client:
+        result = await client.call_tool("get_earnings", {})
+    payload = result.data
+    assert "error" not in payload, _code(payload)
+    assert {"sum", "received", "future"} <= set(payload["data"])

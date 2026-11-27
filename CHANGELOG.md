@@ -6,6 +6,19 @@ e o projeto adota [versionamento semântico](https://semver.org/lang/pt-BR/).
 Enquanto a versão for 0.x: mudanças de comportamento (features) incrementam o
 minor; correções incrementam o patch.
 
+## [Não lançado]
+
+### Adicionado
+
+- **`get_earnings` traz os proventos recebidos e os futuros** (issue #51): além de
+  `data.sum`, a resposta tem `data.received` e `data.future`, por ano e mês e
+  separados por classe de ativo. `future` não depende da janela pedida.
+
+### Corrigido
+
+- A descrição de `get_earnings` tratava `data.sum` como valor recebido, mas com data
+  final depois de hoje a fonte soma também pagamentos ainda não feitos.
+
 ## [0.5.0] - 2026-11-25
 
 Primeira versão depois do fechamento da spec 005: leitura de ETFs nacionais, dependências

@@ -46,7 +46,14 @@ SERVED_RULES = {
         "configuration block of get_session_context",
     ),
     "get_wallet_positions": ("percent_ideal", "fetched_at"),
-    "get_earnings": ("data.sum", "fetched_at"),
+    "get_earnings": (
+        "data.sum",
+        "data.received",
+        "data.future",
+        "never call it received money",
+        "not yet paid",
+        "fetched_at",
+    ),
     "get_patrimony_history": ("fetched_at",),
     "create_price_alert": ("pending check",),
 }

@@ -326,7 +326,9 @@ uv run pytest -m live  # integração opt-in contra a API real
   internacionais, cripto e tesouro retornam `asset_type_not_supported` (ver
   [learning lesson](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/docs/learning-lessons/get_asset_quote_apenas_acoes_b3.md)).
   Ativos dessas classes na carteira aparecem via `get_wallet_positions`.
-- **Detalhe de proventos**: `get_earnings` retorna o total do período; a
+- **Detalhe de proventos**: `get_earnings` retorna o total do período, os
+  recebidos e os futuros por mês e por classe de ativo, mas não por ativo. Com
+  data final depois de hoje, o total inclui pagamentos ainda não feitos. A
   tabela por pagamento existe no upstream e é candidata a uma tool futura
   (ver [learning lesson](https://github.com/rc-ventura/mcp-investidor10-wallet/blob/main/docs/learning-lessons/earnings_list_detalhe_proventos_por_ativo.md)).
 - **Cotações com atraso** (~15 min na B3) — o agente deve sempre mencionar.

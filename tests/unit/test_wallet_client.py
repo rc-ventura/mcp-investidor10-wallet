@@ -624,7 +624,12 @@ async def test_default_earnings_uses_calendar_year(monkeypatch, today, start):
         route = respx.get(f"{BASE}/earnings/total-period/1234567").respond(
             json={"sum": 0.0}
         )
+        barchart = respx.get(url__startswith=f"{BASE}/earnings/barchart/").respond(
+            json=[]
+        )
         await make_client().get_earnings()
+    received = barchart.calls[0].request.url.params["period_date"]
+    assert received == f"{start},{today.isoformat()}"
     assert route.calls[0].request.url.params["start_date"] == start
     assert route.calls[0].request.url.params["end_date"] == today.isoformat()
 
@@ -870,3 +875,101 @@ async def test_check_wallet_without_credential_sends_no_hash():
     await wallet_client.check_wallet("1234567")
 
     assert "hash" not in route.calls.last.request.url.params
+
+
+EARNINGS_TOTAL = f"{BASE}/earnings/total-period/1234567"
+EARNINGS_RECEIVED = f"{BASE}/earnings/barchart/1234567/received"
+EARNINGS_FUTURE = f"{BASE}/earnings/barchart/1234567/future"
+BARCHART = {
+    "2026": {
+        "year": 2026,
+        "total": 12.5,
+        "avg": 1.04,
+        "months": [
+            {"month": "2026-01", "categories": [], "amount": 0},
+            {"month": "2026-02", "categories": {"FIIs": 12.5}, "amount": 12.5},
+        ],
+    }
+}
+
+
+@respx.mock
+async def test_earnings_merges_the_total_with_received_and_future_payloads():
+    respx.get(EARNINGS_TOTAL).respond(json={"sum": 20})
+    received = respx.get(EARNINGS_RECEIVED).respond(json=BARCHART)
+    future = respx.get(EARNINGS_FUTURE).respond(json=[])
+    envelope = await make_client().get_earnings("2026-01-01", "2026-12-31")
+    assert envelope["data"] == {"sum": 20, "received": BARCHART, "future": []}
+    assert envelope["cached"] is False
+    assert received.calls[0].request.url.params["period_date"] == (
+        "2026-01-01,2026-12-31"
+    )
+    # unfiltered: a window ending today would always leave `future` empty
+    assert future.calls[0].request.url.params["period_date"] == ","
+
+
+def _barchart_with(**month):
+    base = {"month": "2026-01", "categories": {"FIIs": 1.0}, "amount": 1.0}
+    return {"2026": {"total": 1.0, "months": [{**base, **month}]}}
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "{}x",
+        '"2026"',
+        "[1]",
+        '{"2026": {"months": []}}',
+        '{"2026": {"total": 1}}',
+        '{"2026": {"total": true, "months": []}}',
+        '{"2026": {"total": NaN, "months": []}}',
+        json.dumps(_barchart_with(amount="1.0")),
+        json.dumps(_barchart_with(amount=False)),
+        json.dumps(_barchart_with(categories=["FIIs"])),
+        json.dumps(_barchart_with(categories={"FIIs": "1.0"})),
+    ],
+)
+@pytest.mark.parametrize("broken", [EARNINGS_RECEIVED, EARNINGS_FUTURE])
+@respx.mock
+async def test_earnings_rejects_barchart_drift_before_caching(broken, body):
+    respx.get(EARNINGS_TOTAL).respond(json={"sum": 1})
+    other = EARNINGS_FUTURE if broken == EARNINGS_RECEIVED else EARNINGS_RECEIVED
+    respx.get(other).respond(json=[])
+    route = respx.get(broken).respond(content=body.encode())
+    client = make_client()
+    for _ in range(2):
+        with pytest.raises(SourceError) as excinfo:
+            await client.get_earnings("2026-01-01", "2026-12-31")
+        assert excinfo.value.code == "unexpected_format"
+        assert "1234567" not in excinfo.value.message
+    assert route.call_count == 2
+
+
+@respx.mock
+async def test_earnings_fails_whole_when_one_part_is_down():
+    respx.get(EARNINGS_TOTAL).respond(json={"sum": 1})
+    respx.get(EARNINGS_RECEIVED).respond(json=[])
+    respx.get(EARNINGS_FUTURE).respond(status_code=500)
+    with pytest.raises(SourceError) as excinfo:
+        await make_client().get_earnings("2026-01-01", "2026-12-31")
+    assert excinfo.value.code == "source_unavailable"
+
+
+@respx.mock
+async def test_earnings_envelope_reports_the_oldest_part(monkeypatch):
+    stamps = iter(
+        [
+            "2026-11-26T12:00:00-03:00",
+            "2026-11-26T11:00:00-03:00",
+            "2026-11-26T13:00:00-03:00",
+        ]
+    )
+    monkeypatch.setattr(wallet_client, "_now_iso", lambda: next(stamps))
+    respx.get(EARNINGS_TOTAL).respond(json={"sum": 1})
+    respx.get(EARNINGS_RECEIVED).respond(json=[])
+    respx.get(EARNINGS_FUTURE).respond(json=[])
+    client = make_client()
+    first = await client.get_earnings("2026-01-01", "2026-12-31")
+    again = await client.get_earnings("2026-01-01", "2026-12-31")
+    assert first["fetched_at"] == "2026-11-26T11:00:00-03:00"
+    assert again == {**first, "cached": True}
