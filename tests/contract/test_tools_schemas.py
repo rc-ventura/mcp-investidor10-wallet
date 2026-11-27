@@ -123,7 +123,7 @@ async def test_get_wallet_positions_rejects_invalid_asset_type():
     payload = result.data
     assert payload["error"]["code"] == "invalid_asset_type"
     message = payload["error"]["message"]
-    for valid in ("Ticker", "Fii", "EtfInternational", "Treasure", "Crypto"):
+    for valid in ("Ticker", "Fii", "Etf", "EtfInternational", "Treasure", "Crypto"):
         assert valid in message
 
 

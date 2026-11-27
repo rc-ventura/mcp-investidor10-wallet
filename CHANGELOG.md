@@ -6,6 +6,42 @@ e o projeto adota [versionamento semântico](https://semver.org/lang/pt-BR/).
 Enquanto a versão for 0.x: mudanças de comportamento (features) incrementam o
 minor; correções incrementam o patch.
 
+## [0.5.0] - 2026-11-25
+
+Primeira versão depois do fechamento da spec 005: leitura de ETFs nacionais, dependências
+atualizadas e as correções do pipeline de release e do alarme semanal da API.
+
+### Adicionado
+
+- **`get_wallet_positions` aceita `Etf`** (issue #38): ETFs nacionais da B3 passam a
+  ser carregados pelo endpoint `/summary/actives/{id}/Etf`. Antes só `EtfInternational`
+  era aceito. O tipo é case-insensitive como os demais (`etf`, `ETF`, `Etf`).
+
+### Alterado
+
+- **Dependências:** `fastmcp` 4.1.2 para 4.2.0 (traz `fastmcp-slim` 4.2.0, `authlib` 1.9.10 e
+  `uncalled-for` 0.6.2, e deixa de instalar a cadeia do `keyring`: `keyring`, `secretstorage`,
+  `jeepney`, `jaraco.*`, `more-itertools`, `zipp` e outras), `hatchling` 1.32.4 para 1.33.0
+  (build), e as de desenvolvimento `pytest` 9.2.0, `pytest-asyncio` 1.5.0 e `pre-commit` 4.7.0.
+  Wheel e sdist com os mesmos arquivos de antes do `hatchling` novo.
+- **`live.yml`** passa a rodar às segundas, 14:17 UTC (11:17 em Brasília), depois da abertura
+  da B3, e o teste live da cotação **pula** quando não há pregão (fim de semana, feriado ou
+  antes da abertura) em vez de falhar. Como o agendamento só vale a partir da `main`, a
+  correção chega lá com esta versão.
+- **`verify` do release** passa a exportar também `UV_CACHE_DIR`, junto de `UV_PYTHON_INSTALL_DIR`.
+  O `setup-uv` 10 deixou de exportar essa variável, e o teste de fumaça, que roda o servidor com
+  um `HOME` falso e um proxy morto, deixou de achar o pacote em cache no Ubuntu e no macOS. A
+  `0.5.0rc1` foi publicada e falhou só nesse passo; a pré-versão seguinte é a `0.5.0rc2`.
+- **Actions do GitHub** atualizadas, todas pinadas por SHA: `actions/checkout` 7.0.1,
+  `astral-sh/setup-uv` 10.3.3, `actions/upload-artifact` 7.0.2 e `actions/download-artifact`
+  8.0.2. O `release.yml` e o `promote.yml` as usam pela primeira vez nesta versão.
+
+### Documentação
+
+- Revisão final da spec 005 (ciclo 1, veredito APPROVED), emendas dos ADR-0019 e ADR-0020,
+  aviso em `docs/PRIVACY.md` sobre a flag `--link`, lição sobre dígitos Unicode, débitos
+  técnicos DT-001 a DT-008 em `docs/technical-debt/` e o `fechamento.md` da spec 005.
+
 ## [0.4.0] - 2026-11-20
 
 Distribuição para o Claude Desktop: o servidor passa a subir sem carteira configurada

@@ -106,3 +106,32 @@ spec 004 achou CVEs no lock (`fastmcp` 4.0.11, `authlib` transitivo e
   sobre o lock exportado em todo push e PR. Um achado novo falha o CI e entra
   na renovação acima. Achados não alcançáveis só podem ser ignorados com
   justificativa registrada no ADR-0004 §8.
+
+### Emenda 2026-11-26 (release 0.5.0): alcance da regra de 7 dias nas transitivas e exceção do `authlib`
+
+A renovação do `uv.lock` que veio com o `fastmcp` 4.2.0 pegou as versões mais
+novas das transitivas, e a revisão final da 0.5.0
+(`reports/sdd-final-review/0.5.0/cycle-1-20261125-2016.md`) apontou
+`authlib` 1.9.10 e `uncalled-for` 0.6.2 com menos de 7 dias. A emenda de
+2026-10-28 foi escrita para renovações motivadas por aviso de segurança e não
+dizia o alcance da regra. Fica registrado:
+
+- **Alcance.** A regra dos 7 dias para transitivas governa o **`uv.lock`**, ou
+  seja, o CI e o ambiente de desenvolvimento. Ela **não alcança o que o usuário
+  instala**: o plugin roda `uvx` com a versão do pacote, e o `uvx` resolve as
+  transitivas pelos metadados do pacote, sem o `uv.lock`. Para o usuário, só as
+  dependências diretas (`fastmcp`, `httpx`, `filelock`) são fixas. Essa lacuna
+  é o débito
+  [DT-009](../technical-debt/DT-009-transitivas-flutuam-na-instalacao-do-usuario.md).
+- **Exceção registrada para a 0.5.0:** `authlib` 1.9.10, publicado em
+  2026-11-20 09:31 UTC, com 6,0 dias em 2026-11-26 (completa 7 dias em
+  2026-11-27 09:31 UTC). O mantenedor decidiu criar a tag sem esperar. Motivos:
+  não muda o que o usuário recebe, o `pip-audit` está limpo, e voltar a uma
+  versão anterior exigiria novo ciclo de testes sem efeito para quem instala.
+  Diferente do `virtualenv` em 2026-10-28, não havia job `audit` vermelho: a
+  exceção vale só para esta versão e **não é precedente**.
+- **Sem exceção:** `uncalled-for` 0.6.2 (publicado em 2026-11-19 01:15 UTC) já
+  tinha 7,4 dias na decisão.
+- **Daqui para frente:** ao renovar o `uv.lock`, conferir no PyPI a idade das
+  versões que mudaram antes do commit.
+

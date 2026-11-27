@@ -12,7 +12,7 @@ from investidor10_wallet.server import mcp
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "privacy"
 SENTINEL = "9988.77"
-CLASSES = ("Ticker", "Fii", "EtfInternational", "Treasure", "Crypto")
+CLASSES = ("Ticker", "Fii", "Etf", "EtfInternational", "Treasure", "Crypto")
 
 
 def _load(name):

@@ -846,6 +846,10 @@ entram na matriz.
     comportamento acontece neles; se o Desktop executa `SessionStart` por
     sessão Cowork e por conversa Chat; e o efeito sobre as skills, que
     dependem da persona para o bootstrap.
+  - **Texto da persona (revisão final de 20/11/2026):** `hooks/session-start.json`
+    ainda diz "operando a carteira **pública**", embora a carteira restrita já
+    seja suportada; corrigir para "pública ou restrita" junto com este ajuste,
+    porque é conteúdo do plugin e pede uma versão nova (0.4.1 ou posterior).
   - **Documentação a mexer quando decidir:** emenda ao ADR-0012 e ao
     ADR-0018 (o que o plugin entrega e quando) e uma learning lesson com o
     caso; revisar o texto de `session-start.json`, o README e

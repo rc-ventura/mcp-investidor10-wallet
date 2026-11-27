@@ -109,11 +109,19 @@ async def _read_capped(response: httpx.Response, path: str) -> bytes:
     return b"".join(chunks)
 
 
-VALID_ASSET_TYPES = ("Ticker", "Fii", "EtfInternational", "Treasure", "Crypto")
+VALID_ASSET_TYPES = (
+    "Ticker",
+    "Fii",
+    "Etf",
+    "EtfInternational",
+    "Treasure",
+    "Crypto",
+)
 
 ASSET_TYPE_ALIASES = {
     "ticker": "Ticker",
     "fii": "Fii",
+    "etf": "Etf",
     "etfinternational": "EtfInternational",
     "treasure": "Treasure",
     "crypto": "Crypto",
