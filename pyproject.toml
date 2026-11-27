@@ -8,7 +8,7 @@ requires-python = ">=3.11"
 dependencies = [
     "fastmcp==4.2.0",
     "httpx==0.28.1",
-    "filelock==4.2.4",
+    "filelock==4.2.12",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
