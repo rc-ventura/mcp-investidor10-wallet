@@ -29,8 +29,12 @@ Fonte: `GET /summary/barchart/{WALLET_ID}/{months}/all`.
 
 ### `get_earnings(start_date: str | None = None, end_date: str | None = None) -> dict`
 Proventos no período. Datas **exatamente** `YYYY-MM-DD` (valores compactos como `20261017` → `invalid_params`); omitidas → últimos 12 meses de calendário (29/02 volta a 28/02 no ano anterior). `start_date > end_date` → `invalid_params` sugerindo correção (edge case da spec — nunca retorno vazio silencioso por data invertida).
-Fonte: `GET /earnings/total-period/{WALLET_ID}?start_date=...&end_date=...`.
-`data`: objeto da fonte com chave `sum` (total recebido, inclusive 0 no período vazio).
+Fontes: `GET /earnings/total-period/{WALLET_ID}?start_date=...&end_date=...`, `GET /earnings/barchart/{WALLET_ID}/received?period_date=<start>,<end>` e `GET /earnings/barchart/{WALLET_ID}/future?period_date=,` (sem filtro: uma janela que termina hoje deixaria `future` sempre vazio).
+`data`: `{sum, received, future}`.
+- `sum`: total líquido da janela, inclusive 0 no período vazio. Com `end_date` depois de hoje, **inclui pagamentos com data futura ainda não pagos**.
+- `received` (pago, mesma janela) e `future` (com data, ainda não pago, independente da janela): payloads da fonte repassados sem transformação, por ano (`total`, `avg`, `months[{month, amount, categories}]`); `[]` quando não há nada. Provento anunciado sem data de pagamento pode não aparecer em `future`.
+- Os dois barcharts são validados (ADR-0016) antes do cache; formato inesperado → `unexpected_format`. A falha de qualquer uma das três fontes falha a tool inteira, sem resultado parcial.
+- Envelope: `cached` é verdadeiro se alguma parte veio do cache; `fetched_at` é o da parte mais antiga.
 
 ### `get_asset_quote(ticker: str) -> dict`
 Cotação e fundamentos de um ticker (da carteira ou não): preço, variação dia/12M, Graham, Bazin, P/L, P/VP, DY, setor. Ticker é normalizado (upper/trim) e validado (`[A-Z][A-Z0-9]{3,11}`); entrada inválida → `invalid_params`. Inexistente (HTTP 404 **ou** payload vazio — objeto JSON vazio) → `ticker_not_found` com orientação para conferir a grafia; não sugerir ticker específico sem lista confiável de alternativas. Payload não-objeto não vazio (ex.: array JSON) → `unexpected_format` (schema mudou, não ticker inexistente — ADR-0003). A fonte REST só cobre ações B3; HTTP 410 → `asset_type_not_supported`.

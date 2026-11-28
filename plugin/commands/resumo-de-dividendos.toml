@@ -5,5 +5,6 @@ prompt = """
 3. Se get_earnings retornar o erro privacy_mode_unavailable, o operador ligou o modo privacidade: informe que o resumo de proventos em R$ não está disponível, use apenas os indicadores de dividend yield por ativo de get_wallet_positions e não estime valores.
 4. Apresente o total de proventos do período e a renda passiva mensal equivalente, usando o rendimento recorrente atual — nunca um dividend yield médio histórico.
 5. Compare com a meta salva na memória (get_wallet_goal) quando houver.
-6. Mencione que get_earnings retorna o total agregado do período e que cotações têm atraso de aproximadamente 15 minutos.
+6. Use data.received para a quebra mensal por classe do que já foi pago e apresente data.future à parte, como ainda não recebido. Com data final depois de hoje, data.sum inclui pagamentos futuros.
+7. Mencione que get_earnings não detalha proventos por ativo, a idade dos dados (cached/fetched_at) e que cotações têm atraso de aproximadamente 15 minutos.
 """

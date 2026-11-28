@@ -4,8 +4,11 @@ import math
 import os
 import re
 import time
+from collections.abc import Callable
+from typing import Annotated
 
 import httpx
+from pydantic import BaseModel, Field, TypeAdapter
 
 from . import bootstrap
 
@@ -61,6 +64,26 @@ def _is_numeric(value) -> bool:
             return False
         return math.isfinite(number)
     return False
+
+
+# Validate-then-passthrough (ADR-0016): the models only check the source shape.
+_Amount = Annotated[float, Field(strict=True, allow_inf_nan=False)]
+# The source sends [] instead of an empty object.
+_EmptyList = Annotated[list, Field(max_length=0)]
+
+
+class _EarningsMonth(BaseModel):
+    month: str
+    amount: _Amount
+    categories: dict[str, _Amount] | _EmptyList
+
+
+class _EarningsYear(BaseModel):
+    total: _Amount
+    months: list[_EarningsMonth]
+
+
+EARNINGS_BARCHART = TypeAdapter(dict[str, _EarningsYear] | _EmptyList)
 
 
 class SourceError(Exception):
@@ -242,6 +265,7 @@ class WalletClient:
         required_keys=None,
         expected_type: type | None = None,
         required_types: dict | None = None,
+        validate: Callable[[object], object] | None = None,
     ) -> dict:
         """GET base_url + path with TTL cache; returns the data envelope.
 
@@ -337,6 +361,15 @@ class WalletClient:
                         "unexpected_format",
                         f"Investidor10 API payload for {shown} field {key} has an unexpected type",
                     )
+
+        if validate is not None:
+            try:
+                validate(data)
+            except ValueError as exc:
+                raise SourceError(
+                    "unexpected_format",
+                    f"Investidor10 API payload for {shown} has an unexpected shape",
+                ) from exc
 
         fetched_at = _now_iso()
         self._remember(cache_key, fetched_at, data)
@@ -548,13 +581,40 @@ class WalletClient:
     async def get_earnings(
         self, start_date: str | None = None, end_date: str | None = None
     ) -> dict:
-        """Earnings received in a period; defaults to the last 12 months."""
+        """Earnings of a period; defaults to the last 12 months.
+
+        Merges three source payloads into {sum, received, future}. `sum` and
+        `received` follow the window; `future` is queried unfiltered, because a
+        window ending today would always leave it empty. The envelope reports
+        `cached` if any part came from cache, with the oldest `fetched_at`.
+        """
         start_date, end_date = self.resolve_earnings_period(start_date, end_date)
-        return await self.request(
+        total = await self.request(
             f"/earnings/total-period/{self.wallet_id}",
             params={"start_date": start_date, "end_date": end_date},
             required_keys=("sum",),
             required_types={"sum": (int, float)},
+        )
+        parts = [total]
+        for kind, period in (
+            ("received", f"{start_date},{end_date}"),
+            ("future", ","),
+        ):
+            parts.append(
+                await self.request(
+                    f"/earnings/barchart/{self.wallet_id}/{kind}",
+                    params={"period_date": period},
+                    validate=EARNINGS_BARCHART.validate_python,
+                )
+            )
+        _, received, future = parts
+        return self._envelope(
+            {**total["data"], "received": received["data"], "future": future["data"]},
+            cached=any(part["cached"] for part in parts),
+            fetched_at=min(
+                (part["fetched_at"] for part in parts),
+                key=datetime.datetime.fromisoformat,
+            ),
         )
 
     @staticmethod

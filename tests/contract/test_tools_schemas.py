@@ -224,6 +224,7 @@ class TestEarningsAndHistory:
             route = respx.get(f"{PROXY}/earnings/total-period/1234567").respond(
                 json={"sum": 0.0}
             )
+            respx.get(url__startswith=f"{PROXY}/earnings/barchart/").respond(json=[])
             wallet_client.wallet_client._cache.clear()
             async with Client(mcp) as client:
                 result = await client.call_tool("get_earnings", {})
@@ -251,6 +252,7 @@ class TestEarningsAndHistory:
             respx.get(f"{PROXY}/earnings/total-period/1234567").respond(
                 json={"sum": 0.0}
             )
+            respx.get(url__startswith=f"{PROXY}/earnings/barchart/").respond(json=[])
             wallet_client.wallet_client._cache.clear()
             async with Client(mcp) as client:
                 result = await client.call_tool(
@@ -259,7 +261,7 @@ class TestEarningsAndHistory:
                 )
         payload = result.data
         assert "error" not in payload
-        assert payload["data"] == {"sum": 0.0}
+        assert payload["data"] == {"sum": 0.0, "received": [], "future": []}
 
     async def test_get_patrimony_history_validates_months(self):
         async with Client(mcp) as client:

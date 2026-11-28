@@ -81,3 +81,137 @@ texto da docstring **anterior** ao bloco `Args:`; o que vem depois é descartado
 As regras de uso das tools precisam, portanto, ficar antes do `Args:`, e um teste
 de contrato garante isso. Ver a learning lesson
 `fastmcp_docstring_descarta_texto_apos_args.md`.
+
+## Emenda 2026-11-28 — `get_earnings` compõe três respostas da fonte (issue #51)
+
+Decisão do mantenedor em 28/11/2026, na revisão da PR #62.
+
+### Problema
+
+`get_earnings` devolvia só o total do período. Havia dois efeitos:
+
+- **Faltavam dados**: não dava para ver os proventos recebidos por mês, nem os
+  futuros. Foi o que a issue #51 pediu, indicando os endpoints.
+- **O total enganava**: a descrição da tool o chamava de valor recebido, mas com
+  `end_date` depois de hoje a fonte soma também pagamentos ainda não feitos
+  (observado na carteira testada: total = recebido + futuro).
+
+### Antes e depois
+
+Base: `https://investidor10.com.br/wallet/api/proxy/wallet-app`. Em carteira
+restrita, o cliente acrescenta `hash=<credencial>` a cada GET. A assinatura não
+mudou: `get_earnings(start_date: str | None, end_date: str | None)`, datas
+`YYYY-MM-DD`; sem as duas, valem os últimos 12 meses de calendário.
+
+**Antes**, um GET:
+
+| Endpoint | Query | Resposta da fonte |
+|---|---|---|
+| `/earnings/total-period/{id}` | `start_date`, `end_date` | `{"sum": N}` |
+
+`data` era a resposta da fonte, validada à mão (`sum` obrigatório e numérico).
+
+**Depois**, três GETs em sequência:
+
+| Endpoint | Query | Vira |
+|---|---|---|
+| `/earnings/total-period/{id}` | `start_date`, `end_date` | `data.sum` (e as demais chaves da resposta) |
+| `/earnings/barchart/{id}/received` | `period_date=<start>,<end>` | `data.received` |
+| `/earnings/barchart/{id}/future` | `period_date=,` | `data.future` |
+
+A vírgula vai codificada como `%2C`. Exemplo de `data` (valores fictícios):
+
+```json
+{
+  "sum": 15.0,
+  "received": {
+    "2026": {
+      "year": 2026,
+      "total": 10.0,
+      "avg": 0.91,
+      "months": [
+        {"month": "2026-01", "categories": [], "amount": 0},
+        {"month": "2026-02", "categories": {"FIIs": 10.0}, "amount": 10.0}
+      ]
+    }
+  },
+  "future": {
+    "2026": {
+      "year": 2026,
+      "total": 5.0,
+      "avg": 0.45,
+      "months": [
+        {"month": "2026-12", "categories": {"Ações": 5.0}, "amount": 5.0}
+      ]
+    }
+  }
+}
+```
+
+O exemplo abrevia `months`.
+
+Comportamentos da fonte observados em 26/11/2026, numa única carteira (a API não
+tem contrato publicado):
+
+- `barchart` devolve `[]`, e não `{}`, quando não há nada; `categories` de um mês
+  vazio também é `[]`.
+- `future` respeita `period_date`: com uma janela que termina hoje, volta vazio.
+- Provento anunciado sem data de pagamento ("Provisionado") não aparece em
+  `future`.
+- `received` e `future` bateram, por mês e classe, com `/earnings/list/{id}`.
+
+### Decisão
+
+1. **Exceção ao item 1, limitada a `get_earnings`**: o servidor monta o objeto
+   `data` a partir de três respostas. Ele continua sem calcular, somar, filtrar
+   ou renomear campos das respostas: as chaves do total seguem no topo, e os dois
+   `barchart` entram como vieram, sob `received` e `future`. Não vale como
+   permissão geral para agregar fontes; outro caso precisa de registro próprio.
+2. **`future` é consultado sem filtro** (`period_date=,`), seja qual for a janela.
+3. **Falha de uma consulta falha a tool inteira**, sem resultado parcial. Vale a
+   regra de cache de sempre para cada consulta: em HTTP 5xx ou erro de
+   transporte, uma entrada vencida de até 24h ainda é servida. A tool só falha se
+   a parte afetada não tiver cache aproveitável. 3xx, 401 e 403 seguem como
+   `access_denied`.
+4. **Validação antes do cache**: os dois endpoints novos usam um `TypeAdapter` do
+   pydantic. Cada ano precisa de `total` e `months`; cada mês, de `month`,
+   `amount` e `categories`. Números são estritos e finitos (`bool` e texto são
+   recusados); `[]` é aceito para vazio; campos extras passam. Formato diferente
+   vira `unexpected_format`. O total mantém a validação manual.
+5. **Envelope**: cada consulta tem a própria entrada de cache (TTL padrão de
+   600s). `cached` é verdadeiro se alguma parte veio do cache, e `fetched_at` é o
+   da parte mais antiga.
+
+O modo privacidade não mudou: a tool responde `privacy_mode_unavailable` sem
+consultar a fonte.
+
+### Alternativas consideradas
+
+- **Tool separada para o detalhamento** — recusada: isolaria o total de falhas
+  dos endpoints novos, mas o modelo poderia consultar só o total e tratá-lo como
+  recebido, que é o erro a corrigir.
+- **Resultado parcial** quando um `barchart` falha — recusado: exigiria um
+  formato para marcar o que faltou e mais casos de teste, e o total sozinho não
+  mostra quanto já foi pago quando a janela passa de hoje.
+- **`future` com a mesma janela de `received`** — recusado: na janela padrão
+  viria sempre vazio.
+- **`/earnings/list/{id}` com agregação no servidor** — fica para o
+  `get_earnings_detailed` (por ativo). Exigiria calcular no servidor, o que o
+  item 1 evita.
+
+### Consequências
+
+- Uma falha ou mudança de formato nos `barchart` derruba também o total, que
+  antes dependia de um só endpoint (risco do ADR-0005). O `live.yml` passa a
+  cobrir os três.
+- São três GETs por chamada sem cache, em vez de um.
+- **As partes não são um retrato único**: com caches de idades diferentes,
+  `sum` pode, por até um TTL (ou mais, em indisponibilidade), não bater com
+  `received` + `future`. `fetched_at` informa só a parte mais antiga.
+- O ADR-0016 não muda: ele obriga a validação em tools novas. Usar a mesma
+  abordagem em endpoints novos de uma tool existente foi escolha desta PR. É o
+  primeiro import direto de `pydantic` em `src/`, ainda como dependência indireta
+  do FastMCP (item 5 do ADR-0016; ver DT-009).
+
+**Rever se:** o `live.yml` ou usuários mostrarem os `barchart` instáveis com o
+total funcionando; ou se a diferença momentânea entre as partes confundir alguém.

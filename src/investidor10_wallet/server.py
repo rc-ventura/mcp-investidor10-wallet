@@ -325,15 +325,23 @@ async def get_asset_quote(ticker: str) -> dict:
 async def get_earnings(
     start_date: str | None = None, end_date: str | None = None
 ) -> dict:
-    """Earnings (dividends, interest, income) received by the wallet in a period.
+    """Earnings (dividends, interest, income) of the wallet: period total, monthly
+    breakdown of what was received and payments still to come.
 
     When privacy mode is on this tool returns a
     privacy_mode_unavailable error: say so and do not estimate earnings.
 
-    Presentation rules: present the total (data.sum) for exactly the requested
-    window; this endpoint does not include per-asset earnings. A period without
-    earnings is not an error — state it plainly. Always mention
-    `cached`/`fetched_at`.
+    data.sum is the net total for exactly the requested window. data.received
+    (paid, same window) and data.future (dated payments not yet paid, regardless
+    of the requested window) are keyed by year, each with `total` and `months`
+    split by asset class in `categories`; either is [] when there is nothing.
+
+    Presentation rules: when end_date is after today, data.sum also counts
+    scheduled payments, so never call it received money — use the data.received
+    totals for that. Keep data.future apart and label it as not yet paid;
+    payments announced without a payment date may be missing from it. There are
+    no per-asset earnings here. A period without earnings is not an error —
+    state it plainly. Always mention `cached`/`fetched_at`.
 
     Args:
         start_date: YYYY-MM-DD. Omit both dates to get the last 12 months.

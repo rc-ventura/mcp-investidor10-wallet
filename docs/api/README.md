@@ -30,6 +30,8 @@ sem aviso. Headers: `User-Agent` de browser.
 | `/summary/actives/{id}/{asset_type}` | `raw=1`, `api_version=v2`, `selected_wallet_currency`, `start`/`length` | Posições: qty, preço médio, equity, appreciation, %wallet vs %ideal, buy flag, rating, fundamentos | `get_wallet_positions` |
 | `/summary/barchart/{id}/{months}/all` | — | Patrimônio mensal: contribuído × ganho de capital | `get_patrimony_history` |
 | `/earnings/total-period/{id}` | `start_date`, `end_date` | Total de proventos líquidos no período | `get_earnings` |
+| `/earnings/barchart/{id}/received` | `period_date=<início>,<fim>` (`,` = sem filtro) | Proventos pagos por ano e mês, por classe (issue #51, validado em 26/11/2026) | `get_earnings` |
+| `/earnings/barchart/{id}/future` | idem | Proventos com data de pagamento futura, no mesmo formato | `get_earnings` |
 | `/assets/tickers/{ticker}` (REST) | — | Cotação + fundamentos de ação B3 (só B3; 404=inexistente, 410=tipo não coberto) | `get_asset_quote` |
 
 ## Endpoints validados sem tool — e a decisão para cada um
@@ -100,6 +102,12 @@ Regra de polegar: persistência você controla; API de terceiro você **desconfi
 - **`sum` do `total-period` = Σ `net_total_original`** do `earnings/list`
   (verificado centavo a centavo). O gap bruto→líquido revela retenção
   (~30% withholding em ETFs internacionais).
+- **`earnings/barchart/{received,future}` devolve `[]`** (não `{}`) quando a
+  janela não tem nada; `categories` de um mês vazio também é `[]`.
+- **`total-period` conta o que ainda não foi pago** quando `end_date` é futuro:
+  na carteira testada, `sum` do ano = `received` + `future` (26/11/2026).
+- **Provento "Provisionado" (ano 2126) não aparece em `barchart/future`**; só no
+  `earnings/list`.
 - **404 vs 410** em `/assets/tickers/{t}`: 404 = inexistente, 410 = classe
   não coberta — já mapeado para `ticker_not_found`/`asset_type_not_supported`.
 - **Números chegam como string** (`"96801.5575437"`) — sempre parsear.
